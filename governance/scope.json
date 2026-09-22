@@ -1,0 +1,12 @@
+{
+  "ai_management_scope": "AI-assisted software development for this repository",
+  "governance_profile": "agentic",
+  "objectives": [
+    "Maintain deterministic engineering assurance",
+    "Constrain tool and data access",
+    "Keep governance evidence reproducible and metadata-only"
+  ],
+  "owner": "project-owner",
+  "project": "regulated-ai-control-plane",
+  "version": "1.0"
+}
