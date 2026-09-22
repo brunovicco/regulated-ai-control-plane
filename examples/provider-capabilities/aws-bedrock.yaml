@@ -1,0 +1,35 @@
+schema_version: "1"
+registry_version: "2026-09-22.1"
+provider: "aws"
+service: "bedrock_runtime"
+region: "sa-east-1"
+verified_at: "2026-09-22"
+sources:
+  - "https://docs.aws.amazon.com/bedrock/latest/userguide/data-protection.html"
+  - "https://docs.aws.amazon.com/bedrock/latest/userguide/vpc-interface-endpoints.html"
+  - "https://docs.aws.amazon.com/bedrock/latest/userguide/logging-using-cloudtrail.html"
+  - "https://docs.aws.amazon.com/bedrock/latest/userguide/models-region-compatibility.html"
+
+capabilities:
+  iam_authorization:
+    state: "supported"
+
+  aws_privatelink:
+    state: "supported"
+    conditions:
+      - "supported_endpoint_and_region_required"
+
+  cloudtrail_api_activity:
+    state: "supported"
+    conditions:
+      - "event_configuration_depends_on_api_operation"
+
+  model_provider_access_to_customer_prompts_and_completions:
+    state: "unsupported"
+    notes:
+      - "AWS data-protection documentation states model providers do not have access to the described Bedrock deployment accounts, logs, customer prompts or completions."
+
+  brazil_in_region_inference_for_any_model:
+    state: "unsupported"
+    notes:
+      - "Model availability/routing is model-specific; never infer in-region processing for every model from the Bedrock region alone."

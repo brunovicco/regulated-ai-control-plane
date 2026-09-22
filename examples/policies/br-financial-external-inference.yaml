@@ -1,0 +1,66 @@
+schema_version: "1"
+policy_set:
+  id: "br-financial-demo"
+  version: "1.0.0"
+  jurisdiction: "BR"
+  sector: "financial_services"
+  status: "demo"
+
+rules:
+  - id: "br.financial.external_inference.minimize_identifier"
+    version: "1.0.0"
+    match:
+      operation_kind: "external_inference"
+      data_class_any:
+        - "BRAZIL_CPF"
+        - "PERSONAL_DIRECT_IDENTIFIER"
+    decision: "ALLOW_WITH_TRANSFORMATION"
+    obligations:
+      - type: "TOKENIZE"
+        target_class: "BRAZIL_CPF"
+        reason_code: "MINIMIZE_EXTERNAL_IDENTIFIER"
+    control_objectives:
+      - "BR.PRIV.MINIMIZE_EXTERNAL_DATA"
+    regulatory_support:
+      - "ANPD-R19-A9"
+
+  - id: "br.financial.external_inference.secret"
+    version: "1.0.0"
+    match:
+      operation_kind: "external_inference"
+      data_class_any:
+        - "AUTHENTICATION_SECRET"
+    decision: "DENY"
+    reason_code: "SECRET_EXTERNAL_TRANSFER_DENIED"
+    control_objectives:
+      - "BR.FIN.DATA_LEAK_PREVENTION"
+
+  - id: "org.agent.high_impact_approval"
+    version: "1.0.0"
+    match:
+      tool_risk_class_any:
+        - "high_impact_state_change"
+    decision: "REQUIRE_APPROVAL"
+    obligations:
+      - type: "REQUIRE_HUMAN_APPROVAL"
+        target: "matched_tool"
+        reason_code: "HIGH_IMPACT_STATE_CHANGE"
+    control_objectives:
+      - "ORG.AGENT.HIGH_IMPACT_APPROVAL"
+
+  - id: "org.provider.require_reviewed_retention"
+    version: "1.0.0"
+    match:
+      operation_kind: "external_inference"
+      assurance_level: "high"
+      provider: "openai"
+      service: "responses_api"
+    requires_capabilities:
+      - key: "zero_data_retention"
+        accepted_states:
+          - "conditional"
+          - "supported"
+        required_condition_assertions:
+          - "eligible_organization_required"
+    control_objectives:
+      - "BR.PRIV.DEMONSTRABLE_CONTROLS"

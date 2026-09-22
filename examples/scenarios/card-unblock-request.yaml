@@ -1,0 +1,41 @@
+schema_version: "1"
+scenario:
+  id: "demo.financial.card_unblock"
+  description: "Synthetic financial-services scenario for policy/evidence demonstration."
+
+input:
+  correlation_id: "demo-card-001"
+  jurisdiction: "BR"
+  sector: "financial_services"
+  purpose: "customer_support"
+  operation_kind: "external_inference"
+  assurance_level: "high"
+  provider:
+    provider: "openai"
+    service: "responses_api"
+    region: "global"
+  organization_assertions:
+    eligible_organization_required: true
+  data:
+    - field: "customer_document"
+      value: "SYNTHETIC_CPF_TEST_VALUE"
+      labels:
+        - "BRAZIL_CPF"
+    - field: "question"
+      value: "Synthetic customer question"
+      labels: []
+  tools:
+    - name: "cards.read"
+      risk_class: "read_only"
+    - name: "cards.unblock"
+      risk_class: "high_impact_state_change"
+
+expected:
+  decision: "REQUIRE_APPROVAL"
+  obligations_include:
+    - "TOKENIZE"
+    - "REQUIRE_HUMAN_APPROVAL"
+    - "REQUIRE_EVIDENCE"
+  evidence_must_not_contain:
+    - "SYNTHETIC_CPF_TEST_VALUE"
+    - "Synthetic customer question"
