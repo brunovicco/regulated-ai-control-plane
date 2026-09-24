@@ -10,14 +10,17 @@ rules:
   - id: "br.financial.external_inference.minimize_identifier"
     version: "1.0.0"
     match:
+      jurisdiction: "BR"
+      sector: "financial_services"
       operation_kind: "external_inference"
       data_class_any:
         - "BRAZIL_CPF"
+        - "BRAZIL_CNPJ"
         - "PERSONAL_DIRECT_IDENTIFIER"
     decision: "ALLOW_WITH_TRANSFORMATION"
     obligations:
       - type: "TOKENIZE"
-        target_class: "BRAZIL_CPF"
+        target_class: "PERSONAL_DIRECT_IDENTIFIER"
         reason_code: "MINIMIZE_EXTERNAL_IDENTIFIER"
     control_objectives:
       - "BR.PRIV.MINIMIZE_EXTERNAL_DATA"

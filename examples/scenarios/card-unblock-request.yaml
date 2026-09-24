@@ -16,6 +16,7 @@ input:
     region: "global"
   organization_assertions:
     eligible_organization_required: true
+    endpoint_or_feature_must_be_zdr_eligible: true
   data:
     - field: "customer_document"
       value: "SYNTHETIC_CPF_TEST_VALUE"

@@ -13,24 +13,14 @@ capabilities:
     state: "unsupported"
     notes:
       - "Official docs state API data is not used for training by default unless the customer opts in."
-
   store_false:
     state: "supported"
-    notes:
-      - "Endpoint behavior and application-state retention remain capability-specific."
-
   zero_data_retention:
     state: "conditional"
     conditions:
       - "eligible_organization_required"
       - "endpoint_or_feature_must_be_zdr_eligible"
-
   brazil_data_residency:
     state: "unknown"
-    notes:
-      - "Do not infer. Re-check the current official data-residency region table before production use."
-
   private_network_from_customer_vpc:
     state: "unknown"
-    notes:
-      - "Keep unknown until represented by a reviewed product/contract-specific capability record."
