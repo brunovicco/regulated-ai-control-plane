@@ -163,9 +163,12 @@ class EvaluateAiOperation:
             input_digest = _digest(_canonical_context(normalized))
             output_payload = {
                 "decision": outcome.value,
+                "input_digest": input_digest,
                 "matched_policy_ids": matched_ids,
                 "obligations": [_canonical_obligation(item) for item in ordered_obligations],
+                "policy_set_version": policy_set.identifier,
                 "provider_capability_ids": capability_id_tuple,
+                "provider_registry_version": registry_version,
                 "reason_codes": reason_codes,
             }
             output_digest = _digest(output_payload)

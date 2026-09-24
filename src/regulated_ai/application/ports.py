@@ -1,9 +1,12 @@
 """Application ports for the deterministic evaluation use case."""
 
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Protocol
 
 from regulated_ai.domain import (
+    ApprovalGrant,
+    ApprovalReceipt,
     DataItem,
     EnforcementRecord,
     EvidenceMetadata,
@@ -85,10 +88,26 @@ class EvaluationObserver(Protocol):
 
 
 class ApprovalPort(Protocol):
-    """Reserved boundary for a future digest-bound approval workflow."""
+    """Validate and atomically consume externally issued approval authority."""
 
-    def is_approved(self, decision_digest: str) -> bool:
-        """Return explicit external approval state."""
+    def inspect(
+        self,
+        assertion: str,
+        *,
+        decision_digest: str,
+        now: datetime,
+    ) -> ApprovalGrant:
+        """Verify an assertion without consuming it."""
+        ...
+
+    def consume(
+        self,
+        grant: ApprovalGrant,
+        *,
+        enforcement_id: str,
+        now: datetime,
+    ) -> ApprovalReceipt:
+        """Consume one verified grant exactly once."""
         ...
 
 

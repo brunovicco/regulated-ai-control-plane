@@ -13,6 +13,8 @@ _EVENTS = frozenset(
         "evidence.persisted",
         "evaluation.failed",
         "enforcement.started",
+        "approval.validated",
+        "approval.consumed",
         "transformation.applied",
         "enforcement.blocked",
         "execution.completed",
@@ -23,6 +25,7 @@ _EVENTS = frozenset(
 _METADATA_KEYS = frozenset(
     {
         "capability_key",
+        "approval_id",
         "correlation_id",
         "decision",
         "error_type",

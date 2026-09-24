@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from regulated_ai.adapters import (
     DeterministicDataClassifier,
@@ -19,6 +19,7 @@ from regulated_ai.adapters import (
     FileProviderCapabilityRepository,
     GovernedGatewayExecutionAdapter,
     GovernedGatewayExecutionConfig,
+    HmacApprovalAdapter,
     HmacTokenizationAdapter,
     MockInferenceExecutionAdapter,
     SqliteEnforcementRepository,
@@ -33,6 +34,7 @@ from regulated_ai.application.ports import (
     ProviderCapabilityRepository,
 )
 from regulated_ai.domain import (
+    ApprovalReceipt,
     AssuranceLevel,
     DataClassification,
     DataItem,
@@ -99,6 +101,12 @@ class EvaluationRequest(_TransportModel):
     fallback_providers: tuple[ProviderInput, ...] = ()
 
 
+class EnforcementRequest(EvaluationRequest):
+    """Evaluation context plus ephemeral externally issued approval authority."""
+
+    approval_assertion: SecretStr | None = Field(default=None, min_length=1, max_length=4096)
+
+
 @dataclass(frozen=True, slots=True)
 class Runtime:
     """Initialized application services exposed to transport handlers."""
@@ -148,11 +156,24 @@ def build_runtime(
         configured_key.encode() if configured_key is not None else secrets.token_bytes(32)
     )
     execution, mock_execution = _execution_adapter_from_environment()
+    configured_approval_key = os.environ.get("REGULAAI_APPROVAL_HMAC_KEY")
+    approval = (
+        None
+        if configured_approval_key is None
+        else HmacApprovalAdapter(
+            database_path,
+            configured_approval_key.encode(),
+            max_lifetime_seconds=_integer_environment(
+                "REGULAAI_APPROVAL_MAX_LIFETIME_SECONDS", 3600
+            ),
+        )
+    )
     enforcer = EnforceAiOperation(
         evaluator=evaluator,
         tokenizer=tokenizer,
         enforcement=enforcement,
         execution=execution,
+        approval=approval,
         observer=observer,
     )
     return Runtime(
@@ -242,6 +263,8 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
             status = 404
         elif exc.code == "INVALID_EVALUATION_CONTEXT":
             status = 422
+        elif exc.code == "APPROVAL_FAILED":
+            status = 403
         else:
             status = 503
         return _error_response(status, exc.code, str(exc))
@@ -257,8 +280,15 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
         return _result_payload(result)
 
     @application.post("/v1/enforcements")
-    def enforce(request: EvaluationRequest) -> dict[str, object]:
-        result = _runtime(application).enforcer.execute(_to_context(request))
+    def enforce(request: EnforcementRequest) -> dict[str, object]:
+        assertion = (
+            None
+            if request.approval_assertion is None
+            else request.approval_assertion.get_secret_value()
+        )
+        result = _runtime(application).enforcer.execute(
+            _to_context(request), approval_assertion=assertion
+        )
         return _enforcement_result_payload(result)
 
     @application.get("/v1/evidence/{evidence_id}", response_model=None)
@@ -405,6 +435,7 @@ def _enforcement_result_payload(result: EnforcementResult) -> dict[str, object]:
         "output_digest": result.output_digest,
         "provider_execution_id": result.provider_execution_id,
         "provider_call_metadata": _provider_call_payload(result.provider_call_metadata),
+        "approval_receipt": _approval_receipt_payload(result.approval_receipt),
     }
 
 
@@ -420,6 +451,7 @@ def _enforcement_record_payload(record: EnforcementRecord) -> dict[str, object]:
         output_digest=record.output_digest,
         provider_execution_id=record.provider_execution_id,
         provider_call_metadata=record.provider_call_metadata,
+        approval_receipt=record.approval_receipt,
     )
     return {
         **_enforcement_result_payload(result),
@@ -457,6 +489,20 @@ def _provider_call_payload(metadata: ProviderCallMetadata | None) -> dict[str, o
         "attempt_number": metadata.attempt_number,
         "fallback_index": metadata.fallback_index,
         "cached": metadata.cached,
+    }
+
+
+def _approval_receipt_payload(receipt: ApprovalReceipt | None) -> dict[str, object] | None:
+    if receipt is None:
+        return None
+    return {
+        "approval_id": receipt.approval_id,
+        "actor_id": receipt.actor_id,
+        "decision_digest": receipt.decision_digest,
+        "enforcement_id": receipt.enforcement_id,
+        "issued_at": receipt.issued_at.isoformat(),
+        "expires_at": receipt.expires_at.isoformat(),
+        "consumed_at": receipt.consumed_at.isoformat(),
     }
 
 

@@ -86,12 +86,16 @@ Implemented in Phase 3a:
 
 ## Phase 4 — Approval and agent authority
 
+Status: Phase 4a implemented for externally issued, HMAC-authenticated approval assertions bound
+to the deterministic decision digest, with expiry and SQLite-backed single-use consumption. Tool
+forwarding remains deferred; the network-silent mock proves the authority transition.
+
 Deliver:
-- approval port;
-- decision-digest-bound approval;
-- expiry/replay protection;
+- approval port; **implemented in Phase 4a**
+- decision-digest-bound approval; **implemented in Phase 4a**
+- expiry/replay protection; **implemented in Phase 4a**
 - tool allow/deny/approval matrix;
-- demo with read vs high-impact action.
+- demo with read vs high-impact action. **implemented against the mock boundary**
 
 ## Phase 5 — Operator dashboard
 

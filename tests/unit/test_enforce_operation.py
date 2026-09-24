@@ -1,4 +1,5 @@
 from dataclasses import replace
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -6,14 +7,17 @@ from regulated_ai.adapters.classifier import DeterministicDataClassifier
 from regulated_ai.adapters.mock_execution import MockInferenceExecutionAdapter
 from regulated_ai.adapters.tokenization import HmacTokenizationAdapter
 from regulated_ai.application import (
+    ApprovalFailedError,
     EnforceAiOperation,
     EnforcementPersistenceError,
     EvaluateAiOperation,
     ExecutionFailedError,
     TransformationFailedError,
 )
-from regulated_ai.application.ports import TokenizationPort
+from regulated_ai.application.ports import ApprovalPort, TokenizationPort
 from regulated_ai.domain import (
+    ApprovalGrant,
+    ApprovalReceipt,
     DataItem,
     DecisionOutcome,
     EnforcementRecord,
@@ -64,6 +68,7 @@ def _enforcer(
     enforcement: MemoryEnforcementRepository | None = None,
     execution: MockInferenceExecutionAdapter | None = None,
     tokenizer: TokenizationPort | None = None,
+    approval: ApprovalPort | None = None,
 ) -> tuple[EnforceAiOperation, MemoryEnforcementRepository, MockInferenceExecutionAdapter]:
     evaluator = EvaluateAiOperation(
         policies=MemoryPolicyRepository(policy),
@@ -79,6 +84,7 @@ def _enforcer(
         tokenizer=tokenizer or HmacTokenizationAdapter(b"t" * 32),
         enforcement=records,
         execution=mock,
+        approval=approval,
         clock=lambda: NOW,
     )
     return service, records, mock
@@ -142,6 +148,142 @@ def test_approval_transforms_but_never_executes() -> None:
     assert result.status is EnforcementStatus.WAITING_APPROVAL
     assert len(result.transformation_receipts) == 1
     assert records.saved_statuses == ["WAITING_APPROVAL"]
+    assert mock.call_count == 0
+
+
+class _ApprovalFake:
+    def __init__(self, *, fail_consumption: bool = False) -> None:
+        self.inspect_count = 0
+        self.consume_count = 0
+        self.fail_consumption = fail_consumption
+
+    def inspect(
+        self,
+        assertion: str,
+        *,
+        decision_digest: str,
+        now: datetime,
+    ) -> ApprovalGrant:
+        del now
+        self.inspect_count += 1
+        if assertion != "synthetic-approval":
+            raise ValueError("synthetic invalid approval")
+        return ApprovalGrant(
+            approval_id="approval-test",
+            actor_id="approver-test",
+            decision_digest=decision_digest,
+            issued_at=NOW - timedelta(minutes=1),
+            expires_at=NOW + timedelta(minutes=5),
+        )
+
+    def consume(
+        self,
+        grant: ApprovalGrant,
+        *,
+        enforcement_id: str,
+        now: datetime,
+    ) -> ApprovalReceipt:
+        self.consume_count += 1
+        if self.fail_consumption:
+            raise ValueError("synthetic replay")
+        assert now == NOW
+        return ApprovalReceipt(
+            approval_id=grant.approval_id,
+            actor_id=grant.actor_id,
+            decision_digest=grant.decision_digest,
+            enforcement_id=enforcement_id,
+            issued_at=grant.issued_at,
+            expires_at=grant.expires_at,
+            consumed_at=NOW,
+        )
+
+
+def test_valid_approval_is_consumed_after_claim_and_sent_as_metadata() -> None:
+    approval = _ApprovalFake()
+    enforcer, records, mock = _enforcer(
+        _policy(DecisionOutcome.REQUIRE_APPROVAL, _obligation(ObligationType.TOKENIZE)),
+        approval=approval,
+    )
+
+    result = enforcer.execute(
+        context(data_items=(DataItem("sensitive_field", "sentinel"),)),
+        approval_assertion="synthetic-approval",
+    )
+
+    assert result.status is EnforcementStatus.EXECUTED
+    assert result.approval_receipt is not None
+    assert result.approval_receipt.approval_id == "approval-test"
+    assert records.saved_statuses == ["PREPARED", "DISPATCHED", "EXECUTED"]
+    assert approval.inspect_count == 1
+    assert approval.consume_count == 1
+    assert mock.last_plan is not None
+    assert mock.last_plan.approval_receipt == result.approval_receipt
+
+
+def test_invalid_approval_stays_waiting_and_never_claims_execution() -> None:
+    approval = _ApprovalFake()
+    enforcer, records, mock = _enforcer(
+        _policy(DecisionOutcome.REQUIRE_APPROVAL),
+        approval=approval,
+    )
+
+    with pytest.raises(ApprovalFailedError):
+        enforcer.execute(context(), approval_assertion="invalid")
+
+    assert records.saved_statuses == ["WAITING_APPROVAL"]
+    assert next(iter(records.items.values())).status is EnforcementStatus.WAITING_APPROVAL
+    assert mock.call_count == 0
+    assert approval.consume_count == 0
+
+
+def test_approval_assertion_without_verifier_fails_closed() -> None:
+    enforcer, records, mock = _enforcer(_policy(DecisionOutcome.REQUIRE_APPROVAL))
+
+    with pytest.raises(ApprovalFailedError):
+        enforcer.execute(context(), approval_assertion="synthetic-approval")
+
+    assert records.saved_statuses == ["WAITING_APPROVAL"]
+    assert mock.call_count == 0
+
+
+def test_approval_consumption_failure_is_terminal_and_prevents_execution() -> None:
+    approval = _ApprovalFake(fail_consumption=True)
+    enforcer, records, mock = _enforcer(
+        _policy(DecisionOutcome.REQUIRE_APPROVAL),
+        approval=approval,
+    )
+
+    with pytest.raises(ApprovalFailedError):
+        enforcer.execute(context(), approval_assertion="synthetic-approval")
+
+    assert records.saved_statuses == ["PREPARED", "DISPATCHED", "APPROVAL_FAILED"]
+    assert next(iter(records.items.values())).status is EnforcementStatus.APPROVAL_FAILED
+    assert approval.consume_count == 1
+    assert mock.call_count == 0
+
+
+class _MismatchedApprovalReceipt(_ApprovalFake):
+    def consume(
+        self,
+        grant: ApprovalGrant,
+        *,
+        enforcement_id: str,
+        now: datetime,
+    ) -> ApprovalReceipt:
+        receipt = super().consume(grant, enforcement_id=enforcement_id, now=now)
+        return replace(receipt, enforcement_id="enf_wrong")
+
+
+def test_untrusted_approval_receipt_is_validated_before_execution() -> None:
+    enforcer, records, mock = _enforcer(
+        _policy(DecisionOutcome.REQUIRE_APPROVAL),
+        approval=_MismatchedApprovalReceipt(),
+    )
+
+    with pytest.raises(ApprovalFailedError):
+        enforcer.execute(context(), approval_assertion="synthetic-approval")
+
+    assert records.saved_statuses == ["PREPARED", "DISPATCHED", "APPROVAL_FAILED"]
     assert mock.call_count == 0
 
 
@@ -343,5 +485,24 @@ def test_execution_claim_contention_does_not_repeat_external_call() -> None:
     result = enforcer.execute(context())
 
     assert result.status is EnforcementStatus.DISPATCHED
+    assert mock.call_count == 0
+    assert records.saved_statuses == ["PREPARED", "DISPATCHED"]
+
+
+def test_execution_claim_contention_does_not_consume_approval() -> None:
+    approval = _ApprovalFake()
+    mock = MockInferenceExecutionAdapter()
+    enforcer, records, _ = _enforcer(
+        _policy(DecisionOutcome.REQUIRE_APPROVAL),
+        enforcement=_ContendedExecutionRepository(),
+        execution=mock,
+        approval=approval,
+    )
+
+    result = enforcer.execute(context(), approval_assertion="synthetic-approval")
+
+    assert result.status is EnforcementStatus.DISPATCHED
+    assert approval.inspect_count == 1
+    assert approval.consume_count == 0
     assert mock.call_count == 0
     assert records.saved_statuses == ["PREPARED", "DISPATCHED"]

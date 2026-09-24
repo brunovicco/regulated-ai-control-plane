@@ -1,6 +1,7 @@
 """Application use cases, ports, commands, and queries."""
 
 from regulated_ai.application.enforce_operation import (
+    ApprovalFailedError,
     EnforceAiOperation,
     EnforcementPersistenceError,
     ExecutionFailedError,
@@ -18,6 +19,7 @@ from regulated_ai.application.evaluate_operation import (
 )
 
 __all__ = [
+    "ApprovalFailedError",
     "EnforceAiOperation",
     "EnforcementPersistenceError",
     "EvaluateAiOperation",

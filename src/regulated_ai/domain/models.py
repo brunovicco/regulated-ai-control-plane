@@ -65,6 +65,7 @@ class EnforcementStatus(StrEnum):
     EXECUTED = "EXECUTED"
     BLOCKED_DENY = "BLOCKED_DENY"
     WAITING_APPROVAL = "WAITING_APPROVAL"
+    APPROVAL_FAILED = "APPROVAL_FAILED"
     TRANSFORMATION_FAILED = "TRANSFORMATION_FAILED"
     EXECUTION_FAILED = "EXECUTION_FAILED"
 
@@ -340,6 +341,30 @@ class TransformationReceipt:
 
 
 @dataclass(frozen=True, slots=True)
+class ApprovalGrant:
+    """Verified but not yet consumed external approval authority."""
+
+    approval_id: str
+    actor_id: str
+    decision_digest: str
+    issued_at: datetime
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ApprovalReceipt:
+    """Metadata-only proof that one approval grant was consumed."""
+
+    approval_id: str
+    actor_id: str
+    decision_digest: str
+    enforcement_id: str
+    issued_at: datetime
+    expires_at: datetime
+    consumed_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class ExecutionPlan:
     """Ephemeral sanitized payload suitable for an inference execution port."""
 
@@ -354,6 +379,7 @@ class ExecutionPlan:
     tools: tuple[ToolRequest, ...]
     transformation_receipts: tuple[TransformationReceipt, ...]
     output_digest: str
+    approval_receipt: ApprovalReceipt | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -403,6 +429,7 @@ class EnforcementRecord:
     output_digest: str | None
     provider_execution_id: str | None
     provider_call_metadata: ProviderCallMetadata | None = None
+    approval_receipt: ApprovalReceipt | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -419,6 +446,7 @@ class EnforcementResult:
     output_digest: str | None
     provider_execution_id: str | None
     provider_call_metadata: ProviderCallMetadata | None = None
+    approval_receipt: ApprovalReceipt | None = None
 
 
 _PRECEDENCE = {

@@ -91,8 +91,8 @@ Initial obligations include:
 
 ## Project status
 
-**Pre-alpha with deterministic evaluation, local enforcement and an opt-in Phase 3a gateway
-execution adapter.**
+**Pre-alpha with deterministic evaluation, local enforcement, digest-bound external approval and
+an opt-in governed-gateway execution adapter.**
 
 Current local flow:
 
@@ -105,6 +105,7 @@ Context
   -> Obligations
   -> Local transformations
   -> Metadata-only transformation receipts
+  -> External approval verification/one-time consumption when required
   -> Persisted PREPARED enforcement state
   -> Network-silent mock (default) or governed gateway (opt-in)
 ```
@@ -115,13 +116,14 @@ The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 inside the local trust boundary and stores only metadata evidence in SQLite. It still stops before
 real provider inference unless gateway mode is explicitly configured. Gateway mode supports only
 text plans without tools, uses bounded timeouts, performs no local retry and discards model output
-after recording allowlisted routing/execution metadata.
+after recording allowlisted routing/execution metadata. Approval assertions are issued outside the
+service, bound to the decision digest, accepted only ephemerally and consumed once before execution.
 
 Not implemented in the first slice:
 
 - direct provider SDK adapters;
 - completion-returning API behavior;
-- tool forwarding and approval execution;
+- tool forwarding to the governed gateway;
 - LLM-based policy judging;
 - frontend/dashboard;
 - SaaS multi-tenancy;

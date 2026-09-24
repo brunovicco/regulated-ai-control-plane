@@ -1,3 +1,5 @@
+import sqlite3
+from contextlib import closing
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -7,6 +9,7 @@ from regulated_ai.adapters.evidence_sqlite import (
     SqliteEvidenceRepository,
 )
 from regulated_ai.domain import (
+    ApprovalReceipt,
     DataClassification,
     DecisionOutcome,
     EnforcementRecord,
@@ -86,6 +89,15 @@ def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path
             dispatched,
             status=EnforcementStatus.EXECUTED,
             provider_execution_id="mockexec_test",
+            approval_receipt=ApprovalReceipt(
+                approval_id="approval-test",
+                actor_id="approver-test",
+                decision_digest="sha256:decision",
+                enforcement_id="enf_test",
+                issued_at=datetime(2026, 9, 23, 11, 55, tzinfo=UTC),
+                expires_at=datetime(2026, 9, 23, 12, 5, tzinfo=UTC),
+                consumed_at=datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
+            ),
             provider_call_metadata=ProviderCallMetadata(
                 gateway_request_id="00000000-0000-0000-0000-000000000001",
                 routing_decision_id="route_1",
@@ -107,6 +119,8 @@ def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path
     assert completed.provider_execution_id == "mockexec_test"
     assert completed.provider_call_metadata is not None
     assert completed.provider_call_metadata.routing_decision_id == "route_1"
+    assert completed.approval_receipt is not None
+    assert completed.approval_receipt.approval_id == "approval-test"
     replayed, replay_claimed = repository.claim_execution(
         replace(prepared, status=EnforcementStatus.DISPATCHED)
     )
@@ -115,3 +129,36 @@ def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path
     assert repository.save(prepared).status is EnforcementStatus.EXECUTED
     assert repository.get("missing") is None
     assert "raw-sensitive-sentinel" not in path.read_bytes().decode(errors="ignore")
+
+
+def test_enforcement_repository_migrates_phase_three_schema(tmp_path: Path) -> None:
+    path = tmp_path / "legacy.sqlite3"
+    with closing(sqlite3.connect(path)) as connection:
+        connection.execute(
+            """
+            CREATE TABLE enforcement (
+                enforcement_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                evaluation_id TEXT NOT NULL,
+                evaluation_evidence_id TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                status TEXT NOT NULL,
+                policy_set_version TEXT NOT NULL,
+                provider_registry_version TEXT NOT NULL,
+                provider_target TEXT NOT NULL,
+                transformation_receipts TEXT NOT NULL,
+                reason_codes TEXT NOT NULL,
+                input_digest TEXT NOT NULL,
+                output_digest TEXT,
+                provider_execution_id TEXT,
+                provider_call_metadata TEXT
+            )
+            """
+        )
+        connection.commit()
+
+    SqliteEnforcementRepository(path)
+
+    with closing(sqlite3.connect(path)) as connection:
+        columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(enforcement)")}
+    assert "approval_receipt" in columns

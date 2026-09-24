@@ -1,5 +1,44 @@
 # Implementation plan
 
+## Phase 4a — digest-bound external approval
+
+### Goal
+
+Allow an organization-owned approval system to authorize one previously evaluated high-impact
+operation without giving RegulaAI or a model authority to mint approvals. Bind approval to the
+deterministic decision digest, enforce expiry and one-time consumption, and retain metadata-only
+evidence.
+
+### Work
+
+1. Add immutable approval grant/receipt types and replace the placeholder boolean approval port
+   with explicit inspect-and-consume operations.
+2. Implement a strict HMAC approval assertion verifier plus SQLite replay ledger. Persist only
+   approval identifiers, actor identifier, decision digest, timestamps and enforcement identifier;
+   never persist the signed token.
+3. Extend `EnforceAiOperation` so missing approval stays `WAITING_APPROVAL`, invalid approval fails
+   closed, and a valid assertion is consumed only after the atomic execution claim and before the
+   execution port.
+4. Accept an ephemeral secret approval assertion only on the enforcement request. Do not expose an
+   approval-creation endpoint.
+5. Add unit, contract and end-to-end tests for digest binding, expiry, future issuance, bounded
+   lifetime, tampering, replay, approval evidence and read-only versus high-impact behavior.
+6. Update the API, architecture, privacy, threat-model, demo, roadmap and ADR documentation; run
+   focused security checks and the complete quality gate.
+
+### Decisions and assumptions
+
+- Approval assertions are issued outside RegulaAI by an organization-controlled workflow.
+- The Phase 4a assertion format is strict canonical JSON protected by HMAC-SHA256 with a dedicated
+  key of at least 32 bytes. A future asymmetric/OIDC adapter can implement the same port.
+- `approval_id` is globally single-use. The assertion is checked before execution claim and
+  consumed atomically after the claim, so losing a concurrent claim does not consume authority.
+- Approval authorizes the deterministic decision digest, not free-form text, a tool name alone or
+  a model response.
+- Gateway tool forwarding remains disabled. The mock adapter proves read-only versus approved
+  high-impact authority without crossing a live tool boundary.
+- Missing approval configuration never creates an implicit allow path.
+
 ## Phase 3a — governed gateway execution
 
 ### Goal

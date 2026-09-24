@@ -106,6 +106,21 @@ The service persists `PREPARED`, atomically claims `DISPATCHED` before invoking 
 and then advances the same record to `EXECUTED`. A persistence or transformation failure stops
 before execution. A repeated request that observes `DISPATCHED` does not issue another call.
 
+To resume the high-impact example, configure a dedicated `REGULAAI_APPROVAL_HMAC_KEY` of at least
+32 bytes before startup. Read `output_digest` from the evaluation evidence referenced by the
+waiting response, then have the organization-owned approval workflow issue the strict Phase 4a
+assertion documented in `API_CONTRACT.md`. Resend the same enforcement request with:
+
+```json
+{
+  "approval_assertion": "ra1.EXTERNALLY_ISSUED_PAYLOAD.EXTERNAL_SIGNATURE"
+}
+```
+
+This field is added alongside the original request fields, not sent by itself. A valid assertion is
+consumed once after `DISPATCHED` is claimed and before the mock executes. The result contains only a
+metadata receipt. RegulaAI intentionally provides no endpoint or CLI for creating approvals.
+
 ## Optional governed gateway execution
 
 Set `REGULAAI_EXECUTION_MODE=gateway` and provide every gateway variable documented in

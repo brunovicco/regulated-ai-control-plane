@@ -9,6 +9,7 @@ from regulated_ai.adapters import (
     FilePolicyRepository,
     FileProviderCapabilityRepository,
     GovernedGatewayExecutionAdapter,
+    HmacApprovalAdapter,
     HmacTokenizationAdapter,
     MockInferenceExecutionAdapter,
     SqliteEnforcementRepository,
@@ -23,7 +24,9 @@ from regulated_ai.entrypoints.api import (
     create_app,
 )
 
-from ..helpers import synthetic_cpf
+from ..helpers import approval_assertion, synthetic_cpf
+
+APPROVAL_KEY = b"p" * 32
 
 
 def _runtime(tmp_path: Path) -> Runtime:
@@ -48,11 +51,13 @@ def _runtime(tmp_path: Path) -> Runtime:
         clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
     )
     mock = MockInferenceExecutionAdapter()
+    approval = HmacApprovalAdapter(database_path, APPROVAL_KEY)
     enforcer = EnforceAiOperation(
         evaluator=evaluator,
         tokenizer=HmacTokenizationAdapter(b"e" * 32),
         enforcement=enforcement,
         execution=mock,
+        approval=approval,
         clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
     )
     return Runtime(
@@ -165,6 +170,15 @@ def test_runtime_gateway_mode_fails_closed_on_partial_configuration(
         build_runtime(evidence_path=tmp_path / "gateway-evidence.sqlite3")
 
 
+def test_runtime_approval_verifier_rejects_short_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_APPROVAL_HMAC_KEY", "short")
+
+    with pytest.raises(ValueError, match="at least 32 bytes"):
+        build_runtime(evidence_path=tmp_path / "approval-evidence.sqlite3")
+
+
 def test_enforcement_api_returns_only_metadata_after_mock_execution(tmp_path: Path) -> None:
     runtime = _runtime(tmp_path)
     app = create_app(lambda: runtime)
@@ -194,6 +208,76 @@ def test_enforcement_api_returns_only_metadata_after_mock_execution(tmp_path: Pa
     plan_values = {item.field: item.value for item in mock_execution.last_plan.data_items}
     assert plan_values["customer_document"].startswith("tok_")
     assert raw_values[0] not in repr(mock_execution.last_plan)
+
+
+def test_external_approval_resumes_same_enforcement_and_is_consumed(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    app = create_app(lambda: runtime)
+    request = _request()
+
+    with TestClient(app) as client:
+        waiting = client.post("/v1/enforcements", json=request)
+        assert waiting.status_code == 200
+        waiting_body = waiting.json()
+        evidence = client.get(f"/v1/evidence/{waiting_body['evaluation_evidence_id']}")
+        assert evidence.status_code == 200
+        assertion = approval_assertion(APPROVAL_KEY, evidence.json()["output_digest"])
+        approved_request = {**request, "approval_assertion": assertion}
+        approved = client.post("/v1/enforcements", json=approved_request)
+        stored = client.get(f"/v1/enforcements/{waiting_body['enforcement_id']}")
+
+    assert waiting_body["status"] == "WAITING_APPROVAL"
+    assert waiting_body["approval_receipt"] is None
+    assert approved.status_code == 200
+    approved_body = approved.json()
+    assert approved_body["status"] == "EXECUTED"
+    assert approved_body["enforcement_id"] == waiting_body["enforcement_id"]
+    assert approved_body["approval_receipt"] == stored.json()["approval_receipt"]
+    assert approved_body["approval_receipt"]["approval_id"] == "approval-test-1"
+    assert assertion not in approved.text
+    assert assertion not in (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
+    assert runtime.mock_execution is not None
+    assert runtime.mock_execution.last_plan is not None
+    assert runtime.mock_execution.last_plan.approval_receipt is not None
+
+
+def test_invalid_external_approval_fails_closed_without_echoing_it(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    app = create_app(lambda: runtime)
+    request = {**_request(), "approval_assertion": "synthetic-invalid-approval"}
+
+    with TestClient(app) as client:
+        response = client.post("/v1/enforcements", json=request)
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "APPROVAL_FAILED"
+    assert "synthetic-invalid-approval" not in response.text
+    assert runtime.mock_execution is not None
+    assert runtime.mock_execution.call_count == 0
+
+
+def test_approval_cannot_authorize_a_different_operation_with_same_policy_result(
+    tmp_path: Path,
+) -> None:
+    runtime = _runtime(tmp_path)
+    app = create_app(lambda: runtime)
+    first_request = _request()
+
+    with TestClient(app) as client:
+        first = client.post("/v1/enforcements", json=first_request)
+        first_evidence = client.get(f"/v1/evidence/{first.json()['evaluation_evidence_id']}").json()
+        assertion = approval_assertion(APPROVAL_KEY, first_evidence["output_digest"])
+        different_request = {
+            **first_request,
+            "correlation_id": "demo-card-002",
+            "approval_assertion": assertion,
+        }
+        rejected = client.post("/v1/enforcements", json=different_request)
+
+    assert rejected.status_code == 403
+    assert rejected.json()["error"]["code"] == "APPROVAL_FAILED"
+    assert runtime.mock_execution is not None
+    assert runtime.mock_execution.call_count == 0
 
 
 def test_api_returns_stable_errors_without_echoing_sensitive_content(tmp_path: Path) -> None:
