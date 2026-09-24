@@ -91,7 +91,7 @@ Obrigações iniciais:
 
 ## Status do projeto
 
-**Pre-alpha/desenho e implementação ativos.**
+**Pre-alpha com avaliação determinística e enforcement local da Fase 2 implementados.**
 
 Objetivo atual:
 
@@ -102,8 +102,15 @@ Contexto
   -> Resolução de capacidades do provider
   -> Decisão
   -> Obrigações
-  -> Evidência apenas com metadados
+  -> Transformações locais
+  -> Recibos de transformação apenas com metadados
+  -> Estado PREPARED persistido
+  -> Execução mock sem rede
 ```
+
+O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
+`POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`, `GET /v1/providers` e
+`GET /health`. A Fase 2 ainda não realiza inferência com um provedor real.
 
 Fora do primeiro ciclo:
 

@@ -27,18 +27,14 @@ The project is currently **pre-alpha**. Until the first release, breaking change
 - Security policy and private vulnerability-reporting guidance.
 - MIT license.
 - Bootstrap baseline based on `brunovicco/codex-python-engineering-harness`.
+- Deterministic Phase 1 evaluation engine, validated YAML registries, SQLite evidence and HTTP API.
+- Phase 2 local enforcement with remove/mask/tokenize/pseudonymize transformations.
+- Metadata-only transformation receipts and enforcement lifecycle evidence.
+- HMAC tokenization abstraction and network-silent mock execution port.
+- Metadata-only enforcement HTTP endpoints.
 
 ### Planned
 
-- Domain model implementation.
-- Versioned YAML policy loader.
-- Versioned provider-capability registry loader.
-- Deterministic CPF/CNPJ/secret classification.
-- `EvaluateAiOperation` application use case.
-- Metadata-only evidence persistence.
-- Phase 1 HTTP API: `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`, `GET /v1/providers`.
-- Scenario-based regression evals.
-- Local transformation enforcement.
 - OpenAI and Amazon Bedrock execution adapters behind an `InferenceExecutionPort`.
 - Integration path with `governed-llm-gateway`.
 - Human-approval workflow and agent-authority controls.

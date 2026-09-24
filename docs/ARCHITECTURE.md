@@ -7,6 +7,10 @@ business context, combines caller labels with narrow deterministic classificatio
 immutable organization policy set, verifies curated provider capability facts and returns an
 execution plan plus metadata-only evidence. Phase 1 does not call an AI provider.
 
+Phase 2 adds local enforcement. It applies field transformations, persists a metadata-only
+`PREPARED` record and then calls a network-silent mock execution port. No real provider SDK or
+external inference is present.
+
 ## Layers
 
 ```text
@@ -73,6 +77,24 @@ High-assurance freshness is policy data (`max_age_days`), not a global domain co
 
 See [ADR-0004](adr/0004-versioned-yaml-and-sqlite-phase-1-adapters.md) for the local adapter
 decision and [the demo](DEMO.md) for the end-to-end flow.
+
+## Phase 2 components
+
+- `application/enforce_operation.py`: evaluation-to-transformation-to-execution orchestration.
+- `adapters/tokenization.py`: injected HMAC tokenization/pseudonymization boundary.
+- `adapters/mock_execution.py`: network-silent execution port used to prove boundary ordering.
+- `adapters/evidence_sqlite.py`: separate metadata-only enforcement lifecycle records.
+- `entrypoints/api.py`: metadata-only enforcement endpoints; transformed payloads remain internal.
+
+The enforcement sequence is:
+
+```text
+evaluate -> transform locally -> persist PREPARED -> execute mock -> persist EXECUTED
+```
+
+`DENY`, missing approval, conflicting transformations, transformation failure and evidence failure
+all stop before execution. See
+[ADR-0005](adr/0005-local-enforcement-before-execution.md).
 
 ## Diagrams
 

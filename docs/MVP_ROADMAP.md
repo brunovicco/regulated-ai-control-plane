@@ -17,6 +17,8 @@ No provider calls.
 
 ## Phase 1 — Deterministic decision vertical slice
 
+Status: complete.
+
 Goal:
 prove that runtime context can produce a reproducible decision.
 
@@ -36,6 +38,8 @@ Exit demo:
 request -> decision/obligations/evidence.
 
 ## Phase 2 — Local enforcement
+
+Status: implemented with a network-silent mock execution port.
 
 Goal:
 prove obligations are applied before provider boundary.

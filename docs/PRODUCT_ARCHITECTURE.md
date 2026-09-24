@@ -28,7 +28,9 @@ flowchart LR
     GW --> P3
 ```
 
-Phase 1 stops before `GW`: it evaluates and returns an execution plan.
+Phase 1 stops before `GW`: it evaluates and returns obligations. Phase 2 builds a locally
+transformed execution plan and sends it only to a network-silent mock port. Real provider/gateway
+execution remains Phase 3 scope.
 
 ## Control plane vs enforcement plane
 
@@ -166,6 +168,30 @@ The application should expose a future `InferenceExecutionPort` so the product c
 - keep provider fallback constrained by the same decision plan.
 
 Do not copy gateway functionality into this repository.
+
+## Local enforcement flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Enforce as EnforceAiOperation
+    participant Eval as EvaluateAiOperation
+    participant Token as TokenizationPort
+    participant Evidence as EnforcementRepository
+    participant Mock as MockExecutionPort
+
+    Client->>API: normalized enforcement request
+    API->>Enforce: typed context
+    Enforce->>Eval: deterministic evaluation
+    Eval-->>Enforce: decision + obligations + digest
+    Enforce->>Token: transform required fields locally
+    Enforce->>Evidence: persist PREPARED metadata
+    Enforce->>Mock: sanitized execution plan
+    Mock-->>Enforce: metadata-only execution receipt
+    Enforce->>Evidence: persist EXECUTED metadata
+    Enforce-->>API: metadata-only enforcement result
+```
 
 ## Failure model
 
