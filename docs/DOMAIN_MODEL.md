@@ -169,5 +169,7 @@ Forbidden:
 - Required transformation precedes provider execution.
 - A `DENY` cannot be overridden by another matching policy.
 - Human approval is explicit state, never inferred from model output.
+- Approval binds to an operation-specific decision digest covering normalized input plus policy and
+  provider-registry versions; it cannot authorize another operation with the same outcome shape.
 - Evidence creation is part of a successful evaluation.
 - Same normalized input + same versioned knowledge yields same decision.

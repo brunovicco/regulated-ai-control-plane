@@ -18,7 +18,7 @@
 2. enforcement service -> local transform/tokenization;
 3. enforcement service -> evidence persistence;
 4. enforcement service -> governed gateway/provider execution;
-5. enforcement service -> future approval system;
+5. external approval system -> enforcement service approval verifier;
 6. control-plane policy/registry release -> runtime enforcement plane.
 
 ## Threats and required mitigations
@@ -132,13 +132,20 @@ Mitigations:
   `EXECUTED`;
 - require operational reconciliation for an interrupted, uncertain `DISPATCHED` record.
 
-### Approval spoofing (future)
+### Approval spoofing or replay
 
 Mitigations:
-- signed/authenticated approval source;
-- actor identity and policy version binding;
-- expiry/nonces for approvals;
-- approval applies to a decision digest, not just a human-readable task.
+- dedicated HMAC-authenticated external issuer and strict assertion schema;
+- actor identity and policy/provider versions are transitively bound by the decision digest;
+- bounded lifetime, future-issuance rejection and globally single-use approval IDs;
+- atomic consumption after the execution claim and before execution;
+- no approval minting endpoint and no persistence/logging of raw assertions;
+- approval applies to an operation-specific decision digest that commits to normalized input and
+  policy output, not free-form text, a tool name or model output.
+
+The HMAC verifier necessarily possesses symmetric signing material. Issuer/verifier separation is
+therefore operational in Phase 4a, not cryptographic; deployments must restrict key access. A
+future asymmetric or OIDC adapter should remove signing capability from the enforcement service.
 
 ## Abuse cases to test
 
@@ -155,3 +162,5 @@ Mitigations:
 - gateway terminal provider differs from the configured provider boundary;
 - tool-bearing plan reaches the text-only gateway adapter;
 - malformed, failed or content-free terminal gateway response.
+- malformed, tampered, expired, future, wrong-digest or replayed approval assertion;
+- approval consumption fails after the execution claim;

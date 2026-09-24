@@ -133,10 +133,20 @@ No credentials/config secrets.
 
 ## POST /v1/enforcements
 
-Accepts the same normalized request as `POST /v1/evaluations`. It evaluates policy, applies local
-field transformations and persists metadata-only enforcement state. The default runtime calls the
-Phase 2 network-silent mock. Explicit gateway mode sends the sanitized text-only plan through
-`governed-llm-gateway`; tool-bearing plans fail before network access.
+Accepts the same normalized request as `POST /v1/evaluations`, plus an optional
+`approval_assertion` string (maximum 4096 bytes). It evaluates policy, applies local field
+transformations and persists metadata-only enforcement state. The assertion is treated as a
+secret, is never persisted or returned and is inspected only for `REQUIRE_APPROVAL`. The default
+runtime calls the network-silent mock. Explicit gateway mode sends the sanitized text-only plan
+through `governed-llm-gateway`; tool-bearing plans still fail before network access.
+
+The Phase 4a assertion is issued by an external organization-owned workflow and has the form
+`ra1.<base64url-canonical-json>.<base64url-hmac-sha256>`. Its exact fields are `schema_version=1`,
+`approval_id`, pseudonymous `actor_id`, `decision_digest`, `issued_at` and `expires_at`. Unix
+timestamps are seconds. The configured verifier rejects malformed, future, expired, over-lifetime,
+wrong-digest and previously consumed approvals. The decision digest commits to both the normalized
+operation input digest and the resulting policy decision, so an approval cannot be moved to another
+operation with the same policy outcome. RegulaAI exposes no approval-issuance endpoint.
 
 The response never includes source or transformed values:
 
@@ -160,7 +170,8 @@ The response never includes source or transformed values:
   "reason_codes": [],
   "output_digest": "sha256:...",
   "provider_execution_id": "mockexec_...",
-  "provider_call_metadata": null
+  "provider_call_metadata": null,
+  "approval_receipt": null
 }
 ```
 
@@ -172,7 +183,13 @@ credentials, provider response bodies or provider request IDs.
 Status behavior:
 
 - `DENY` -> `BLOCKED_DENY`, with no transformation or execution;
-- `REQUIRE_APPROVAL` -> `WAITING_APPROVAL`, transformed in memory but not executed;
+- `REQUIRE_APPROVAL` without an assertion -> `WAITING_APPROVAL`, transformed in memory but not
+  executed;
+- a valid digest-bound assertion is consumed once after the atomic execution claim and before the
+  execution port; the metadata-only `approval_receipt` is returned and persisted;
+- invalid/unavailable approval verification returns `APPROVAL_FAILED` with HTTP 403 while keeping
+  the record waiting; failure while atomically consuming a verified grant records terminal
+  `APPROVAL_FAILED` and never executes;
 - allowed outcome -> `PREPARED` is persisted, an atomic claim advances it to `DISPATCHED` before
   the configured execution port, then a successful result becomes `EXECUTED`;
 - replay or concurrency that observes `DISPATCHED` does not call the execution port again; this
@@ -202,6 +219,7 @@ Use stable machine-readable codes, for example:
 - `EVIDENCE_PERSISTENCE_FAILED`
 - `TRANSFORMATION_FAILED`
 - `EXECUTION_FAILED`
+- `APPROVAL_FAILED`
 - `ENFORCEMENT_PERSISTENCE_FAILED`
 
 Error messages must not echo raw sensitive input.

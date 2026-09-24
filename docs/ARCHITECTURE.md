@@ -15,6 +15,9 @@ Phase 3a adds an opt-in adapter for `governed-llm-gateway`. It sends only the sa
 execution plan, delegates provider routing/retry/fallback to the gateway and persists allowlisted
 provider-call metadata. The public enforcement response remains content-free.
 
+Phase 4a adds verification and one-time consumption of externally issued approval assertions.
+Approval remains outside model authority and is bound to the deterministic evaluation digest.
+
 ## Layers
 
 ```text
@@ -114,6 +117,25 @@ provider mismatch fails closed. An atomic `PREPARED -> DISPATCHED` claim prevent
 post-crash replay from issuing a second external request; interrupted `DISPATCHED` records require
 operational reconciliation. See
 [ADR-0006](adr/0006-governed-gateway-execution-adapter.md).
+
+## Phase 4a components
+
+- `application/ports.py`: inspect-and-consume approval authority contract.
+- `adapters/approval.py`: strict HMAC assertion verification and SQLite replay ledger.
+- `application/enforce_operation.py`: approval validation before preparation and atomic consumption
+  after the execution claim but before execution.
+- `entrypoints/api.py`: ephemeral secret assertion input and metadata-only approval receipt output.
+
+The approval sequence is:
+
+```text
+evaluate -> transform -> inspect digest-bound assertion -> persist PREPARED
+         -> claim DISPATCHED -> consume approval once -> execute -> persist EXECUTED
+```
+
+Missing assertions remain `WAITING_APPROVAL`. Invalid assertions never reach an execution claim;
+consumption failure after a claim becomes terminal `APPROVAL_FAILED`. The raw assertion is never
+stored. See [ADR-0007](adr/0007-digest-bound-external-approval.md).
 
 ## Diagrams
 

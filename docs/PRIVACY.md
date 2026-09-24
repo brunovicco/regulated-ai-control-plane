@@ -7,11 +7,15 @@ Complete this document before processing personal or regulated data.
 | Data category | Source | Purpose | Legal/contractual basis | Destination | Retention | Deletion method |
 |---|---|---|---|---|---|---|
 | Evaluation evidence metadata | Evaluation API | Reproduce policy decisions without content retention | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate the configured database under an approved evidence-retention procedure |
+| Approval consumption metadata | External approval workflow | Prove scoped human authority and prevent replay | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate under the same approved evidence-retention procedure |
 
 ## Controls
 
 - Data minimization: evidence stores only identifiers, labels, versions, outcomes, reason codes and
   cryptographic digests; raw field values are excluded.
+- Approval assertions are ephemeral secrets and are never stored or returned. Approval receipts
+  retain only the approval ID, pseudonymous actor ID, bound decision digest, enforcement ID and
+  timestamps. Do not place names, email addresses or other personal data in either identifier.
 - Access control:
 - Encryption in transit:
 - Encryption at rest:

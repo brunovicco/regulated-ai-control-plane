@@ -91,8 +91,8 @@ Obrigações iniciais:
 
 ## Status do projeto
 
-**Pre-alpha com avaliação determinística, enforcement local e adapter opt-in de execução via
-gateway da Fase 3a.**
+**Pre-alpha com avaliação determinística, enforcement local, aprovação externa vinculada ao
+digest e adapter opt-in de execução via gateway governado.**
 
 Objetivo atual:
 
@@ -105,6 +105,7 @@ Contexto
   -> Obrigações
   -> Transformações locais
   -> Recibos de transformação apenas com metadados
+  -> Verificação e consumo único de aprovação externa quando exigida
   -> Estado PREPARED persistido
   -> Mock sem rede (padrão) ou gateway governado (opt-in)
 ```
@@ -114,12 +115,14 @@ O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `GET /health`. O modo padrão continua sem rede. Quando configurado explicitamente, o modo gateway
 executa somente planos textuais sem ferramentas, usa timeouts limitados, não realiza retry local e
 descarta a saída do modelo após registrar metadados permitidos de roteamento/execução.
+As asserções de aprovação são emitidas fora do serviço, vinculadas ao digest determinístico da
+decisão, recebidas apenas de forma efêmera e consumidas uma única vez antes da execução.
 
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
 - retorno de completion pela API;
-- encaminhamento de ferramentas e execução de aprovações;
+- encaminhamento de ferramentas ao gateway governado;
 - LLM decidindo política;
 - frontend/dashboard;
 - SaaS multi-tenant;
