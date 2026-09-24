@@ -1,6 +1,7 @@
 """FastAPI transport and composition root for the Phase 1 evaluation service."""
 
 import os
+import secrets
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -16,15 +17,24 @@ from regulated_ai.adapters import (
     DeterministicDataClassifier,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
+    HmacTokenizationAdapter,
+    MockInferenceExecutionAdapter,
+    SqliteEnforcementRepository,
     SqliteEvidenceRepository,
     StructuredEvaluationObserver,
 )
-from regulated_ai.application import EvaluateAiOperation, EvaluationError
-from regulated_ai.application.ports import EvidenceRepository, ProviderCapabilityRepository
+from regulated_ai.application import EnforceAiOperation, EvaluateAiOperation, EvaluationError
+from regulated_ai.application.ports import (
+    EnforcementRepository,
+    EvidenceRepository,
+    ProviderCapabilityRepository,
+)
 from regulated_ai.domain import (
     AssuranceLevel,
     DataClassification,
     DataItem,
+    EnforcementRecord,
+    EnforcementResult,
     EvaluationContext,
     EvaluationResult,
     EvidenceMetadata,
@@ -33,6 +43,7 @@ from regulated_ai.domain import (
     Purpose,
     Sector,
     ToolRequest,
+    TransformationReceipt,
 )
 
 
@@ -91,6 +102,9 @@ class Runtime:
     evaluator: EvaluateAiOperation
     evidence: EvidenceRepository
     capabilities: ProviderCapabilityRepository
+    enforcer: EnforceAiOperation
+    enforcement: EnforcementRepository
+    mock_execution: MockInferenceExecutionAdapter
 
 
 def build_runtime(
@@ -113,17 +127,37 @@ def build_runtime(
         )
     )
     configured_path = os.environ.get("REGULAAI_EVIDENCE_DB")
-    repository = SqliteEvidenceRepository(
-        evidence_path or Path(configured_path or "var/regulaai-evidence.sqlite3")
-    )
+    database_path = evidence_path or Path(configured_path or "var/regulaai-evidence.sqlite3")
+    repository = SqliteEvidenceRepository(database_path)
+    enforcement = SqliteEnforcementRepository(database_path)
+    observer = StructuredEvaluationObserver()
     evaluator = EvaluateAiOperation(
         policies=policies,
         capabilities=capabilities,
         evidence=repository,
         classifier=DeterministicDataClassifier(),
-        observer=StructuredEvaluationObserver(),
+        observer=observer,
     )
-    return Runtime(evaluator=evaluator, evidence=repository, capabilities=capabilities)
+    configured_key = os.environ.get("REGULAAI_TOKENIZATION_KEY")
+    tokenizer = HmacTokenizationAdapter(
+        configured_key.encode() if configured_key is not None else secrets.token_bytes(32)
+    )
+    mock_execution = MockInferenceExecutionAdapter()
+    enforcer = EnforceAiOperation(
+        evaluator=evaluator,
+        tokenizer=tokenizer,
+        enforcement=enforcement,
+        execution=mock_execution,
+        observer=observer,
+    )
+    return Runtime(
+        evaluator=evaluator,
+        evidence=repository,
+        capabilities=capabilities,
+        enforcer=enforcer,
+        enforcement=enforcement,
+        mock_execution=mock_execution,
+    )
 
 
 def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAPI:
@@ -160,12 +194,24 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
         result = runtime.evaluator.execute(_to_context(request))
         return _result_payload(result)
 
+    @application.post("/v1/enforcements")
+    def enforce(request: EvaluationRequest) -> dict[str, object]:
+        result = _runtime(application).enforcer.execute(_to_context(request))
+        return _enforcement_result_payload(result)
+
     @application.get("/v1/evidence/{evidence_id}", response_model=None)
     def get_evidence(evidence_id: str) -> JSONResponse | dict[str, object]:
         evidence = _runtime(application).evidence.get(evidence_id)
         if evidence is None:
             return _error_response(404, "EVIDENCE_NOT_FOUND", "Evidence record was not found")
         return _evidence_payload(evidence)
+
+    @application.get("/v1/enforcements/{enforcement_id}", response_model=None)
+    def get_enforcement(enforcement_id: str) -> JSONResponse | dict[str, object]:
+        record = _runtime(application).enforcement.get(enforcement_id)
+        if record is None:
+            return _error_response(404, "ENFORCEMENT_NOT_FOUND", "Enforcement record was not found")
+        return _enforcement_record_payload(record)
 
     @application.get("/v1/providers")
     def get_providers() -> dict[str, object]:
@@ -280,6 +326,55 @@ def _evidence_payload(evidence: EvidenceMetadata) -> dict[str, object]:
         "output_digest": evidence.output_digest,
         "event_digest": evidence.event_digest,
         "previous_event_digest": evidence.previous_event_digest,
+    }
+
+
+def _enforcement_result_payload(result: EnforcementResult) -> dict[str, object]:
+    return {
+        "enforcement_id": result.enforcement_id,
+        "evaluation_id": result.evaluation_id,
+        "evaluation_evidence_id": result.evaluation_evidence_id,
+        "decision": result.decision.value,
+        "status": result.status.value,
+        "transformation_receipts": [
+            _receipt_payload(item) for item in result.transformation_receipts
+        ],
+        "reason_codes": list(result.reason_codes),
+        "output_digest": result.output_digest,
+        "provider_execution_id": result.provider_execution_id,
+    }
+
+
+def _enforcement_record_payload(record: EnforcementRecord) -> dict[str, object]:
+    result = EnforcementResult(
+        enforcement_id=record.enforcement_id,
+        evaluation_id=record.evaluation_id,
+        evaluation_evidence_id=record.evaluation_evidence_id,
+        decision=record.decision,
+        status=record.status,
+        transformation_receipts=record.transformation_receipts,
+        reason_codes=record.reason_codes,
+        output_digest=record.output_digest,
+        provider_execution_id=record.provider_execution_id,
+    )
+    return {
+        **_enforcement_result_payload(result),
+        "created_at": record.created_at.isoformat(),
+        "policy_set_version": record.policy_set_version,
+        "provider_registry_version": record.provider_registry_version,
+        "provider_target": record.provider_target,
+        "input_digest": record.input_digest,
+    }
+
+
+def _receipt_payload(receipt: TransformationReceipt) -> dict[str, str]:
+    return {
+        "receipt_id": receipt.receipt_id,
+        "type": receipt.type.value,
+        "target": receipt.target,
+        "input_digest": receipt.input_digest,
+        "output_digest": receipt.output_digest,
+        "reason_code": receipt.reason_code,
     }
 
 

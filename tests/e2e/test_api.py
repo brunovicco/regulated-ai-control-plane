@@ -8,9 +8,12 @@ from regulated_ai.adapters import (
     DeterministicDataClassifier,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
+    HmacTokenizationAdapter,
+    MockInferenceExecutionAdapter,
+    SqliteEnforcementRepository,
     SqliteEvidenceRepository,
 )
-from regulated_ai.application import EvaluateAiOperation
+from regulated_ai.application import EnforceAiOperation, EvaluateAiOperation
 from regulated_ai.entrypoints.api import (
     EvaluationRequest,
     Runtime,
@@ -33,7 +36,9 @@ def _runtime(tmp_path: Path) -> Runtime:
             root / "examples/provider-capabilities/aws-bedrock.yaml",
         )
     )
-    evidence = SqliteEvidenceRepository(tmp_path / "evidence.sqlite3")
+    database_path = tmp_path / "evidence.sqlite3"
+    evidence = SqliteEvidenceRepository(database_path)
+    enforcement = SqliteEnforcementRepository(database_path)
     evaluator = EvaluateAiOperation(
         policies=policies,
         capabilities=capabilities,
@@ -41,7 +46,15 @@ def _runtime(tmp_path: Path) -> Runtime:
         classifier=DeterministicDataClassifier(),
         clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
     )
-    return Runtime(evaluator, evidence, capabilities)
+    mock = MockInferenceExecutionAdapter()
+    enforcer = EnforceAiOperation(
+        evaluator=evaluator,
+        tokenizer=HmacTokenizationAdapter(b"e" * 32),
+        enforcement=enforcement,
+        execution=mock,
+        clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
+    )
+    return Runtime(evaluator, evidence, capabilities, enforcer, enforcement, mock)
 
 
 def _request() -> dict[str, object]:
@@ -117,6 +130,35 @@ def test_packaged_runtime_records_are_loadable(tmp_path: Path) -> None:
     assert {item.target.provider for item in runtime.capabilities.list()} == {"aws", "openai"}
 
 
+def test_enforcement_api_returns_only_metadata_after_mock_execution(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    app = create_app(lambda: runtime)
+    request = _request()
+    request["tools"] = [{"name": "cards.read", "risk_class": "read_only"}]
+    data = request["data"]
+    assert isinstance(data, list)
+    raw_values = [item["value"] for item in data if isinstance(item, dict)]
+
+    with TestClient(app) as client:
+        response = client.post("/v1/enforcements", json=request)
+        assert response.status_code == 200
+        body = response.json()
+        stored = client.get(f"/v1/enforcements/{body['enforcement_id']}")
+
+    assert body["status"] == "EXECUTED"
+    assert body["decision"] == "ALLOW_WITH_TRANSFORMATION"
+    assert body["provider_execution_id"].startswith("mockexec_")
+    assert stored.status_code == 200
+    assert stored.json()["status"] == "EXECUTED"
+    for value in raw_values:
+        assert value not in response.text
+        assert value not in stored.text
+    assert runtime.mock_execution.last_plan is not None
+    plan_values = {item.field: item.value for item in runtime.mock_execution.last_plan.data_items}
+    assert plan_values["customer_document"].startswith("tok_")
+    assert raw_values[0] not in repr(runtime.mock_execution.last_plan)
+
+
 def test_api_returns_stable_errors_without_echoing_sensitive_content(tmp_path: Path) -> None:
     runtime = _runtime(tmp_path)
     app = create_app(lambda: runtime)
@@ -127,6 +169,7 @@ def test_api_returns_stable_errors_without_echoing_sensitive_content(tmp_path: P
             "/v1/evaluations", json={"correlation_id": sentinel, "unexpected": sentinel}
         )
         missing_evidence = client.get("/v1/evidence/ev_missing")
+        missing_enforcement = client.get("/v1/enforcements/enf_missing")
         request = _request()
         request["policy_set_version"] = "missing@1"
         missing_policy = client.post("/v1/evaluations", json=request)
@@ -135,6 +178,7 @@ def test_api_returns_stable_errors_without_echoing_sensitive_content(tmp_path: P
     assert invalid.json()["error"]["code"] == "INVALID_EVALUATION_CONTEXT"
     assert sentinel not in invalid.text
     assert missing_evidence.json()["error"]["code"] == "EVIDENCE_NOT_FOUND"
+    assert missing_enforcement.json()["error"]["code"] == "ENFORCEMENT_NOT_FOUND"
     assert missing_policy.status_code == 404
     assert missing_policy.json()["error"]["code"] == "POLICY_SET_NOT_FOUND"
 
@@ -149,7 +193,9 @@ def test_evaluation_requires_no_network_access(
 
     monkeypatch.setattr(socket, "create_connection", blocked)
     runtime = _runtime(tmp_path)
+    request = _request()
+    request["tools"] = [{"name": "cards.read", "risk_class": "read_only"}]
 
-    result = runtime.evaluator.execute(_to_context(EvaluationRequest.model_validate(_request())))
+    result = runtime.enforcer.execute(_to_context(EvaluationRequest.model_validate(request)))
 
-    assert result.decision.value == "REQUIRE_APPROVAL"
+    assert result.status.value == "EXECUTED"
