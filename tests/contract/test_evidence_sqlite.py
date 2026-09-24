@@ -22,6 +22,7 @@ from regulated_ai.domain import (
     ToolActionRecord,
     ToolActionStatus,
     ToolProposal,
+    ToolResultClassification,
     TransformationReceipt,
 )
 
@@ -199,6 +200,7 @@ def test_tool_action_round_trip_claims_once_without_ephemeral_values(tmp_path: P
         idempotency_key_digest="sha256:idempotency",
         action_digest="sha256:action",
         status=ToolActionStatus.WAITING_APPROVAL,
+        output_schema_digest="sha256:output-schema",
     )
     repository.save(waiting)
     prepared = repository.save(replace(waiting, status=ToolActionStatus.PREPARED))
@@ -224,6 +226,12 @@ def test_tool_action_round_trip_claims_once_without_ephemeral_values(tmp_path: P
             ),
             tool_execution_id="mocktool_test",
             output_digest="sha256:output",
+            safe_output_digest="sha256:safe-output",
+            result_classifications=(
+                ToolResultClassification.FINANCIAL,
+                ToolResultClassification.INTERNAL,
+            ),
+            exposed_result_fields=("operation_reference", "operation_status"),
         )
     )
 
@@ -232,7 +240,53 @@ def test_tool_action_round_trip_claims_once_without_ephemeral_values(tmp_path: P
     assert replayed.status is ToolActionStatus.DISPATCHED
     assert completed.status is ToolActionStatus.EXECUTED
     assert completed.approval_receipt is not None
+    assert completed.output_schema_digest == "sha256:output-schema"
+    assert completed.safe_output_digest == "sha256:safe-output"
+    assert completed.result_classifications == (
+        ToolResultClassification.FINANCIAL,
+        ToolResultClassification.INTERNAL,
+    )
+    assert completed.exposed_result_fields == ("operation_reference", "operation_status")
     assert repository.save(waiting).status is ToolActionStatus.EXECUTED
     stored = path.read_bytes().decode(errors="ignore")
     assert "raw-arguments-sentinel" not in stored
     assert "raw-idempotency-sentinel" not in stored
+
+
+def test_tool_action_repository_migrates_phase_four_c_schema(tmp_path: Path) -> None:
+    path = tmp_path / "legacy-actions.sqlite3"
+    with closing(sqlite3.connect(path)) as connection:
+        connection.execute(
+            """
+            CREATE TABLE tool_action (
+                action_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                enforcement_id TEXT NOT NULL,
+                evaluation_id TEXT NOT NULL,
+                call_id TEXT NOT NULL UNIQUE,
+                tool_name TEXT NOT NULL,
+                tool_schema_version TEXT NOT NULL,
+                tool_schema_digest TEXT NOT NULL,
+                arguments_digest TEXT NOT NULL,
+                workload_identity TEXT NOT NULL,
+                idempotency_key_digest TEXT NOT NULL,
+                action_digest TEXT NOT NULL,
+                status TEXT NOT NULL,
+                approval_receipt TEXT,
+                tool_execution_id TEXT,
+                output_digest TEXT
+            )
+            """
+        )
+        connection.commit()
+
+    SqliteToolActionRepository(path)
+
+    with closing(sqlite3.connect(path)) as connection:
+        columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(tool_action)")}
+    assert {
+        "output_schema_digest",
+        "safe_output_digest",
+        "result_classifications",
+        "exposed_result_fields",
+    }.issubset(columns)

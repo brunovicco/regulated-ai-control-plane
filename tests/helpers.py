@@ -217,14 +217,28 @@ def authorized_tool(name: str, risk_class: str) -> AuthorizedTool:
         '{"additionalProperties":false,"properties":{"token":{"type":"string"}},'
         '"required":["token"],"type":"object"}'
     )
+    output_schema_json = (
+        '{"additionalProperties":false,"properties":{'
+        '"public_result":{"classification":"INTERNAL","enum":["SUCCEEDED"],'
+        '"handling":"RETURN","type":"string"},'
+        '"sensitive_result":{"classification":"FINANCIAL","handling":"MASK",'
+        '"maxLength":128,"type":"string"},'
+        '"secret_result":{"classification":"AUTHENTICATION_SECRET","handling":"DROP",'
+        '"maxLength":128,"type":"string"}},'
+        '"required":["public_result","sensitive_result","secret_result"],"type":"object"}'
+    )
+    output_schema_digest = f"sha256:{hashlib.sha256(output_schema_json.encode()).hexdigest()}"
+    definition = f"{name}:{risk_class}:{schema_json}:{output_schema_digest}"
     return AuthorizedTool(
         name=name,
         description=f"Synthetic {name} tool.",
         risk_class=risk_class,
-        schema_version="1.0.0",
+        schema_version="1.1.0",
         input_schema_json=schema_json,
         input_schema_digest=f"sha256:{hashlib.sha256(schema_json.encode()).hexdigest()}",
-        definition_digest=f"sha256:{hashlib.sha256(f'{name}:{risk_class}:{schema_json}'.encode()).hexdigest()}",
+        output_schema_json=output_schema_json,
+        output_schema_digest=output_schema_digest,
+        definition_digest=f"sha256:{hashlib.sha256(definition.encode()).hexdigest()}",
         catalog_version="tools@test",
     )
 

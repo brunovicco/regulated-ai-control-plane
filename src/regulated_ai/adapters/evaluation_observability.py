@@ -26,6 +26,8 @@ _EVENTS = frozenset(
         "tool_action.approval_consumed",
         "tool_action.completed",
         "tool_action.failed",
+        "tool_result.accepted",
+        "tool_result.rejected",
     }
 )
 _METADATA_KEYS = frozenset(

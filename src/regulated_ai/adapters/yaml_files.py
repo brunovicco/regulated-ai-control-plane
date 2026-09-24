@@ -25,6 +25,8 @@ from regulated_ai.domain import (
     ProviderCapability,
     ProviderCapabilityRecord,
     ProviderTarget,
+    ToolResultClassification,
+    ToolResultHandling,
 )
 
 
@@ -191,11 +193,56 @@ class _ToolInputSchemaModel(_StrictModel):
         return self
 
 
+class _ToolResultPropertyModel(_ToolPropertyModel):
+    classification: ToolResultClassification
+    handling: ToolResultHandling
+
+    @model_validator(mode="after")
+    def safe_exposure(self) -> "_ToolResultPropertyModel":
+        """Prevent sensitive result classes from being returned verbatim."""
+        if self.handling is ToolResultHandling.RETURN and self.enum is None:
+            raise ValueError("returned tool result fields must use a closed enum")
+        if (
+            self.classification
+            in {
+                ToolResultClassification.PERSONAL,
+                ToolResultClassification.FINANCIAL,
+            }
+            and self.handling is ToolResultHandling.RETURN
+        ):
+            raise ValueError("sensitive tool result fields cannot use RETURN")
+        if (
+            self.classification is ToolResultClassification.AUTHENTICATION_SECRET
+            and self.handling is not ToolResultHandling.DROP
+        ):
+            raise ValueError("authentication-secret tool result fields must use DROP")
+        return self
+
+
+class _ToolOutputSchemaModel(_StrictModel):
+    type: Literal["object"]
+    additionalProperties: Literal[False]
+    properties: dict[str, _ToolResultPropertyModel] = Field(min_length=1, max_length=128)
+    required: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def valid_required_fields(self) -> "_ToolOutputSchemaModel":
+        """Require normalized property names and a unique required subset."""
+        if (
+            any(_TOOL_NAME.fullmatch(name) is None for name in self.properties)
+            or len(self.required) != len(set(self.required))
+            or not set(self.required).issubset(self.properties)
+        ):
+            raise ValueError("tool output schema fields are invalid")
+        return self
+
+
 class _ToolModel(_StrictModel):
     description: str = Field(min_length=1, max_length=512)
     risk_class: str = Field(min_length=1, max_length=128, pattern=r"^[a-z0-9][a-z0-9._-]*$")
     schema_version: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
     input_schema: _ToolInputSchemaModel
+    output_schema: _ToolOutputSchemaModel
 
     @field_validator("description")
     @classmethod
@@ -344,12 +391,22 @@ def _authorized_tool(catalog_version: str, name: str, item: _ToolModel) -> Autho
     if len(schema_json.encode()) > 32_768:
         raise MalformedYamlError("Tool input schema exceeds the size limit")
     schema_digest = f"sha256:{hashlib.sha256(schema_json.encode()).hexdigest()}"
+    output_schema_json = json.dumps(
+        item.output_schema.model_dump(exclude_none=True),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    if len(output_schema_json.encode()) > 32_768:
+        raise MalformedYamlError("Tool output schema exceeds the size limit")
+    output_schema_digest = f"sha256:{hashlib.sha256(output_schema_json.encode()).hexdigest()}"
     definition_json = json.dumps(
         {
             "catalog_version": catalog_version,
             "description": item.description,
             "input_schema_digest": schema_digest,
             "name": name,
+            "output_schema_digest": output_schema_digest,
             "risk_class": item.risk_class,
             "schema_version": item.schema_version,
         },
@@ -364,6 +421,8 @@ def _authorized_tool(catalog_version: str, name: str, item: _ToolModel) -> Autho
         schema_version=item.schema_version,
         input_schema_json=schema_json,
         input_schema_digest=schema_digest,
+        output_schema_json=output_schema_json,
+        output_schema_digest=output_schema_digest,
         definition_digest=f"sha256:{hashlib.sha256(definition_json.encode()).hexdigest()}",
         catalog_version=catalog_version,
     )

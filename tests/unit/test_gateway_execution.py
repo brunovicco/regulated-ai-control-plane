@@ -224,6 +224,13 @@ def test_gateway_forwards_only_authorized_definitions_and_returns_metadata_only_
         schema_version="1.0.0",
         input_schema_json=schema,
         input_schema_digest="sha256:schema",
+        output_schema_json=(
+            '{"additionalProperties":false,"properties":{"status":'
+            '{"classification":"INTERNAL","enum":["OK"],"handling":"RETURN",'
+            '"type":"string"}},'
+            '"required":["status"],"type":"object"}'
+        ),
+        output_schema_digest="sha256:output-schema",
         definition_digest="sha256:definition",
         catalog_version="tools@test",
     )

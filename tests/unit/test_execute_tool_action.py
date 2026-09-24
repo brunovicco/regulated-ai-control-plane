@@ -15,6 +15,7 @@ from regulated_ai.application import (
     InvalidToolActionError,
     ToolActionConflictError,
     ToolActionExecutionFailedError,
+    ToolResultRejectedError,
 )
 from regulated_ai.domain import (
     DecisionOutcome,
@@ -25,7 +26,9 @@ from regulated_ai.domain import (
     ToolActionResult,
     ToolActionStatus,
     ToolExecutionReceipt,
+    ToolExecutionResult,
     ToolProposal,
+    ToolResultClassification,
 )
 
 from ..helpers import (
@@ -47,7 +50,7 @@ class _FailingExecution:
         self.call_count = 0
         self.last_plan: ToolActionPlan | None = None
 
-    def execute(self, plan: ToolActionPlan) -> ToolExecutionReceipt:
+    def execute(self, plan: ToolActionPlan) -> ToolExecutionResult:
         self.call_count += 1
         self.last_plan = plan
         raise TimeoutError("synthetic timeout")
@@ -168,7 +171,20 @@ def test_exact_action_waits_for_new_approval_then_executes_once(tmp_path: Path) 
     assert completed.status is ToolActionStatus.EXECUTED
     assert completed.approval_receipt is not None
     assert completed.approval_receipt.action_digest == waiting.action_digest
-    assert replayed == completed
+    assert replayed.action_id == completed.action_id
+    assert replayed.status == completed.status
+    assert replayed.safe_output is None
+    assert dict(completed.safe_output or ()) == {
+        "public_result": "SUCCEEDED",
+        "sensitive_result": "***MASKED***",
+    }
+    assert completed.exposed_result_fields == ("public_result", "sensitive_result")
+    assert completed.result_classifications == (
+        ToolResultClassification.AUTHENTICATION_SECRET,
+        ToolResultClassification.FINANCIAL,
+        ToolResultClassification.INTERNAL,
+    )
+    assert completed.safe_output_digest is not None
     assert execution.call_count == 1
     assert execution.last_plan is not None
     assert dict(execution.last_plan.arguments) == {"token": RAW_ARGUMENT}
@@ -176,6 +192,70 @@ def test_exact_action_waits_for_new_approval_then_executes_once(tmp_path: Path) 
     assert RAW_ARGUMENT not in stored
     assert IDEMPOTENCY_KEY not in stored
     assert assertion not in stored
+    assert "SUCCEEDED" not in stored
+    assert "synthetic-sensitive-result" not in stored
+    assert "synthetic-secret-result" not in stored
+
+
+def test_ephemeral_tool_result_repr_excludes_raw_output() -> None:
+    result = ToolExecutionResult(
+        receipt=ToolExecutionReceipt(execution_id="mocktool_test", action_id="act_test"),
+        output={"secret_result": "raw-output-sentinel"},
+    )
+
+    assert "raw-output-sentinel" not in repr(result)
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        {
+            "public_result": "SUCCEEDED",
+            "sensitive_result": "sensitive-sentinel",
+            "secret_result": "secret-sentinel",
+            "unexpected": "unexpected-sentinel",
+        },
+        {
+            "public_result": "SUCCEEDED",
+            "sensitive_result": "sensitive-sentinel",
+        },
+        {
+            "public_result": 123,
+            "sensitive_result": "sensitive-sentinel",
+            "secret_result": "secret-sentinel",
+        },
+        {
+            "public_result": "UNAPPROVED",
+            "sensitive_result": "sensitive-sentinel",
+            "secret_result": "secret-sentinel",
+        },
+    ],
+)
+def test_untrusted_tool_result_fails_closed_without_persisting_content(
+    tmp_path: Path, output: dict[str, object]
+) -> None:
+    execution = MockToolExecutionAdapter(output=output)
+    service, _selected, database_path = _service(tmp_path, execution=execution)
+    waiting = _execute(service)
+    assertion = action_approval_assertion(KEY, waiting.action_digest)
+
+    with pytest.raises(ToolResultRejectedError):
+        _execute(service, approval_assertion=assertion)
+    rejected = _execute(service, approval_assertion=assertion)
+
+    assert rejected.status is ToolActionStatus.RESULT_REJECTED
+    assert rejected.output_digest is None
+    assert rejected.safe_output_digest is None
+    assert rejected.safe_output is None
+    assert execution.call_count == 1
+    stored = database_path.read_bytes().decode(errors="ignore")
+    for sentinel in (
+        "sensitive-sentinel",
+        "secret-sentinel",
+        "unexpected-sentinel",
+        "UNAPPROVED",
+    ):
+        assert sentinel not in stored
 
 
 @pytest.mark.parametrize(

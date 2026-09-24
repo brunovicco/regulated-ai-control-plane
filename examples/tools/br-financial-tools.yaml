@@ -1,11 +1,11 @@
 schema_version: "1"
-catalog_version: "br-financial-tools@1.0.0"
+catalog_version: "br-financial-tools@1.1.0"
 
 tools:
   cards.read:
     description: "Read synthetic card status using a pre-tokenized account reference."
     risk_class: "read_only"
-    schema_version: "1.0.0"
+    schema_version: "1.1.0"
     input_schema:
       type: "object"
       additionalProperties: false
@@ -16,11 +16,35 @@ tools:
           maxLength: 128
       required:
         - "account_token"
+    output_schema:
+      type: "object"
+      additionalProperties: false
+      properties:
+        card_status:
+          type: "string"
+          enum: ["ACTIVE", "BLOCKED"]
+          classification: "INTERNAL"
+          handling: "RETURN"
+        internal_reference:
+          type: "string"
+          minLength: 1
+          maxLength: 128
+          classification: "FINANCIAL"
+          handling: "MASK"
+        diagnostic:
+          type: "string"
+          maxLength: 256
+          classification: "INTERNAL"
+          handling: "DROP"
+      required:
+        - "card_status"
+        - "internal_reference"
+        - "diagnostic"
 
   cards.unblock:
     description: "Propose unblocking a synthetic card using a pre-tokenized account reference."
     risk_class: "high_impact_state_change"
-    schema_version: "1.0.0"
+    schema_version: "1.1.0"
     input_schema:
       type: "object"
       additionalProperties: false
@@ -36,3 +60,27 @@ tools:
       required:
         - "account_token"
         - "reason_code"
+    output_schema:
+      type: "object"
+      additionalProperties: false
+      properties:
+        operation_status:
+          type: "string"
+          enum: ["SUCCEEDED"]
+          classification: "INTERNAL"
+          handling: "RETURN"
+        operation_reference:
+          type: "string"
+          minLength: 1
+          maxLength: 128
+          classification: "FINANCIAL"
+          handling: "MASK"
+        diagnostic:
+          type: "string"
+          maxLength: 256
+          classification: "INTERNAL"
+          handling: "DROP"
+      required:
+        - "operation_status"
+        - "operation_reference"
+        - "diagnostic"
