@@ -133,4 +133,16 @@ deployments compatible with `REGULAAI_GATEWAY_ALLOWED_TARGET` and
 
 Gateway mode sends the sanitized text payload to the configured service and may incur provider
 cost. Model output is discarded. A returned tool call is exposed only as metadata and an arguments
-digest with `execution_authorized: false`; RegulaAI does not execute the proposed action.
+digest with `execution_authorized: false`.
+
+## Action-specific approval proof
+
+Configure a distinct `REGULAAI_ACTION_APPROVAL_HMAC_KEY` of at least 32 bytes. Submit the exact
+proposal arguments, workload identity and idempotency key to
+`POST /v1/enforcements/{enforcement_id}/tool-actions`. The first response is
+`WAITING_APPROVAL` and contains the action digest. An organization-owned workflow issues the
+domain-separated `ra2` assertion documented in `API_CONTRACT.md`; resend the identical request with
+that assertion to reach the network-silent mock tool boundary.
+
+The demo never persists or returns the arguments, idempotency key, raw assertion or tool output.
+Live enterprise-system connectors remain disabled.

@@ -8,6 +8,7 @@ Complete this document before processing personal or regulated data.
 |---|---|---|---|---|---|---|
 | Evaluation evidence metadata | Evaluation API | Reproduce policy decisions without content retention | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate the configured database under an approved evidence-retention procedure |
 | Approval consumption metadata | External approval workflow | Prove scoped human authority and prevent replay | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate under the same approved evidence-retention procedure |
+| Tool-action metadata | Tool-action API | Prove exact action authority and execution state without retaining payloads | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate under the same approved evidence-retention procedure |
 
 ## Controls
 
@@ -38,9 +39,10 @@ Complete this document before processing personal or regulated data.
   organization-authorized provider. Gateway/model response content remains ephemeral and is
   discarded by this service. Provider/model/deployment and bounded routing/execution provenance
   may be retained as evidence metadata.
-- Tool definitions contain organization-owned names, descriptions and schemas. Model-produced tool
-  arguments remain ephemeral; RegulaAI persists and returns only their cryptographic digest and
-  trusted schema identity, and performs no tool side effect in Phase 4b.
+- Tool definitions contain organization-owned names, descriptions and schemas. Model-produced and
+  resubmitted arguments, idempotency keys, approval assertions and tool output remain ephemeral.
+  RegulaAI persists only trusted identities, statuses, approval metadata and cryptographic digests.
+  Phase 4c executes only through a network-silent mock tool adapter.
 - Incident-response owner:
 
 ## Prohibited logging
