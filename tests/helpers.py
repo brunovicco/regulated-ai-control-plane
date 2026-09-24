@@ -1,0 +1,151 @@
+"""Synthetic-safe builders shared by behavior tests."""
+
+from collections.abc import Mapping
+from datetime import UTC, date, datetime
+
+from regulated_ai.application.ports import EvaluationObserver
+from regulated_ai.domain import (
+    AssuranceLevel,
+    CapabilityState,
+    DataItem,
+    EvaluationContext,
+    EvidenceMetadata,
+    Jurisdiction,
+    PolicySet,
+    ProviderCapability,
+    ProviderCapabilityRecord,
+    ProviderTarget,
+    Purpose,
+    Sector,
+    ToolRequest,
+)
+
+NOW = datetime(2026, 9, 23, 12, 0, tzinfo=UTC)
+
+
+def synthetic_cpf() -> str:
+    """Build a checksum-valid synthetic identifier without a copied fixture value."""
+    base = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    first = _digit(base, tuple(range(10, 1, -1)))
+    second = _digit([*base, first], tuple(range(11, 1, -1)))
+    return "".join(str(value) for value in (*base, first, second))
+
+
+def synthetic_cnpj() -> str:
+    """Build a checksum-valid synthetic company identifier."""
+    base = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 1]
+    first = _digit(base, (5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2))
+    second = _digit([*base, first], (6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2))
+    return "".join(str(value) for value in (*base, first, second))
+
+
+def _digit(numbers: list[int], weights: tuple[int, ...]) -> int:
+    remainder = sum(value * weight for value, weight in zip(numbers, weights, strict=True)) % 11
+    return 0 if remainder < 2 else 11 - remainder
+
+
+class MemoryEvidenceRepository:
+    """In-memory metadata-only evidence fake."""
+
+    def __init__(self) -> None:
+        self.items: dict[str, EvidenceMetadata] = {}
+
+    def save(self, evidence: EvidenceMetadata) -> EvidenceMetadata:
+        self.items.setdefault(evidence.evidence_id, evidence)
+        return self.items[evidence.evidence_id]
+
+    def get(self, evidence_id: str) -> EvidenceMetadata | None:
+        return self.items.get(evidence_id)
+
+
+class MemoryPolicyRepository:
+    """In-memory immutable policy fake."""
+
+    def __init__(self, policy: PolicySet) -> None:
+        self.policy = policy
+
+    def get(self, identifier: str) -> PolicySet | None:
+        return self.policy if self.policy.identifier == identifier else None
+
+
+class MemoryCapabilityRepository:
+    """In-memory provider fact fake."""
+
+    def __init__(self, records: tuple[ProviderCapabilityRecord, ...]) -> None:
+        self.records = records
+
+    @property
+    def registry_version(self) -> str:
+        return "registry@test"
+
+    def get(self, target: ProviderTarget) -> ProviderCapabilityRecord | None:
+        return next((item for item in self.records if item.target == target), None)
+
+    def list(self) -> tuple[ProviderCapabilityRecord, ...]:
+        return self.records
+
+
+class CapturingObserver(EvaluationObserver):
+    """Capture allowlisted event calls for assertions."""
+
+    def __init__(self) -> None:
+        self.events: list[tuple[str, Mapping[str, str]]] = []
+
+    def emit(self, event: str, metadata: Mapping[str, str]) -> None:
+        self.events.append((event, metadata))
+
+
+def capability_record(
+    *,
+    state: CapabilityState = CapabilityState.SUPPORTED,
+    verified_at: date = date(2026, 9, 22),
+    target: ProviderTarget | None = None,
+    conditions: tuple[str, ...] = (),
+) -> ProviderCapabilityRecord:
+    """Build a source-backed synthetic provider record."""
+    selected = target or ProviderTarget("test-provider", "test-service", "test-region")
+    fact = ProviderCapability(
+        provider=selected.provider,
+        service=selected.service,
+        region=selected.region,
+        key="required_control",
+        state=state,
+        conditions=conditions,
+        notes=(),
+        source_urls=("https://provider.invalid/documentation",),
+        verified_at=verified_at,
+        record_version="1",
+        registry_version="registry@test",
+    )
+    return ProviderCapabilityRecord(
+        target=selected,
+        registry_version="registry@test",
+        record_version="1",
+        verified_at=verified_at,
+        source_urls=fact.source_urls,
+        capabilities=(fact,),
+    )
+
+
+def context(
+    *,
+    data_items: tuple[DataItem, ...] = (),
+    tools: tuple[ToolRequest, ...] = (),
+    fallback_providers: tuple[ProviderTarget, ...] = (),
+    assertions: tuple[tuple[str, bool], ...] = (),
+) -> EvaluationContext:
+    """Build a normalized synthetic evaluation context."""
+    return EvaluationContext(
+        correlation_id="test-correlation",
+        jurisdiction=Jurisdiction("BR"),
+        sector=Sector("financial_services"),
+        purpose=Purpose("customer_support"),
+        operation_kind="external_inference",
+        assurance_level=AssuranceLevel.HIGH,
+        provider=ProviderTarget("test-provider", "test-service", "test-region"),
+        data_items=data_items,
+        tools=tools,
+        policy_set_version="test-policy@1.0.0",
+        organization_assertions=assertions,
+        fallback_providers=fallback_providers,
+    )
