@@ -1,6 +1,8 @@
 """RegulaAI framework-free business entities and invariants."""
 
 from regulated_ai.domain.models import (
+    ApprovalGrant,
+    ApprovalReceipt,
     AssuranceLevel,
     CapabilityRequirement,
     CapabilityState,
@@ -35,6 +37,8 @@ from regulated_ai.domain.models import (
 )
 
 __all__ = [
+    "ApprovalGrant",
+    "ApprovalReceipt",
     "AssuranceLevel",
     "CapabilityRequirement",
     "CapabilityState",

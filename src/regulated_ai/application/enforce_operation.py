@@ -13,12 +13,15 @@ from regulated_ai.application.evaluate_operation import (
     normalize_evaluation_context,
 )
 from regulated_ai.application.ports import (
+    ApprovalPort,
     EnforcementRepository,
     EvaluationObserver,
     InferenceExecutionPort,
     TokenizationPort,
 )
 from regulated_ai.domain import (
+    ApprovalGrant,
+    ApprovalReceipt,
     DataItem,
     DecisionOutcome,
     EnforcementRecord,
@@ -56,6 +59,12 @@ class ExecutionFailedError(EvaluationError):
     code = "EXECUTION_FAILED"
 
 
+class ApprovalFailedError(EvaluationError):
+    """External approval authority was unavailable, invalid or not consumable."""
+
+    code = "APPROVAL_FAILED"
+
+
 class EnforcementPersistenceError(EvaluationError):
     """Enforcement metadata could not be persisted."""
 
@@ -72,6 +81,7 @@ class EnforceAiOperation:
         tokenizer: TokenizationPort,
         enforcement: EnforcementRepository,
         execution: InferenceExecutionPort,
+        approval: ApprovalPort | None = None,
         observer: EvaluationObserver | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
@@ -80,10 +90,16 @@ class EnforceAiOperation:
         self._tokenizer = tokenizer
         self._enforcement = enforcement
         self._execution = execution
+        self._approval = approval
         self._observer = observer
         self._clock = clock or (lambda: datetime.now(UTC))
 
-    def execute(self, context: EvaluationContext) -> EnforcementResult:
+    def execute(
+        self,
+        context: EvaluationContext,
+        *,
+        approval_assertion: str | None = None,
+    ) -> EnforcementResult:
         """Apply required controls before allowing the execution port to observe data."""
         normalized = normalize_evaluation_context(context)
         evaluation = self._evaluator.execute(normalized)
@@ -112,19 +128,48 @@ class EnforceAiOperation:
             raise TransformationFailedError("A required transformation failed") from exc
 
         output_digest = _execution_output_digest(transformed, normalized)
+        approval_grant: ApprovalGrant | None = None
         if evaluation.decision is DecisionOutcome.REQUIRE_APPROVAL:
-            record = self._record(
-                evaluation=evaluation,
-                context=normalized,
-                status=EnforcementStatus.WAITING_APPROVAL,
-                receipts=receipts,
-                output_digest=output_digest,
-                provider_execution_id=None,
-                extra_reason="HUMAN_APPROVAL_REQUIRED",
-            )
-            stored = self._save(record)
-            self._emit("enforcement.blocked", status=stored.status.value)
-            return _to_result(stored)
+            if approval_assertion is None:
+                return self._waiting_for_approval(
+                    evaluation=evaluation,
+                    context=normalized,
+                    receipts=receipts,
+                    output_digest=output_digest,
+                    reason="HUMAN_APPROVAL_REQUIRED",
+                )
+            if self._approval is None:
+                self._waiting_for_approval(
+                    evaluation=evaluation,
+                    context=normalized,
+                    receipts=receipts,
+                    output_digest=output_digest,
+                    reason="APPROVAL_VERIFIER_UNAVAILABLE",
+                )
+                raise ApprovalFailedError("Approval verification failed closed")
+            verification_time = self._clock()
+            try:
+                approval_grant = self._approval.inspect(
+                    approval_assertion,
+                    decision_digest=evaluation.output_digest,
+                    now=verification_time,
+                )
+                _validate_approval_grant(
+                    approval_grant,
+                    decision_digest=evaluation.output_digest,
+                    now=verification_time,
+                )
+            except Exception as exc:
+                self._waiting_for_approval(
+                    evaluation=evaluation,
+                    context=normalized,
+                    receipts=receipts,
+                    output_digest=output_digest,
+                    reason="APPROVAL_INVALID",
+                )
+                self._emit("enforcement.failed", error_type=type(exc).__name__)
+                raise ApprovalFailedError("Approval verification failed closed") from exc
+            self._emit("approval.validated", approval_id=approval_grant.approval_id)
 
         plan = _execution_plan(evaluation, normalized, transformed, receipts, output_digest)
         prepared = self._record(
@@ -140,6 +185,7 @@ class EnforceAiOperation:
             EnforcementStatus.DISPATCHED,
             EnforcementStatus.EXECUTED,
             EnforcementStatus.EXECUTION_FAILED,
+            EnforcementStatus.APPROVAL_FAILED,
         }:
             self._emit("enforcement.completed", status=stored_prepared.status.value)
             return _to_result(stored_prepared)
@@ -148,12 +194,42 @@ class EnforceAiOperation:
         if not claimed:
             self._emit("enforcement.completed", status=stored_dispatched.status.value)
             return _to_result(stored_dispatched)
+        active_plan = plan
+        active_record = dispatched
+        if approval_grant is not None:
+            consumption_time = self._clock()
+            try:
+                if self._approval is None:
+                    raise ValueError("Approval verifier is unavailable")
+                approval_receipt = self._approval.consume(
+                    approval_grant,
+                    enforcement_id=dispatched.enforcement_id,
+                    now=consumption_time,
+                )
+                _validate_approval_receipt(
+                    approval_receipt,
+                    grant=approval_grant,
+                    enforcement_id=dispatched.enforcement_id,
+                    now=consumption_time,
+                )
+            except Exception as exc:
+                failed = replace(
+                    dispatched,
+                    status=EnforcementStatus.APPROVAL_FAILED,
+                    reason_codes=tuple(sorted({*dispatched.reason_codes, "APPROVAL_FAILED"})),
+                )
+                self._save(failed)
+                self._emit("enforcement.failed", error_type=type(exc).__name__)
+                raise ApprovalFailedError("Approval consumption failed closed") from exc
+            active_plan = replace(plan, approval_receipt=approval_receipt)
+            active_record = replace(dispatched, approval_receipt=approval_receipt)
+            self._emit("approval.consumed", approval_id=approval_receipt.approval_id)
         try:
-            provider_receipt = self._execution.execute(plan)
-            _validate_provider_receipt(provider_receipt, plan)
+            provider_receipt = self._execution.execute(active_plan)
+            _validate_provider_receipt(provider_receipt, active_plan)
         except Exception as exc:
             failed = replace(
-                dispatched,
+                active_record,
                 status=EnforcementStatus.EXECUTION_FAILED,
                 reason_codes=tuple(sorted({*dispatched.reason_codes, "EXECUTION_FAILED"})),
             )
@@ -161,7 +237,7 @@ class EnforceAiOperation:
             self._emit("enforcement.failed", error_type=type(exc).__name__)
             raise ExecutionFailedError("The execution port failed") from exc
         completed = replace(
-            dispatched,
+            active_record,
             status=EnforcementStatus.EXECUTED,
             provider_execution_id=provider_receipt.execution_id,
             provider_call_metadata=provider_receipt.call_metadata,
@@ -169,6 +245,28 @@ class EnforceAiOperation:
         self._emit("execution.completed", provider_execution_id=provider_receipt.execution_id)
         stored = self._save(completed)
         self._emit("enforcement.completed", status=stored.status.value)
+        return _to_result(stored)
+
+    def _waiting_for_approval(
+        self,
+        *,
+        evaluation: EvaluationResult,
+        context: EvaluationContext,
+        receipts: tuple[TransformationReceipt, ...],
+        output_digest: str,
+        reason: str,
+    ) -> EnforcementResult:
+        record = self._record(
+            evaluation=evaluation,
+            context=context,
+            status=EnforcementStatus.WAITING_APPROVAL,
+            receipts=receipts,
+            output_digest=output_digest,
+            provider_execution_id=None,
+            extra_reason=reason,
+        )
+        stored = self._save(record)
+        self._emit("enforcement.blocked", status=stored.status.value)
         return _to_result(stored)
 
     def _apply_transformations(
@@ -394,9 +492,11 @@ def _execution_output_digest(data_items: tuple[DataItem, ...], context: Evaluati
 
 def _status_family(status: EnforcementStatus) -> str:
     if status in {
+        EnforcementStatus.WAITING_APPROVAL,
         EnforcementStatus.PREPARED,
         EnforcementStatus.DISPATCHED,
         EnforcementStatus.EXECUTED,
+        EnforcementStatus.APPROVAL_FAILED,
         EnforcementStatus.EXECUTION_FAILED,
     }:
         return "execution"
@@ -415,6 +515,7 @@ def _to_result(record: EnforcementRecord) -> EnforcementResult:
         output_digest=record.output_digest,
         provider_execution_id=record.provider_execution_id,
         provider_call_metadata=record.provider_call_metadata,
+        approval_receipt=record.approval_receipt,
     )
 
 
@@ -432,6 +533,53 @@ def _validate_provider_receipt(receipt: ProviderExecutionReceipt, plan: Executio
         raise ValueError("Execution adapter returned an invalid receipt")
     if receipt.call_metadata is not None:
         _validate_provider_call_metadata(receipt.call_metadata)
+
+
+def _validate_approval_grant(
+    grant: ApprovalGrant,
+    *,
+    decision_digest: str,
+    now: datetime,
+) -> None:
+    if (
+        len(grant.approval_id) > 128
+        or len(grant.actor_id) > 128
+        or _SAFE_EXECUTION_ID.fullmatch(grant.approval_id) is None
+        or _SAFE_EXECUTION_ID.fullmatch(grant.actor_id) is None
+        or grant.decision_digest != decision_digest
+        or grant.issued_at.tzinfo is None
+        or grant.issued_at.utcoffset() is None
+        or grant.expires_at.tzinfo is None
+        or grant.expires_at.utcoffset() is None
+        or grant.issued_at > now
+        or grant.expires_at <= now
+        or grant.expires_at <= grant.issued_at
+        or (grant.expires_at - grant.issued_at).total_seconds() > 86_400
+    ):
+        raise ValueError("Approval adapter returned an invalid grant")
+
+
+def _validate_approval_receipt(
+    receipt: ApprovalReceipt,
+    *,
+    grant: ApprovalGrant,
+    enforcement_id: str,
+    now: datetime,
+) -> None:
+    if (
+        receipt.approval_id != grant.approval_id
+        or receipt.actor_id != grant.actor_id
+        or receipt.decision_digest != grant.decision_digest
+        or receipt.enforcement_id != enforcement_id
+        or receipt.issued_at != grant.issued_at
+        or receipt.expires_at != grant.expires_at
+        or receipt.consumed_at.tzinfo is None
+        or receipt.consumed_at.utcoffset() is None
+        or receipt.consumed_at != now
+        or receipt.consumed_at < receipt.issued_at
+        or receipt.consumed_at >= receipt.expires_at
+    ):
+        raise ValueError("Approval adapter returned an invalid receipt")
 
 
 _SAFE_PROVIDER_METADATA = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@/-]*\Z")

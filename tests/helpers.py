@@ -1,7 +1,11 @@
 """Synthetic-safe builders shared by behavior tests."""
 
+import base64
+import hashlib
+import hmac
+import json
 from collections.abc import Mapping
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from regulated_ai.application.ports import EvaluationObserver
 from regulated_ai.domain import (
@@ -23,6 +27,36 @@ from regulated_ai.domain import (
 )
 
 NOW = datetime(2026, 9, 23, 12, 0, tzinfo=UTC)
+
+
+def approval_assertion(
+    key: bytes,
+    decision_digest: str,
+    *,
+    approval_id: str = "approval-test-1",
+    actor_id: str = "approver-test-1",
+    issued_at: datetime = NOW,
+    expires_at: datetime | None = None,
+) -> str:
+    """Issue a synthetic external assertion for boundary tests only."""
+    payload = json.dumps(
+        {
+            "actor_id": actor_id,
+            "approval_id": approval_id,
+            "decision_digest": decision_digest,
+            "expires_at": int((expires_at or issued_at + timedelta(minutes=5)).timestamp()),
+            "issued_at": int(issued_at.timestamp()),
+            "schema_version": "1",
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    segment = base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
+    signed = f"ra1.{segment}"
+    signature = base64.urlsafe_b64encode(
+        hmac.new(key, signed.encode(), hashlib.sha256).digest()
+    ).rstrip(b"=")
+    return f"{signed}.{signature.decode()}"
 
 
 def synthetic_cpf() -> str:
@@ -72,11 +106,13 @@ class MemoryEnforcementRepository:
         if existing is not None:
             if existing.status in {
                 EnforcementStatus.EXECUTED,
+                EnforcementStatus.APPROVAL_FAILED,
                 EnforcementStatus.EXECUTION_FAILED,
             }:
                 return existing
             if existing.status is EnforcementStatus.DISPATCHED and record.status not in {
                 EnforcementStatus.EXECUTED,
+                EnforcementStatus.APPROVAL_FAILED,
                 EnforcementStatus.EXECUTION_FAILED,
             }:
                 return existing
