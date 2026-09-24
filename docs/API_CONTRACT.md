@@ -1,4 +1,4 @@
-# API contract — Phases 1 through 3a
+# API contract — Phases 1 through 4b
 
 The exact wire schema may be refined during implementation, but behavior and privacy boundaries
 must remain stable.
@@ -62,6 +62,11 @@ configuration facts required by conditional capabilities.
 Correlation IDs, logical field names, provider identifiers, policy versions and tool identifiers
 must use bounded machine-identifier syntax. Arbitrary content belongs only in ephemeral `value`
 fields and is never echoed in validation errors.
+
+Each requested tool requires only `name`. The legacy-compatible `risk_class` field is optional and
+is treated as an untrusted assertion: when present it must exactly match the organization-owned,
+versioned tool catalog. Unknown tools, duplicate names and mismatched claims fail closed with
+`TOOL_NOT_AUTHORIZED`. Catalog risk and schema data, never caller claims, drive policy matching.
 
 The CPF above is a public algorithm test/example value only. Tests may prefer clearly synthetic,
 non-person values generated specifically for the suite.
@@ -137,8 +142,9 @@ Accepts the same normalized request as `POST /v1/evaluations`, plus an optional
 `approval_assertion` string (maximum 4096 bytes). It evaluates policy, applies local field
 transformations and persists metadata-only enforcement state. The assertion is treated as a
 secret, is never persisted or returned and is inspected only for `REQUIRE_APPROVAL`. The default
-runtime calls the network-silent mock. Explicit gateway mode sends the sanitized text-only plan
-through `governed-llm-gateway`; tool-bearing plans still fail before network access.
+runtime calls the network-silent mock. Explicit gateway mode sends the sanitized plan through
+`governed-llm-gateway`; tool-bearing plans include only definitions resolved from the trusted
+catalog.
 
 The Phase 4a assertion is issued by an external organization-owned workflow and has the form
 `ra1.<base64url-canonical-json>.<base64url-hmac-sha256>`. Its exact fields are `schema_version=1`,
@@ -171,7 +177,8 @@ The response never includes source or transformed values:
   "output_digest": "sha256:...",
   "provider_execution_id": "mockexec_...",
   "provider_call_metadata": null,
-  "approval_receipt": null
+  "approval_receipt": null,
+  "tool_proposals": []
 }
 ```
 
@@ -179,6 +186,11 @@ In gateway mode, `provider_execution_id` begins with `gw_` and `provider_call_me
 only allowlisted gateway request/routing IDs, gateway policy ID/version, provider/model/deployment,
 latency, attempt/fallback indexes and cache state. It never contains request content, model output,
 credentials, provider response bodies or provider request IDs.
+
+When the gateway proposes a tool call, `tool_proposals` contains only `call_id`, trusted tool name,
+schema version/digest, an arguments digest and `execution_authorized: false`. Raw arguments are
+neither returned nor persisted. A proposal is not an executed action, and Phase 4a approval does
+not authorize its model-generated arguments.
 
 Status behavior:
 
@@ -220,6 +232,7 @@ Use stable machine-readable codes, for example:
 - `TRANSFORMATION_FAILED`
 - `EXECUTION_FAILED`
 - `APPROVAL_FAILED`
+- `TOOL_NOT_AUTHORIZED`
 - `ENFORCEMENT_PERSISTENCE_FAILED`
 
 Error messages must not echo raw sensitive input.

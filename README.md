@@ -114,16 +114,18 @@ The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`, `GET /v1/providers` and
 `GET /health`. It validates versioned YAML control-plane records at startup, applies transformations
 inside the local trust boundary and stores only metadata evidence in SQLite. It still stops before
-real provider inference unless gateway mode is explicitly configured. Gateway mode supports only
-text plans without tools, uses bounded timeouts, performs no local retry and discards model output
-after recording allowlisted routing/execution metadata. Approval assertions are issued outside the
-service, bound to the decision digest, accepted only ephemerally and consumed once before execution.
+real provider inference unless gateway mode is explicitly configured. Gateway mode uses bounded
+timeouts, performs no local retry, discards model output and accepts only tool definitions resolved
+from the versioned organization catalog. Returned tool calls are proposal metadata and are not
+executed; only allowlisted routing/execution metadata is recorded. Approval assertions are issued
+outside the service, bound to the decision digest, accepted only ephemerally and consumed once
+before execution.
 
 Not implemented in the first slice:
 
 - direct provider SDK adapters;
 - completion-returning API behavior;
-- tool forwarding to the governed gateway;
+- tool side-effect execution and action-digest-bound approval;
 - LLM-based policy judging;
 - frontend/dashboard;
 - SaaS multi-tenancy;

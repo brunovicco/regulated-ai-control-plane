@@ -18,6 +18,10 @@ provider-call metadata. The public enforcement response remains content-free.
 Phase 4a adds verification and one-time consumption of externally issued approval assertions.
 Approval remains outside model authority and is bound to the deterministic evaluation digest.
 
+Phase 4b removes caller control over tool risk. A versioned catalog supplies trusted risk classes
+and closed input schemas. The gateway may propose an authorized tool call, but RegulaAI stores only
+its metadata/digest and performs no tool side effect.
+
 ## Layers
 
 ```text
@@ -110,8 +114,9 @@ all stop before execution. See
 - `entrypoints/api.py`: explicit mock/gateway composition selected at startup.
 - `adapters/evidence_sqlite.py`: optional provider-call metadata stored with enforcement state.
 
-The gateway path is text-only and rejects tools before network access. Separate transport and
-provider timeouts are configured, while retry and fallback remain gateway-owned. The configured
+The gateway path sends only sanitized text and, in Phase 4b, trusted catalog tool definitions.
+Separate transport and provider timeouts are configured, while retry and fallback remain
+gateway-owned. The configured
 gateway workload must be constrained to the provider already evaluated by RegulaAI; terminal
 provider mismatch fails closed. An atomic `PREPARED -> DISPATCHED` claim prevents concurrent or
 post-crash replay from issuing a second external request; interrupted `DISPATCHED` records require
@@ -136,6 +141,27 @@ evaluate -> transform -> inspect digest-bound assertion -> persist PREPARED
 Missing assertions remain `WAITING_APPROVAL`. Invalid assertions never reach an execution claim;
 consumption failure after a claim becomes terminal `APPROVAL_FAILED`. The raw assertion is never
 stored. See [ADR-0007](adr/0007-digest-bound-external-approval.md).
+
+## Phase 4b components
+
+- `domain/models.py`: immutable authorized-tool definitions and metadata-only proposals.
+- `application/ports.py`: organization-owned tool-catalog contract.
+- `adapters/yaml_files.py`: strict versioned tool catalog and canonical schema digests.
+- `application/evaluate_operation.py`: fail-closed resolution and policy matching using catalog
+  risk classes only.
+- `adapters/gateway_execution.py`: trusted schema translation and proposal digesting.
+- `adapters/evidence_sqlite.py`: catalog/tool identities and argument digests without arguments.
+
+The sequence is:
+
+```text
+caller tool name -> catalog resolution -> deterministic policy -> trusted gateway definition
+                 -> model proposal -> metadata/digest only -> no tool execution
+```
+
+An approval bound to the evaluation digest does not authorize model-generated arguments. A later
+action-execution slice must validate exact arguments and require authority bound to their digest.
+See [ADR-0008](adr/0008-trusted-tool-catalog-and-proposal-boundary.md).
 
 ## Diagrams
 

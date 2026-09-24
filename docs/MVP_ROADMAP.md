@@ -55,8 +55,9 @@ Still allow a mock provider.
 
 ## Phase 3 — Provider execution adapters
 
-Status: Phase 3a implemented as an opt-in, text-only `governed-llm-gateway` adapter. Mock execution
-remains the default; tools and live composition proof remain pending.
+Status: Phase 3a implemented as an opt-in `governed-llm-gateway` adapter. Phase 4b adds trusted tool
+definitions and proposal-only results. Mock execution remains the default; live composition proof
+and tool side-effect execution remain pending.
 
 Goal:
 execute a sanitized request without duplicating gateway responsibilities.
@@ -87,14 +88,16 @@ Implemented in Phase 3a:
 ## Phase 4 — Approval and agent authority
 
 Status: Phase 4a implemented for externally issued, HMAC-authenticated approval assertions bound
-to the deterministic decision digest, with expiry and SQLite-backed single-use consumption. Tool
-forwarding remains deferred; the network-silent mock proves the authority transition.
+to the deterministic decision digest, with expiry and SQLite-backed single-use consumption. Phase
+4b adds a trusted tool catalog, server-side risk resolution and metadata-only gateway proposals.
+External tool side effects remain deferred.
 
 Deliver:
 - approval port; **implemented in Phase 4a**
 - decision-digest-bound approval; **implemented in Phase 4a**
 - expiry/replay protection; **implemented in Phase 4a**
-- tool allow/deny/approval matrix;
+- trusted tool allow/deny/approval matrix; **implemented in Phase 4b**
+- proposal-only gateway tool definitions and metadata; **implemented in Phase 4b**
 - demo with read vs high-impact action. **implemented against the mock boundary**
 
 ## Phase 5 — Operator dashboard

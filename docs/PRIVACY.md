@@ -38,6 +38,9 @@ Complete this document before processing personal or regulated data.
   organization-authorized provider. Gateway/model response content remains ephemeral and is
   discarded by this service. Provider/model/deployment and bounded routing/execution provenance
   may be retained as evidence metadata.
+- Tool definitions contain organization-owned names, descriptions and schemas. Model-produced tool
+  arguments remain ephemeral; RegulaAI persists and returns only their cryptographic digest and
+  trusted schema identity, and performs no tool side effect in Phase 4b.
 - Incident-response owner:
 
 ## Prohibited logging
