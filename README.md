@@ -91,8 +91,8 @@ Initial obligations include:
 
 ## Project status
 
-**Pre-alpha with deterministic evaluation, local enforcement, digest-bound external approval and
-an opt-in governed-gateway execution adapter.**
+**Pre-alpha with deterministic evaluation, local enforcement, digest-bound decision/action
+approval, trusted tool proposals and an opt-in governed-gateway execution adapter.**
 
 Current local flow:
 
@@ -108,16 +108,20 @@ Context
   -> External approval verification/one-time consumption when required
   -> Persisted PREPARED enforcement state
   -> Network-silent mock (default) or governed gateway (opt-in)
+  -> Exact tool-proposal validation and action-specific approval
+  -> Network-silent tool execution mock
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
-`POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`, `GET /v1/providers` and
-`GET /health`. It validates versioned YAML control-plane records at startup, applies transformations
+`POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`,
+`POST /v1/enforcements/{enforcement_id}/tool-actions`, `GET /v1/tool-actions/{action_id}`,
+`GET /v1/providers` and `GET /health`. It validates versioned YAML control-plane records at startup, applies transformations
 inside the local trust boundary and stores only metadata evidence in SQLite. It still stops before
 real provider inference unless gateway mode is explicitly configured. Gateway mode uses bounded
 timeouts, performs no local retry, discards model output and accepts only tool definitions resolved
-from the versioned organization catalog. Returned tool calls are proposal metadata and are not
-executed; only allowlisted routing/execution metadata is recorded. Approval assertions are issued
+from the versioned organization catalog. Returned tool calls remain unauthorized proposals until
+their exact arguments are resubmitted, validated and approved using separate action authority.
+Phase 4c tool execution is a network-silent mock. Approval assertions are issued
 outside the service, bound to the decision digest, accepted only ephemerally and consumed once
 before execution.
 
@@ -125,7 +129,7 @@ Not implemented in the first slice:
 
 - direct provider SDK adapters;
 - completion-returning API behavior;
-- tool side-effect execution and action-digest-bound approval;
+- live enterprise-system tool adapters and returning tool results to a model;
 - LLM-based policy judging;
 - frontend/dashboard;
 - SaaS multi-tenancy;

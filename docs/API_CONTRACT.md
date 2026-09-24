@@ -192,6 +192,28 @@ schema version/digest, an arguments digest and `execution_authorized: false`. Ra
 neither returned nor persisted. A proposal is not an executed action, and Phase 4a approval does
 not authorize its model-generated arguments.
 
+## POST /v1/enforcements/{enforcement_id}/tool-actions
+
+Resubmit one proposal's exact arguments with a downstream `workload_identity` and ephemeral
+`idempotency_key`. RegulaAI validates the closed trusted schema and stored proposal digest, then
+returns metadata-only `WAITING_APPROVAL` state and an `action_digest`. Every tool effect requires a
+separate action approval in Phase 4c.
+
+Resend the identical request with an externally issued `approval_assertion` using
+`ra2.<base64url-canonical-json>.<base64url-hmac-sha256>`. Its payload contains
+`schema_version=2`, `subject_type=tool_action`, `approval_id`, pseudonymous `actor_id`,
+`action_digest`, `issued_at` and `expires_at`. `ra1` decision approvals are rejected.
+
+After an atomic `DISPATCHED` claim, authority is consumed once and the network-silent mock tool
+port executes. Success returns `EXECUTED`; an ambiguous failure becomes terminal
+`RECONCILIATION_REQUIRED`. Responses and persistence exclude raw arguments, idempotency keys,
+assertions and tool output.
+
+## GET /v1/tool-actions/{action_id}
+
+Returns action identity, trusted schema/argument/action digests, workload identity, status,
+metadata-only approval receipt and execution/output digests. It never returns execution payloads.
+
 Status behavior:
 
 - `DENY` -> `BLOCKED_DENY`, with no transformation or execution;

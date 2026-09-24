@@ -1,3 +1,5 @@
+import hashlib
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -10,13 +12,17 @@ from regulated_ai.adapters import (
     FileProviderCapabilityRepository,
     FileToolCatalogRepository,
     GovernedGatewayExecutionAdapter,
+    HmacActionApprovalAdapter,
     HmacApprovalAdapter,
     HmacTokenizationAdapter,
     MockInferenceExecutionAdapter,
+    MockToolExecutionAdapter,
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
+    SqliteToolActionRepository,
 )
-from regulated_ai.application import EnforceAiOperation, EvaluateAiOperation
+from regulated_ai.application import EnforceAiOperation, EvaluateAiOperation, ExecuteToolAction
+from regulated_ai.domain import ToolProposal
 from regulated_ai.entrypoints.api import (
     EvaluationRequest,
     Runtime,
@@ -25,12 +31,13 @@ from regulated_ai.entrypoints.api import (
     create_app,
 )
 
-from ..helpers import approval_assertion, synthetic_cpf
+from ..helpers import action_approval_assertion, approval_assertion, synthetic_cpf
 
 APPROVAL_KEY = b"p" * 32
+ACTION_APPROVAL_KEY = b"r" * 32
 
 
-def _runtime(tmp_path: Path) -> Runtime:
+def _runtime(tmp_path: Path, *, tool_proposals: tuple[ToolProposal, ...] = ()) -> Runtime:
     root = Path(__file__).resolve().parents[2]
     policies = FilePolicyRepository(
         (root / "examples/policies/br-financial-external-inference.yaml",)
@@ -45,6 +52,7 @@ def _runtime(tmp_path: Path) -> Runtime:
     database_path = tmp_path / "evidence.sqlite3"
     evidence = SqliteEvidenceRepository(database_path)
     enforcement = SqliteEnforcementRepository(database_path)
+    actions = SqliteToolActionRepository(database_path)
     evaluator = EvaluateAiOperation(
         policies=policies,
         capabilities=capabilities,
@@ -53,7 +61,7 @@ def _runtime(tmp_path: Path) -> Runtime:
         tools=tools,
         clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
     )
-    mock = MockInferenceExecutionAdapter()
+    mock = MockInferenceExecutionAdapter(tool_proposals)
     approval = HmacApprovalAdapter(database_path, APPROVAL_KEY)
     enforcer = EnforceAiOperation(
         evaluator=evaluator,
@@ -61,6 +69,16 @@ def _runtime(tmp_path: Path) -> Runtime:
         enforcement=enforcement,
         execution=mock,
         approval=approval,
+        clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
+    )
+    mock_tool_execution = MockToolExecutionAdapter()
+    action_executor = ExecuteToolAction(
+        enforcement=enforcement,
+        evidence=evidence,
+        tools=tools,
+        actions=actions,
+        execution=mock_tool_execution,
+        approval=HmacActionApprovalAdapter(database_path, ACTION_APPROVAL_KEY),
         clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
     )
     return Runtime(
@@ -71,6 +89,35 @@ def _runtime(tmp_path: Path) -> Runtime:
         enforcement=enforcement,
         execution=mock,
         mock_execution=mock,
+        action_executor=action_executor,
+        actions=actions,
+        tool_execution=mock_tool_execution,
+        mock_tool_execution=mock_tool_execution,
+    )
+
+
+def _proposal(arguments: dict[str, str]) -> ToolProposal:
+    root = Path(__file__).resolve().parents[2]
+    tool = FileToolCatalogRepository(root / "examples/tools/br-financial-tools.yaml").get(
+        "cards.unblock"
+    )
+    assert tool is not None
+    binding = json.dumps(
+        {
+            "arguments": arguments,
+            "schema_digest": tool.input_schema_digest,
+            "tool": tool.name,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode()
+    return ToolProposal(
+        call_id="call_unblock_test",
+        tool_name=tool.name,
+        tool_schema_version=tool.schema_version,
+        tool_schema_digest=tool.input_schema_digest,
+        arguments_digest=f"sha256:{hashlib.sha256(binding).hexdigest()}",
     )
 
 
@@ -197,6 +244,17 @@ def test_runtime_approval_verifier_rejects_short_key(
         build_runtime(evidence_path=tmp_path / "approval-evidence.sqlite3")
 
 
+def test_runtime_rejects_reusing_decision_key_for_action_approval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shared_key = "shared-approval-key-material-123456789"
+    monkeypatch.setenv("REGULAAI_APPROVAL_HMAC_KEY", shared_key)
+    monkeypatch.setenv("REGULAAI_ACTION_APPROVAL_HMAC_KEY", shared_key)
+
+    with pytest.raises(ValueError, match="must differ"):
+        build_runtime(evidence_path=tmp_path / "approval-evidence.sqlite3")
+
+
 def test_enforcement_api_returns_only_metadata_after_mock_execution(tmp_path: Path) -> None:
     runtime = _runtime(tmp_path)
     app = create_app(lambda: runtime)
@@ -257,6 +315,59 @@ def test_external_approval_resumes_same_enforcement_and_is_consumed(tmp_path: Pa
     assert runtime.mock_execution is not None
     assert runtime.mock_execution.last_plan is not None
     assert runtime.mock_execution.last_plan.approval_receipt is not None
+
+
+def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_ephemeral(
+    tmp_path: Path,
+) -> None:
+    arguments = {
+        "account_token": "tok_synthetic_account",
+        "reason_code": "CUSTOMER_VERIFIED",
+    }
+    runtime = _runtime(tmp_path, tool_proposals=(_proposal(arguments),))
+    app = create_app(lambda: runtime)
+    request = _request()
+    idempotency_key = "idempotency-synthetic-action"
+
+    with TestClient(app) as client:
+        waiting_enforcement = client.post("/v1/enforcements", json=request).json()
+        evidence = client.get(
+            f"/v1/evidence/{waiting_enforcement['evaluation_evidence_id']}"
+        ).json()
+        decision_assertion = approval_assertion(APPROVAL_KEY, evidence["output_digest"])
+        completed_enforcement = client.post(
+            "/v1/enforcements",
+            json={**request, "approval_assertion": decision_assertion},
+        ).json()
+        action_request = {
+            "call_id": "call_unblock_test",
+            "arguments": arguments,
+            "workload_identity": "workload.cards-synthetic",
+            "idempotency_key": idempotency_key,
+        }
+        waiting_action = client.post(
+            f"/v1/enforcements/{completed_enforcement['enforcement_id']}/tool-actions",
+            json=action_request,
+        )
+        action_assertion = action_approval_assertion(
+            ACTION_APPROVAL_KEY, waiting_action.json()["action_digest"]
+        )
+        completed_action = client.post(
+            f"/v1/enforcements/{completed_enforcement['enforcement_id']}/tool-actions",
+            json={**action_request, "approval_assertion": action_assertion},
+        )
+        stored_action = client.get(f"/v1/tool-actions/{completed_action.json()['action_id']}")
+
+    assert waiting_action.status_code == 200
+    assert waiting_action.json()["status"] == "WAITING_APPROVAL"
+    assert completed_action.status_code == 200
+    assert completed_action.json()["status"] == "EXECUTED"
+    assert stored_action.json()["status"] == "EXECUTED"
+    assert runtime.mock_tool_execution.call_count == 1
+    database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
+    for raw_value in (*arguments.values(), idempotency_key, action_assertion):
+        assert raw_value not in database
+        assert raw_value not in completed_action.text
 
 
 def test_invalid_external_approval_fails_closed_without_echoing_it(tmp_path: Path) -> None:

@@ -60,6 +60,37 @@ def approval_assertion(
     return f"{signed}.{signature.decode()}"
 
 
+def action_approval_assertion(
+    key: bytes,
+    action_digest: str,
+    *,
+    approval_id: str = "action-approval-test-1",
+    actor_id: str = "approver-test-1",
+    issued_at: datetime = NOW,
+    expires_at: datetime | None = None,
+) -> str:
+    """Issue a synthetic action-specific assertion for boundary tests only."""
+    payload = json.dumps(
+        {
+            "action_digest": action_digest,
+            "actor_id": actor_id,
+            "approval_id": approval_id,
+            "expires_at": int((expires_at or issued_at + timedelta(minutes=5)).timestamp()),
+            "issued_at": int(issued_at.timestamp()),
+            "schema_version": "2",
+            "subject_type": "tool_action",
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    segment = base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
+    signed = f"ra2.{segment}"
+    signature = base64.urlsafe_b64encode(
+        hmac.new(key, signed.encode(), hashlib.sha256).digest()
+    ).rstrip(b"=")
+    return f"{signed}.{signature.decode()}"
+
+
 def synthetic_cpf() -> str:
     """Build a checksum-valid synthetic identifier without a copied fixture value."""
     base = [1, 2, 3, 4, 5, 6, 7, 8, 9]

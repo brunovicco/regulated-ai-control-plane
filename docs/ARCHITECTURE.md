@@ -159,9 +159,29 @@ caller tool name -> catalog resolution -> deterministic policy -> trusted gatewa
                  -> model proposal -> metadata/digest only -> no tool execution
 ```
 
-An approval bound to the evaluation digest does not authorize model-generated arguments. A later
-action-execution slice must validate exact arguments and require authority bound to their digest.
-See [ADR-0008](adr/0008-trusted-tool-catalog-and-proposal-boundary.md).
+An approval bound to the evaluation digest does not authorize model-generated arguments. Phase 4c
+therefore validates exact arguments and requires new authority bound to the action digest. See
+[ADR-0008](adr/0008-trusted-tool-catalog-and-proposal-boundary.md).
+
+## Phase 4c components
+
+- `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim
+  and fail-closed reconciliation lifecycle.
+- `adapters/action_approval.py`: domain-separated `ra2` HMAC verification and replay ledger.
+- `adapters/evidence_sqlite.py`: metadata-only action records and atomic `DISPATCHED` claim.
+- `adapters/mock_tool_execution.py`: local, network-silent execution proof.
+- `entrypoints/api.py`: two-step action submission and metadata-only inspection endpoints.
+
+```text
+stored proposal + resubmitted arguments -> schema/digest validation -> action digest
+    -> WAITING_APPROVAL -> inspect ra2 -> PREPARED -> claim DISPATCHED
+    -> consume once -> mock tool boundary -> EXECUTED
+                              \-> ambiguous failure -> RECONCILIATION_REQUIRED
+```
+
+Raw arguments and idempotency keys exist only in the request and ephemeral action plan. Phase 4c
+does not return tool output to a model or enable a live enterprise connector. See
+[ADR-0009](adr/0009-action-digest-bound-tool-execution.md).
 
 ## Diagrams
 

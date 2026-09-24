@@ -87,10 +87,10 @@ Implemented in Phase 3a:
 
 ## Phase 4 — Approval and agent authority
 
-Status: Phase 4a implemented for externally issued, HMAC-authenticated approval assertions bound
-to the deterministic decision digest, with expiry and SQLite-backed single-use consumption. Phase
-4b adds a trusted tool catalog, server-side risk resolution and metadata-only gateway proposals.
-External tool side effects remain deferred.
+Status: Phases 4a–4c implemented. Decision approval is bound to the pre-inference deterministic
+digest; trusted tool proposals stop at metadata; exact resubmitted arguments require a separate,
+domain-separated action approval before a network-silent tool execution boundary is crossed.
+Live enterprise-system side effects remain deferred.
 
 Deliver:
 - approval port; **implemented in Phase 4a**
@@ -98,6 +98,9 @@ Deliver:
 - expiry/replay protection; **implemented in Phase 4a**
 - trusted tool allow/deny/approval matrix; **implemented in Phase 4b**
 - proposal-only gateway tool definitions and metadata; **implemented in Phase 4b**
+- exact argument/schema/digest validation; **implemented in Phase 4c**
+- action-digest-bound approval and single-use consumption; **implemented in Phase 4c**
+- atomic action claim and ambiguous-outcome reconciliation state; **implemented in Phase 4c**
 - demo with read vs high-impact action. **implemented against the mock boundary**
 
 ## Phase 5 — Operator dashboard

@@ -2,16 +2,17 @@
 
 import hashlib
 
-from regulated_ai.domain import ExecutionPlan, ProviderExecutionReceipt
+from regulated_ai.domain import ExecutionPlan, ProviderExecutionReceipt, ToolProposal
 
 
 class MockInferenceExecutionAdapter:
     """Capture a sanitized execution plan and return metadata without model content."""
 
-    def __init__(self) -> None:
+    def __init__(self, tool_proposals: tuple[ToolProposal, ...] = ()) -> None:
         """Initialize an empty process-local capture surface."""
         self.last_plan: ExecutionPlan | None = None
         self.call_count = 0
+        self._tool_proposals = tool_proposals
 
     def execute(self, plan: ExecutionPlan) -> ProviderExecutionReceipt:
         """Capture only the already-transformed plan and simulate no external call."""
@@ -23,4 +24,5 @@ class MockInferenceExecutionAdapter:
             provider_target=plan.provider.identifier,
             plan_id=plan.plan_id,
             output_digest=plan.output_digest,
+            tool_proposals=self._tool_proposals,
         )

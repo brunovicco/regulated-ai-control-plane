@@ -1,5 +1,38 @@
 # Implementation plan
 
+## Phase 4c — action-bound approval and bounded tool execution
+
+### Goal
+
+Validate exact proposed arguments and require fresh authority bound to the resulting action digest
+before any tool execution boundary is crossed.
+
+### Work
+
+1. Add immutable action grant, plan, record, receipt and lifecycle types plus action persistence,
+   approval and execution ports.
+2. Revalidate ephemeral arguments against the current trusted schema and require their canonical
+   digest to match the stored proposal.
+3. Bind enforcement, call, catalog/tool definition, schema, arguments, downstream workload and
+   idempotency digest into one deterministic action digest.
+4. Use domain-separated `ra2` assertions with a dedicated key and replay ledger; never accept a
+   Phase 4a decision approval as action authority.
+5. Persist and atomically claim metadata-only action state before execution. Treat ambiguous
+   failures as terminal reconciliation cases with no automatic retry.
+6. Expose the two-step action API and a network-silent mock tool adapter. Keep live connectors and
+   tool-result/model composition out of scope.
+7. Add unit, persistence and end-to-end privacy/authority tests and document ADR-0009.
+
+### Decisions and assumptions
+
+- Every tool effect, including catalog `read_only` operations, requires action-specific approval in
+  this first execution slice.
+- Raw arguments, idempotency keys, assertions and tool output are ephemeral and never persisted or
+  returned.
+- A proposal has at most one action binding. Changing workload identity or idempotency after the
+  binding is created fails with a conflict.
+- Live downstream integrations remain disabled; Phase 4c proves the authority contract locally.
+
 ## Phase 4b — trusted tool authority and proposal boundary
 
 ### Goal

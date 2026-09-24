@@ -20,6 +20,7 @@
 4. enforcement service -> governed gateway/provider execution;
 5. external approval system -> enforcement service approval verifier;
 6. control-plane policy/registry release -> runtime enforcement plane.
+7. enforcement service -> organization tool system through the tool execution port.
 
 ## Threats and required mitigations
 
@@ -46,7 +47,22 @@ Mitigations:
 - approval state is external and explicit.
 - tool risk, description and schema come from a versioned organization catalog, never model output
   or caller claims;
-- gateway tool calls are proposals only and cannot invoke an external side effect in Phase 4b.
+- gateway tool calls are proposals only; Phase 4c requires exact argument validation and separate
+  action-specific authority before its network-silent tool boundary.
+
+### Model proposal gains excessive authority
+
+Threat:
+a valid decision approval or altered/replayed arguments execute a model-proposed external action.
+
+Mitigations:
+- decision (`ra1`) and action (`ra2`) assertions use separate schemas, prefixes and keys;
+- action digest binds enforcement/call, current catalog definition/schema, exact argument digest,
+  downstream workload and idempotency digest;
+- resubmitted arguments must satisfy the closed schema and reproduce the stored proposal digest;
+- each proposal has one immutable action binding and one atomic execution claim;
+- approval is consumed before the tool port and ambiguous failures are never retried automatically;
+- Phase 4c exposes only a network-silent mock tool adapter.
 
 ### Caller downgrades tool risk
 
@@ -178,6 +194,10 @@ future asymmetric or OIDC adapter should remove signing capability from the enfo
 - malformed, failed or content-free terminal gateway response.
 - malformed, tampered, expired, future, wrong-digest or replayed approval assertion;
 - approval consumption fails after the execution claim;
+- decision approval is presented as action approval;
+- action arguments or current catalog schema differ from the stored proposal;
+- concurrent action attempts or a changed idempotency key target the same proposal;
+- tool timeout produces `RECONCILIATION_REQUIRED` without an automatic retry;
 - caller supplies a false tool risk class or unknown tool name;
 - gateway proposes an unlisted tool, duplicate call id or non-JSON/oversized arguments;
 - tool proposal metadata leaks raw arguments or is mistaken for execution authority.

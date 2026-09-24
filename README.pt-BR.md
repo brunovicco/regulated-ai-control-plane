@@ -93,8 +93,8 @@ Obrigações iniciais:
 
 ## Status do projeto
 
-**Pre-alpha com avaliação determinística, enforcement local, aprovação externa vinculada ao
-digest, catálogo confiável de ferramentas e adapter opt-in de execução via gateway governado.**
+**Pre-alpha com avaliação determinística, enforcement local, aprovações de decisão e ação
+vinculadas a digests, catálogo confiável de ferramentas e adapter opt-in via gateway governado.**
 
 Objetivo atual:
 
@@ -111,15 +111,19 @@ Contexto
   -> Verificação e consumo único de aprovação externa quando exigida
   -> Estado PREPARED persistido
   -> Mock sem rede (padrão) ou gateway governado (opt-in)
+  -> Validação exata da proposta e aprovação específica da ação
+  -> Mock de execução de ferramenta sem rede
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
-`POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`, `GET /v1/providers` e
-`GET /health`. O modo padrão continua sem rede. Quando configurado explicitamente, o modo gateway
+`POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`,
+`POST /v1/enforcements/{enforcement_id}/tool-actions`, `GET /v1/tool-actions/{action_id}`,
+`GET /v1/providers` e `GET /health`. O modo padrão continua sem rede. Quando configurado explicitamente, o modo gateway
 usa timeouts limitados, não realiza retry local, descarta a saída do modelo e aceita somente
 definições de ferramentas resolvidas pelo catálogo versionado da organização. Chamadas de
-ferramentas retornadas pelo modelo são propostas apenas com metadados e não são executadas; somente
-metadados permitidos de roteamento e execução são registrados.
+ferramentas retornadas pelo modelo continuam sem autoridade até que os argumentos exatos sejam
+reenviados, validados e aprovados com uma autoridade de ação separada. A execução da Fase 4c usa
+somente um mock sem rede.
 As asserções de aprovação são emitidas fora do serviço, vinculadas ao digest determinístico da
 decisão, recebidas apenas de forma efêmera e consumidas uma única vez antes da execução.
 
@@ -127,7 +131,7 @@ Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
 - retorno de completion pela API;
-- execução de efeitos de ferramentas e aprovação vinculada ao digest exato da ação;
+- adapters reais para sistemas corporativos e retorno do resultado da ferramenta ao modelo;
 - LLM decidindo política;
 - frontend/dashboard;
 - SaaS multi-tenant;
