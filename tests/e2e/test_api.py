@@ -8,6 +8,7 @@ from regulated_ai.adapters import (
     DeterministicDataClassifier,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
+    GovernedGatewayExecutionAdapter,
     HmacTokenizationAdapter,
     MockInferenceExecutionAdapter,
     SqliteEnforcementRepository,
@@ -54,7 +55,15 @@ def _runtime(tmp_path: Path) -> Runtime:
         execution=mock,
         clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
     )
-    return Runtime(evaluator, evidence, capabilities, enforcer, enforcement, mock)
+    return Runtime(
+        evaluator=evaluator,
+        evidence=evidence,
+        capabilities=capabilities,
+        enforcer=enforcer,
+        enforcement=enforcement,
+        execution=mock,
+        mock_execution=mock,
+    )
 
 
 def _request() -> dict[str, object]:
@@ -130,6 +139,32 @@ def test_packaged_runtime_records_are_loadable(tmp_path: Path) -> None:
     assert {item.target.provider for item in runtime.capabilities.list()} == {"aws", "openai"}
 
 
+def test_runtime_gateway_mode_requires_complete_explicit_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_EXECUTION_MODE", "gateway")
+    monkeypatch.setenv("GOVERNED_LLM_GATEWAY_URL", "https://gateway.example.test")
+    monkeypatch.setenv("GOVERNED_LLM_GATEWAY_API_KEY", "synthetic-gateway-credential")
+    monkeypatch.setenv("REGULAAI_GATEWAY_WORKLOAD", "regulated-ai.external-inference")
+    monkeypatch.setenv("REGULAAI_GATEWAY_ALLOWED_TARGET", "openai.responses_api.global")
+    monkeypatch.setenv("REGULAAI_GATEWAY_EXPECTED_PROVIDER", "openai")
+
+    runtime = build_runtime(evidence_path=tmp_path / "gateway-evidence.sqlite3")
+
+    assert isinstance(runtime.execution, GovernedGatewayExecutionAdapter)
+    assert runtime.mock_execution is None
+
+
+def test_runtime_gateway_mode_fails_closed_on_partial_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_EXECUTION_MODE", "gateway")
+    monkeypatch.delenv("GOVERNED_LLM_GATEWAY_URL", raising=False)
+
+    with pytest.raises(ValueError, match="GOVERNED_LLM_GATEWAY_URL"):
+        build_runtime(evidence_path=tmp_path / "gateway-evidence.sqlite3")
+
+
 def test_enforcement_api_returns_only_metadata_after_mock_execution(tmp_path: Path) -> None:
     runtime = _runtime(tmp_path)
     app = create_app(lambda: runtime)
@@ -153,10 +188,12 @@ def test_enforcement_api_returns_only_metadata_after_mock_execution(tmp_path: Pa
     for value in raw_values:
         assert value not in response.text
         assert value not in stored.text
-    assert runtime.mock_execution.last_plan is not None
-    plan_values = {item.field: item.value for item in runtime.mock_execution.last_plan.data_items}
+    mock_execution = runtime.mock_execution
+    assert mock_execution is not None
+    assert mock_execution.last_plan is not None
+    plan_values = {item.field: item.value for item in mock_execution.last_plan.data_items}
     assert plan_values["customer_document"].startswith("tok_")
-    assert raw_values[0] not in repr(runtime.mock_execution.last_plan)
+    assert raw_values[0] not in repr(mock_execution.last_plan)
 
 
 def test_api_returns_stable_errors_without_echoing_sensitive_content(tmp_path: Path) -> None:

@@ -1,4 +1,44 @@
-# Phase 1 implementation plan
+# Implementation plan
+
+## Phase 3a — governed gateway execution
+
+### Goal
+
+Execute an already-sanitized text request through `governed-llm-gateway` without copying provider
+routing, credentials, retry or fallback into RegulaAI. Keep the integration opt-in, metadata-only
+outside the ephemeral execution payload and network-silent in the default test/runtime profile.
+
+### Work
+
+1. Pin the gateway's thin typed client to a reviewed Git commit and add a synchronous
+   `InferenceExecutionPort` adapter over its bounded async client lifecycle.
+2. Translate the execution plan into one provider-neutral text message, conservative risk/data
+   classification and explicit workload/time limits. Reject tools until RegulaAI has a complete
+   tool-schema and approval contract.
+3. Require an explicit execution mode plus gateway URL, credential, workload, allowed RegulaAI
+   target and expected terminal provider. Partial/unsafe configuration fails at startup.
+4. Treat all gateway output as untrusted. Require terminal success and matching provider
+   provenance, discard response content, and persist only routing/execution metadata.
+5. Keep the mock adapter as the default. Add unit, persistence and composition tests with fake
+   clients only; no test may make a live gateway/provider call.
+6. Record the integration boundary in an ADR, update runtime/API/privacy documentation and run the
+   complete quality and security gates.
+
+### Decisions and assumptions
+
+- Gateway mode is opt-in through `REGULAAI_EXECUTION_MODE=gateway`; unset means the existing
+  network-silent mock.
+- The configured gateway workload must authorize only deployments whose provider matches the
+  RegulaAI target. The adapter verifies terminal provenance but cannot repair a misconfigured
+  gateway after a provider call.
+- The initial adapter supports text-only execution plans without tools. Unsupported plans fail
+  before any network call.
+- Gateway/provider response content remains ephemeral and is discarded because the current API is
+  an enforcement/evidence surface, not a completion-returning product API.
+- The consumer makes one gateway request. Retry and fallback remain inside the gateway's already
+  authorized candidate set.
+- Gateway packages are not published to PyPI, so the client is pinned to an immutable Git commit
+  rather than a moving branch.
 
 Phase 1 is complete. The following accepted iteration extends it without changing the deterministic
 decision contract.

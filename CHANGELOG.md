@@ -32,11 +32,15 @@ The project is currently **pre-alpha**. Until the first release, breaking change
 - Metadata-only transformation receipts and enforcement lifecycle evidence.
 - HMAC tokenization abstraction and network-silent mock execution port.
 - Metadata-only enforcement HTTP endpoints.
+- Opt-in text-only execution through a Git-pinned `governed-llm-gateway` client.
+- Bounded gateway/provider timeouts, explicit workload/target binding and fail-closed provenance
+  validation.
+- Metadata-only gateway routing and provider-call evidence.
 
 ### Planned
 
-- OpenAI and Amazon Bedrock execution adapters behind an `InferenceExecutionPort`.
-- Integration path with `governed-llm-gateway`.
+- Additional reviewed gateway workload/target bindings, including Bedrock-backed deployments.
+- Live local composition proof with `governed-llm-gateway`.
 - Human-approval workflow and agent-authority controls.
 
 ### Security

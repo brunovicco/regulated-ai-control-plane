@@ -16,7 +16,7 @@ Complete this document before processing personal or regulated data.
 - Encryption in transit:
 - Encryption at rest:
 - Masking/tokenization: Phase 2 executes field removal, fixed masking, HMAC tokenization and HMAC
-  pseudonymization locally before the mock execution boundary. Receipts contain digests, never
+  pseudonymization locally before any execution boundary. Receipts contain digests, never
   source or transformed values.
 - Non-production data strategy: tests and examples use generated or explicitly synthetic values;
   tests assert that sentinels do not appear in evidence or errors.
@@ -29,8 +29,11 @@ Complete this document before processing personal or regulated data.
   status descriptions, and exception details. W3C baggage is not propagated by default.
 - Data-subject deletion/anonymization: define evidence retention and correlation-id deletion
   handling before production use.
-- External processors: none through Phase 2; evaluation and mock execution perform no provider or
-  network call.
+- External processors: none in the default mock mode. Opt-in gateway mode sends only the sanitized
+  execution payload to the explicitly configured `governed-llm-gateway`, which may invoke an
+  organization-authorized provider. Gateway/model response content remains ephemeral and is
+  discarded by this service. Provider/model/deployment and bounded routing/execution provenance
+  may be retained as evidence metadata.
 - Incident-response owner:
 
 ## Prohibited logging

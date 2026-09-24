@@ -59,6 +59,10 @@ class EnforcementRepository(Protocol):
         """Persist the latest state for one enforcement attempt."""
         ...
 
+    def claim_execution(self, record: EnforcementRecord) -> tuple[EnforcementRecord, bool]:
+        """Atomically advance PREPARED to DISPATCHED and report claim ownership."""
+        ...
+
     def get(self, enforcement_id: str) -> EnforcementRecord | None:
         """Return one enforcement record by id."""
         ...
@@ -101,7 +105,7 @@ class TokenizationPort(Protocol):
 
 
 class InferenceExecutionPort(Protocol):
-    """Reserved boundary for future post-enforcement provider execution."""
+    """Boundary for post-enforcement provider or gateway execution."""
 
     def execute(self, plan: ExecutionPlan) -> ProviderExecutionReceipt:
         """Execute only a transformed, evidence-backed decision plan."""

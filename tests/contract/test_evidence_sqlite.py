@@ -13,6 +13,7 @@ from regulated_ai.domain import (
     EnforcementStatus,
     EvidenceMetadata,
     ObligationType,
+    ProviderCallMetadata,
     TransformationReceipt,
 )
 
@@ -77,16 +78,40 @@ def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path
     )
 
     repository.save(prepared)
+    dispatched, claimed = repository.claim_execution(
+        replace(prepared, status=EnforcementStatus.DISPATCHED)
+    )
     completed = repository.save(
         replace(
-            prepared,
+            dispatched,
             status=EnforcementStatus.EXECUTED,
             provider_execution_id="mockexec_test",
+            provider_call_metadata=ProviderCallMetadata(
+                gateway_request_id="00000000-0000-0000-0000-000000000001",
+                routing_decision_id="route_1",
+                policy_id="gateway.policy",
+                policy_version="1.0",
+                provider="openai",
+                model="gpt-test",
+                deployment="openai-test",
+                latency_ms=25,
+                attempt_number=1,
+                fallback_index=0,
+                cached=False,
+            ),
         )
     )
 
     assert completed.status is EnforcementStatus.EXECUTED
+    assert claimed
     assert completed.provider_execution_id == "mockexec_test"
+    assert completed.provider_call_metadata is not None
+    assert completed.provider_call_metadata.routing_decision_id == "route_1"
+    replayed, replay_claimed = repository.claim_execution(
+        replace(prepared, status=EnforcementStatus.DISPATCHED)
+    )
+    assert replayed.status is EnforcementStatus.EXECUTED
+    assert not replay_claimed
     assert repository.save(prepared).status is EnforcementStatus.EXECUTED
     assert repository.get("missing") is None
     assert "raw-sensitive-sentinel" not in path.read_bytes().decode(errors="ignore")

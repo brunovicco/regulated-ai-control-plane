@@ -6,6 +6,10 @@ from regulated_ai.adapters.evidence_sqlite import (
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
 )
+from regulated_ai.adapters.gateway_execution import (
+    GovernedGatewayExecutionAdapter,
+    GovernedGatewayExecutionConfig,
+)
 from regulated_ai.adapters.mock_execution import MockInferenceExecutionAdapter
 from regulated_ai.adapters.tokenization import HmacTokenizationAdapter
 from regulated_ai.adapters.yaml_files import (
@@ -21,6 +25,8 @@ __all__ = [
     "DeterministicDataClassifier",
     "FilePolicyRepository",
     "FileProviderCapabilityRepository",
+    "GovernedGatewayExecutionAdapter",
+    "GovernedGatewayExecutionConfig",
     "HmacTokenizationAdapter",
     "MalformedYamlError",
     "MockInferenceExecutionAdapter",

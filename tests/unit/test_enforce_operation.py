@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from regulated_ai.adapters.classifier import DeterministicDataClassifier
@@ -102,7 +104,7 @@ def test_transformations_are_applied_before_mock_execution(
     result = enforcer.execute(context(data_items=(DataItem("sensitive_field", sentinel),)))
 
     assert result.status is EnforcementStatus.EXECUTED
-    assert records.saved_statuses == ["PREPARED", "EXECUTED"]
+    assert records.saved_statuses == ["PREPARED", "DISPATCHED", "EXECUTED"]
     assert mock.call_count == 1
     assert mock.last_plan is not None
     values = {item.field: item.value for item in mock.last_plan.data_items}
@@ -228,8 +230,12 @@ def test_persistence_failure_prevents_execution() -> None:
 
 
 class _BrokenExecution:
+    def __init__(self) -> None:
+        self.call_count = 0
+
     def execute(self, plan: ExecutionPlan) -> ProviderExecutionReceipt:
         del plan
+        self.call_count += 1
         raise TimeoutError("synthetic execution timeout")
 
 
@@ -242,18 +248,23 @@ def test_execution_failure_is_recorded_and_fails_closed() -> None:
         clock=lambda: NOW,
     )
     records = MemoryEnforcementRepository()
+    broken = _BrokenExecution()
     enforcer = EnforceAiOperation(
         evaluator=evaluator,
         tokenizer=HmacTokenizationAdapter(b"t" * 32),
         enforcement=records,
-        execution=_BrokenExecution(),
+        execution=broken,
         clock=lambda: NOW,
     )
 
     with pytest.raises(ExecutionFailedError):
         enforcer.execute(context())
 
-    assert records.saved_statuses == ["PREPARED", "EXECUTION_FAILED"]
+    replayed = enforcer.execute(context())
+
+    assert replayed.status is EnforcementStatus.EXECUTION_FAILED
+    assert broken.call_count == 1
+    assert records.saved_statuses == ["PREPARED", "DISPATCHED", "EXECUTION_FAILED"]
 
 
 class _MismatchedExecution:
@@ -286,7 +297,7 @@ def test_untrusted_execution_receipt_is_validated() -> None:
     with pytest.raises(ExecutionFailedError):
         enforcer.execute(context())
 
-    assert records.saved_statuses == ["PREPARED", "EXECUTION_FAILED"]
+    assert records.saved_statuses == ["PREPARED", "DISPATCHED", "EXECUTION_FAILED"]
 
 
 def test_hmac_tokenization_is_scoped_and_rejects_short_keys() -> None:
@@ -310,4 +321,27 @@ def test_completed_enforcement_is_idempotent() -> None:
 
     assert first == second
     assert mock.call_count == 1
-    assert records.saved_statuses == ["PREPARED", "EXECUTED"]
+    assert records.saved_statuses == ["PREPARED", "DISPATCHED", "EXECUTED"]
+
+
+class _ContendedExecutionRepository(MemoryEnforcementRepository):
+    def claim_execution(self, record: EnforcementRecord) -> tuple[EnforcementRecord, bool]:
+        dispatched = replace(record, status=EnforcementStatus.DISPATCHED)
+        self.items[record.enforcement_id] = dispatched
+        self.saved_statuses.append(dispatched.status.value)
+        return dispatched, False
+
+
+def test_execution_claim_contention_does_not_repeat_external_call() -> None:
+    mock = MockInferenceExecutionAdapter()
+    enforcer, records, _ = _enforcer(
+        _policy(DecisionOutcome.ALLOW),
+        enforcement=_ContendedExecutionRepository(),
+        execution=mock,
+    )
+
+    result = enforcer.execute(context())
+
+    assert result.status is EnforcementStatus.DISPATCHED
+    assert mock.call_count == 0
+    assert records.saved_statuses == ["PREPARED", "DISPATCHED"]

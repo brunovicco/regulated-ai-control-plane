@@ -29,6 +29,7 @@ from regulated_ai.domain import (
     ExecutionPlan,
     Obligation,
     ObligationType,
+    ProviderCallMetadata,
     ProviderExecutionReceipt,
     TransformationReceipt,
 )
@@ -135,27 +136,37 @@ class EnforceAiOperation:
             provider_execution_id=None,
         )
         stored_prepared = self._save(prepared)
-        if stored_prepared.status is EnforcementStatus.EXECUTED:
+        if stored_prepared.status in {
+            EnforcementStatus.DISPATCHED,
+            EnforcementStatus.EXECUTED,
+            EnforcementStatus.EXECUTION_FAILED,
+        }:
             self._emit("enforcement.completed", status=stored_prepared.status.value)
             return _to_result(stored_prepared)
+        dispatched = replace(prepared, status=EnforcementStatus.DISPATCHED)
+        stored_dispatched, claimed = self._claim_execution(dispatched)
+        if not claimed:
+            self._emit("enforcement.completed", status=stored_dispatched.status.value)
+            return _to_result(stored_dispatched)
         try:
             provider_receipt = self._execution.execute(plan)
             _validate_provider_receipt(provider_receipt, plan)
         except Exception as exc:
             failed = replace(
-                prepared,
+                dispatched,
                 status=EnforcementStatus.EXECUTION_FAILED,
-                reason_codes=tuple(sorted({*prepared.reason_codes, "EXECUTION_FAILED"})),
+                reason_codes=tuple(sorted({*dispatched.reason_codes, "EXECUTION_FAILED"})),
             )
             self._save(failed)
             self._emit("enforcement.failed", error_type=type(exc).__name__)
             raise ExecutionFailedError("The execution port failed") from exc
         completed = replace(
-            prepared,
+            dispatched,
             status=EnforcementStatus.EXECUTED,
             provider_execution_id=provider_receipt.execution_id,
+            provider_call_metadata=provider_receipt.call_metadata,
         )
-        self._emit("execution.mocked", provider_execution_id=provider_receipt.execution_id)
+        self._emit("execution.completed", provider_execution_id=provider_receipt.execution_id)
         stored = self._save(completed)
         self._emit("enforcement.completed", status=stored.status.value)
         return _to_result(stored)
@@ -290,6 +301,14 @@ class EnforceAiOperation:
                 "Enforcement metadata could not be persisted"
             ) from exc
 
+    def _claim_execution(self, record: EnforcementRecord) -> tuple[EnforcementRecord, bool]:
+        try:
+            return self._enforcement.claim_execution(record)
+        except Exception as exc:
+            raise EnforcementPersistenceError(
+                "Enforcement execution claim could not be persisted"
+            ) from exc
+
     def _emit(self, event: str, **metadata: str) -> None:
         if self._observer is None:
             return
@@ -317,6 +336,9 @@ def _execution_plan(
         plan_id=f"plan_{plan_key.removeprefix('sha256:')[:24]}",
         evaluation_id=evaluation.evaluation_id,
         decision_digest=evaluation.output_digest,
+        operation_kind=context.operation_kind,
+        purpose=context.purpose.name,
+        assurance_level=context.assurance_level,
         provider=context.provider,
         data_items=transformed,
         tools=context.tools,
@@ -373,6 +395,7 @@ def _execution_output_digest(data_items: tuple[DataItem, ...], context: Evaluati
 def _status_family(status: EnforcementStatus) -> str:
     if status in {
         EnforcementStatus.PREPARED,
+        EnforcementStatus.DISPATCHED,
         EnforcementStatus.EXECUTED,
         EnforcementStatus.EXECUTION_FAILED,
     }:
@@ -391,6 +414,7 @@ def _to_result(record: EnforcementRecord) -> EnforcementResult:
         reason_codes=record.reason_codes,
         output_digest=record.output_digest,
         provider_execution_id=record.provider_execution_id,
+        provider_call_metadata=record.provider_call_metadata,
     )
 
 
@@ -406,6 +430,32 @@ def _validate_provider_receipt(receipt: ProviderExecutionReceipt, plan: Executio
         or receipt.output_digest != plan.output_digest
     ):
         raise ValueError("Execution adapter returned an invalid receipt")
+    if receipt.call_metadata is not None:
+        _validate_provider_call_metadata(receipt.call_metadata)
+
+
+_SAFE_PROVIDER_METADATA = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@/-]*\Z")
+
+
+def _validate_provider_call_metadata(metadata: ProviderCallMetadata) -> None:
+    values = (
+        metadata.gateway_request_id,
+        metadata.routing_decision_id,
+        metadata.policy_id,
+        metadata.policy_version,
+        metadata.provider,
+        metadata.model,
+        metadata.deployment,
+    )
+    if (
+        any(
+            len(value) > 256 or _SAFE_PROVIDER_METADATA.fullmatch(value) is None for value in values
+        )
+        or metadata.latency_ms < 0
+        or metadata.attempt_number <= 0
+        or metadata.fallback_index < 0
+    ):
+        raise ValueError("Execution adapter returned invalid provider metadata")
 
 
 def _digest(value: object) -> str:

@@ -1,4 +1,4 @@
-# API contract — Phases 1 and 2
+# API contract — Phases 1 through 3a
 
 The exact wire schema may be refined during implementation, but behavior and privacy boundaries
 must remain stable.
@@ -134,8 +134,9 @@ No credentials/config secrets.
 ## POST /v1/enforcements
 
 Accepts the same normalized request as `POST /v1/evaluations`. It evaluates policy, applies local
-field transformations, persists metadata-only enforcement state and calls only the Phase 2
-network-silent mock execution port.
+field transformations and persists metadata-only enforcement state. The default runtime calls the
+Phase 2 network-silent mock. Explicit gateway mode sends the sanitized text-only plan through
+`governed-llm-gateway`; tool-bearing plans fail before network access.
 
 The response never includes source or transformed values:
 
@@ -158,15 +159,26 @@ The response never includes source or transformed values:
   ],
   "reason_codes": [],
   "output_digest": "sha256:...",
-  "provider_execution_id": "mockexec_..."
+  "provider_execution_id": "mockexec_...",
+  "provider_call_metadata": null
 }
 ```
+
+In gateway mode, `provider_execution_id` begins with `gw_` and `provider_call_metadata` may contain
+only allowlisted gateway request/routing IDs, gateway policy ID/version, provider/model/deployment,
+latency, attempt/fallback indexes and cache state. It never contains request content, model output,
+credentials, provider response bodies or provider request IDs.
 
 Status behavior:
 
 - `DENY` -> `BLOCKED_DENY`, with no transformation or execution;
 - `REQUIRE_APPROVAL` -> `WAITING_APPROVAL`, transformed in memory but not executed;
-- allowed outcome -> `PREPARED` is persisted before the mock port, then `EXECUTED`;
+- allowed outcome -> `PREPARED` is persisted, an atomic claim advances it to `DISPATCHED` before
+  the configured execution port, then a successful result becomes `EXECUTED`;
+- replay or concurrency that observes `DISPATCHED` does not call the execution port again; this
+  fail-closed state requires operational reconciliation after an interrupted process;
+- `EXECUTION_FAILED` is also terminal for automatic replay because a timeout or transport failure
+  may be ambiguous after external processing;
 - transformation or execution error -> fail closed with a stable error code.
 
 ## GET /v1/enforcements/{enforcement_id}

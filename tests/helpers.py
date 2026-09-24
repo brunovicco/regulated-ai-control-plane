@@ -69,14 +69,31 @@ class MemoryEnforcementRepository:
 
     def save(self, record: EnforcementRecord) -> EnforcementRecord:
         existing = self.items.get(record.enforcement_id)
-        if existing is not None and existing.status is EnforcementStatus.EXECUTED:
-            return existing
+        if existing is not None:
+            if existing.status in {
+                EnforcementStatus.EXECUTED,
+                EnforcementStatus.EXECUTION_FAILED,
+            }:
+                return existing
+            if existing.status is EnforcementStatus.DISPATCHED and record.status not in {
+                EnforcementStatus.EXECUTED,
+                EnforcementStatus.EXECUTION_FAILED,
+            }:
+                return existing
         self.items[record.enforcement_id] = record
         self.saved_statuses.append(record.status.value)
         return record
 
     def get(self, enforcement_id: str) -> EnforcementRecord | None:
         return self.items.get(enforcement_id)
+
+    def claim_execution(self, record: EnforcementRecord) -> tuple[EnforcementRecord, bool]:
+        existing = self.items.get(record.enforcement_id)
+        if existing is None or existing.status is not EnforcementStatus.PREPARED:
+            return existing or record, False
+        self.items[record.enforcement_id] = record
+        self.saved_statuses.append(record.status.value)
+        return record, True
 
 
 class MemoryPolicyRepository:

@@ -1,7 +1,9 @@
-# Phase 1 and 2 local demo
+# Phase 1 through 3a local demo
 
 The demo evaluates and locally enforces a synthetic Brazilian financial-services operation. It
 performs no provider or network call and needs no cloud credentials.
+
+The opt-in Phase 3a gateway path is not exercised by the default demo or automated tests.
 
 ## Start the service
 
@@ -100,5 +102,17 @@ Inspect the stored metadata with:
 curl http://127.0.0.1:8000/v1/enforcements/enf_REPLACE_WITH_RETURNED_ID
 ```
 
-The service persists `PREPARED` before invoking the mock port and then advances the same record to
-`EXECUTED`. A persistence or transformation failure stops before execution.
+The service persists `PREPARED`, atomically claims `DISPATCHED` before invoking the execution port
+and then advances the same record to `EXECUTED`. A persistence or transformation failure stops
+before execution. A repeated request that observes `DISPATCHED` does not issue another call.
+
+## Optional governed gateway execution
+
+Set `REGULAAI_EXECUTION_MODE=gateway` and provide every gateway variable documented in
+`.env.example` before process startup. Use a request without tools: Phase 3a rejects tool-bearing
+plans before network access. The configured gateway workload must be reviewed to authorize only
+deployments compatible with `REGULAAI_GATEWAY_ALLOWED_TARGET` and
+`REGULAAI_GATEWAY_EXPECTED_PROVIDER`.
+
+Gateway mode sends the sanitized text payload to the configured service and may incur provider
+cost. The response remains metadata-only; model output is discarded and never stored by RegulaAI.

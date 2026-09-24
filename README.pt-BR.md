@@ -91,7 +91,8 @@ Obrigações iniciais:
 
 ## Status do projeto
 
-**Pre-alpha com avaliação determinística e enforcement local da Fase 2 implementados.**
+**Pre-alpha com avaliação determinística, enforcement local e adapter opt-in de execução via
+gateway da Fase 3a.**
 
 Objetivo atual:
 
@@ -105,17 +106,20 @@ Contexto
   -> Transformações locais
   -> Recibos de transformação apenas com metadados
   -> Estado PREPARED persistido
-  -> Execução mock sem rede
+  -> Mock sem rede (padrão) ou gateway governado (opt-in)
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`, `GET /v1/providers` e
-`GET /health`. A Fase 2 ainda não realiza inferência com um provedor real.
+`GET /health`. O modo padrão continua sem rede. Quando configurado explicitamente, o modo gateway
+executa somente planos textuais sem ferramentas, usa timeouts limitados, não realiza retry local e
+descarta a saída do modelo após registrar metadados permitidos de roteamento/execução.
 
 Fora do primeiro ciclo:
 
-- chamadas reais à OpenAI;
-- chamadas reais ao Amazon Bedrock;
+- adapters diretos de SDKs de providers;
+- retorno de completion pela API;
+- encaminhamento de ferramentas e execução de aprovações;
 - LLM decidindo política;
 - frontend/dashboard;
 - SaaS multi-tenant;
@@ -167,7 +171,11 @@ Ela não deve registrar prompts completos, respostas de modelos, valores de dado
 
 ### Portabilidade entre providers
 
-A visão de longo prazo mantém a inteligência regulatória e as políticas corporativas acima do provedor de inferência. Um futuro execution port poderá integrar com o [`governed-llm-gateway`](https://github.com/brunovicco/governed-llm-gateway), evitando duplicar roteamento, resiliência e normalização multi-provider.
+A arquitetura mantém a inteligência regulatória e as políticas corporativas acima do provedor de
+inferência. O primeiro adapter real integra com o
+[`governed-llm-gateway`](https://github.com/brunovicco/governed-llm-gateway), evitando duplicar
+roteamento, resiliência, credenciais de providers e normalização multi-provider. O modo é opt-in;
+mock continua sendo o padrão.
 
 ## Precedência de decisão
 

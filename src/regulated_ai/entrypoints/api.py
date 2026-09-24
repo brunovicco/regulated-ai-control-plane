@@ -1,4 +1,4 @@
-"""FastAPI transport and composition root for the Phase 1 evaluation service."""
+"""FastAPI transport and composition root for evaluation and enforcement."""
 
 import os
 import secrets
@@ -17,6 +17,8 @@ from regulated_ai.adapters import (
     DeterministicDataClassifier,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
+    GovernedGatewayExecutionAdapter,
+    GovernedGatewayExecutionConfig,
     HmacTokenizationAdapter,
     MockInferenceExecutionAdapter,
     SqliteEnforcementRepository,
@@ -27,6 +29,7 @@ from regulated_ai.application import EnforceAiOperation, EvaluateAiOperation, Ev
 from regulated_ai.application.ports import (
     EnforcementRepository,
     EvidenceRepository,
+    InferenceExecutionPort,
     ProviderCapabilityRepository,
 )
 from regulated_ai.domain import (
@@ -39,6 +42,7 @@ from regulated_ai.domain import (
     EvaluationResult,
     EvidenceMetadata,
     Jurisdiction,
+    ProviderCallMetadata,
     ProviderTarget,
     Purpose,
     Sector,
@@ -104,7 +108,8 @@ class Runtime:
     capabilities: ProviderCapabilityRepository
     enforcer: EnforceAiOperation
     enforcement: EnforcementRepository
-    mock_execution: MockInferenceExecutionAdapter
+    execution: InferenceExecutionPort
+    mock_execution: MockInferenceExecutionAdapter | None
 
 
 def build_runtime(
@@ -142,12 +147,12 @@ def build_runtime(
     tokenizer = HmacTokenizationAdapter(
         configured_key.encode() if configured_key is not None else secrets.token_bytes(32)
     )
-    mock_execution = MockInferenceExecutionAdapter()
+    execution, mock_execution = _execution_adapter_from_environment()
     enforcer = EnforceAiOperation(
         evaluator=evaluator,
         tokenizer=tokenizer,
         enforcement=enforcement,
-        execution=mock_execution,
+        execution=execution,
         observer=observer,
     )
     return Runtime(
@@ -156,8 +161,65 @@ def build_runtime(
         capabilities=capabilities,
         enforcer=enforcer,
         enforcement=enforcement,
+        execution=execution,
         mock_execution=mock_execution,
     )
+
+
+def _execution_adapter_from_environment() -> tuple[
+    InferenceExecutionPort, MockInferenceExecutionAdapter | None
+]:
+    mode = os.environ.get("REGULAAI_EXECUTION_MODE", "mock").strip().casefold()
+    if mode == "mock":
+        mock = MockInferenceExecutionAdapter()
+        return mock, mock
+    if mode != "gateway":
+        raise ValueError("REGULAAI_EXECUTION_MODE must be 'mock' or 'gateway'")
+    adapter = GovernedGatewayExecutionAdapter(
+        GovernedGatewayExecutionConfig(
+            base_url=_required_environment("GOVERNED_LLM_GATEWAY_URL"),
+            api_key=_required_environment("GOVERNED_LLM_GATEWAY_API_KEY"),
+            workload=_required_environment("REGULAAI_GATEWAY_WORKLOAD"),
+            allowed_target=_required_environment("REGULAAI_GATEWAY_ALLOWED_TARGET"),
+            expected_provider=_required_environment("REGULAAI_GATEWAY_EXPECTED_PROVIDER"),
+            request_timeout_seconds=_float_environment(
+                "REGULAAI_GATEWAY_REQUEST_TIMEOUT_SECONDS", 60.0
+            ),
+            provider_timeout_seconds=_float_environment(
+                "REGULAAI_GATEWAY_PROVIDER_TIMEOUT_SECONDS", 30.0
+            ),
+            max_output_tokens=_integer_environment("REGULAAI_GATEWAY_MAX_OUTPUT_TOKENS", 2000),
+            max_input_bytes=_integer_environment("REGULAAI_GATEWAY_MAX_INPUT_BYTES", 1024 * 1024),
+        )
+    )
+    return adapter, None
+
+
+def _required_environment(name: str) -> str:
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        raise ValueError(f"{name} is required in gateway execution mode")
+    return value
+
+
+def _float_environment(name: str, default: float) -> float:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number") from exc
+
+
+def _integer_environment(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
 
 
 def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAPI:
@@ -342,6 +404,7 @@ def _enforcement_result_payload(result: EnforcementResult) -> dict[str, object]:
         "reason_codes": list(result.reason_codes),
         "output_digest": result.output_digest,
         "provider_execution_id": result.provider_execution_id,
+        "provider_call_metadata": _provider_call_payload(result.provider_call_metadata),
     }
 
 
@@ -356,6 +419,7 @@ def _enforcement_record_payload(record: EnforcementRecord) -> dict[str, object]:
         reason_codes=record.reason_codes,
         output_digest=record.output_digest,
         provider_execution_id=record.provider_execution_id,
+        provider_call_metadata=record.provider_call_metadata,
     )
     return {
         **_enforcement_result_payload(result),
@@ -375,6 +439,24 @@ def _receipt_payload(receipt: TransformationReceipt) -> dict[str, str]:
         "input_digest": receipt.input_digest,
         "output_digest": receipt.output_digest,
         "reason_code": receipt.reason_code,
+    }
+
+
+def _provider_call_payload(metadata: ProviderCallMetadata | None) -> dict[str, object] | None:
+    if metadata is None:
+        return None
+    return {
+        "gateway_request_id": metadata.gateway_request_id,
+        "routing_decision_id": metadata.routing_decision_id,
+        "policy_id": metadata.policy_id,
+        "policy_version": metadata.policy_version,
+        "provider": metadata.provider,
+        "model": metadata.model,
+        "deployment": metadata.deployment,
+        "latency_ms": metadata.latency_ms,
+        "attempt_number": metadata.attempt_number,
+        "fallback_index": metadata.fallback_index,
+        "cached": metadata.cached,
     }
 
 
