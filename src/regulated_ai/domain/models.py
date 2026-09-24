@@ -70,6 +70,17 @@ class EnforcementStatus(StrEnum):
     EXECUTION_FAILED = "EXECUTION_FAILED"
 
 
+class ToolActionStatus(StrEnum):
+    """Lifecycle state for one action bound to an exact tool proposal."""
+
+    WAITING_APPROVAL = "WAITING_APPROVAL"
+    PREPARED = "PREPARED"
+    DISPATCHED = "DISPATCHED"
+    EXECUTED = "EXECUTED"
+    APPROVAL_FAILED = "APPROVAL_FAILED"
+    RECONCILIATION_REQUIRED = "RECONCILIATION_REQUIRED"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -399,6 +410,30 @@ class ApprovalReceipt:
 
 
 @dataclass(frozen=True, slots=True)
+class ActionApprovalGrant:
+    """Verified but unconsumed authority for one exact tool action."""
+
+    approval_id: str
+    actor_id: str
+    action_digest: str
+    issued_at: datetime
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ActionApprovalReceipt:
+    """Metadata-only proof that action-specific authority was consumed."""
+
+    approval_id: str
+    actor_id: str
+    action_digest: str
+    action_id: str
+    issued_at: datetime
+    expires_at: datetime
+    consumed_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class ExecutionPlan:
     """Ephemeral sanitized payload suitable for an inference execution port."""
 
@@ -443,6 +478,68 @@ class ProviderExecutionReceipt:
     output_digest: str
     call_metadata: ProviderCallMetadata | None = None
     tool_proposals: tuple[ToolProposal, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ToolActionPlan:
+    """Ephemeral exact action passed only to the downstream execution boundary."""
+
+    action_id: str
+    action_digest: str
+    enforcement_id: str
+    call_id: str
+    tool: AuthorizedTool
+    workload_identity: str
+    idempotency_key: str
+    arguments: tuple[tuple[str, str], ...]
+    approval_receipt: ActionApprovalReceipt
+
+
+@dataclass(frozen=True, slots=True)
+class ToolExecutionReceipt:
+    """Metadata-only receipt from the bounded tool execution boundary."""
+
+    execution_id: str
+    action_id: str
+    output_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class ToolActionRecord:
+    """Persisted metadata for one exact proposed action."""
+
+    action_id: str
+    created_at: datetime
+    enforcement_id: str
+    evaluation_id: str
+    call_id: str
+    tool_name: str
+    tool_schema_version: str
+    tool_schema_digest: str
+    arguments_digest: str
+    workload_identity: str
+    idempotency_key_digest: str
+    action_digest: str
+    status: ToolActionStatus
+    approval_receipt: ActionApprovalReceipt | None = None
+    tool_execution_id: str | None = None
+    output_digest: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ToolActionResult:
+    """Metadata-only action state returned to a caller."""
+
+    action_id: str
+    enforcement_id: str
+    call_id: str
+    tool_name: str
+    workload_identity: str
+    action_digest: str
+    status: ToolActionStatus
+    approval_receipt: ActionApprovalReceipt | None = None
+    tool_execution_id: str | None = None
+    output_digest: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

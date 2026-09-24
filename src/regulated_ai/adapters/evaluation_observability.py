@@ -20,12 +20,19 @@ _EVENTS = frozenset(
         "execution.completed",
         "enforcement.completed",
         "enforcement.failed",
+        "tool_action.started",
+        "tool_action.waiting_approval",
+        "tool_action.approval_validated",
+        "tool_action.approval_consumed",
+        "tool_action.completed",
+        "tool_action.failed",
     }
 )
 _METADATA_KEYS = frozenset(
     {
         "capability_key",
         "approval_id",
+        "action_id",
         "correlation_id",
         "decision",
         "error_type",

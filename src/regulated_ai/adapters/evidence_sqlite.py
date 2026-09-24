@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from regulated_ai.domain import (
+    ActionApprovalReceipt,
     ApprovalReceipt,
     DataClassification,
     DecisionOutcome,
@@ -15,6 +16,8 @@ from regulated_ai.domain import (
     EvidenceMetadata,
     ObligationType,
     ProviderCallMetadata,
+    ToolActionRecord,
+    ToolActionStatus,
     ToolProposal,
     TransformationReceipt,
 )
@@ -111,6 +114,62 @@ _ENFORCEMENT_CLAIM = """
 UPDATE enforcement
 SET status = 'DISPATCHED'
 WHERE enforcement_id = ? AND status = 'PREPARED'
+"""
+_TOOL_ACTION_SCHEMA = """
+CREATE TABLE IF NOT EXISTS tool_action (
+    action_id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    enforcement_id TEXT NOT NULL,
+    evaluation_id TEXT NOT NULL,
+    call_id TEXT NOT NULL,
+    tool_name TEXT NOT NULL,
+    tool_schema_version TEXT NOT NULL,
+    tool_schema_digest TEXT NOT NULL,
+    arguments_digest TEXT NOT NULL,
+    workload_identity TEXT NOT NULL,
+    idempotency_key_digest TEXT NOT NULL,
+    action_digest TEXT NOT NULL,
+    status TEXT NOT NULL,
+    approval_receipt TEXT,
+    tool_execution_id TEXT,
+    output_digest TEXT,
+    UNIQUE(enforcement_id, call_id)
+)
+"""
+_TOOL_ACTION_UPSERT = """
+INSERT INTO tool_action (
+    action_id, created_at, enforcement_id, evaluation_id, call_id, tool_name,
+    tool_schema_version, tool_schema_digest, arguments_digest, workload_identity,
+    idempotency_key_digest, action_digest, status, approval_receipt,
+    tool_execution_id, output_digest
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT(action_id) DO UPDATE SET
+    status=excluded.status,
+    approval_receipt=excluded.approval_receipt,
+    tool_execution_id=excluded.tool_execution_id,
+    output_digest=excluded.output_digest
+WHERE tool_action.enforcement_id=excluded.enforcement_id
+  AND tool_action.evaluation_id=excluded.evaluation_id
+  AND tool_action.call_id=excluded.call_id
+  AND tool_action.tool_name=excluded.tool_name
+  AND tool_action.tool_schema_version=excluded.tool_schema_version
+  AND tool_action.tool_schema_digest=excluded.tool_schema_digest
+  AND tool_action.arguments_digest=excluded.arguments_digest
+  AND tool_action.workload_identity=excluded.workload_identity
+  AND tool_action.idempotency_key_digest=excluded.idempotency_key_digest
+  AND tool_action.action_digest=excluded.action_digest
+  AND (
+      (tool_action.status='WAITING_APPROVAL' AND excluded.status IN ('WAITING_APPROVAL','PREPARED'))
+      OR (
+          tool_action.status='DISPATCHED'
+          AND excluded.status IN ('EXECUTED','APPROVAL_FAILED','RECONCILIATION_REQUIRED')
+      )
+  )
+"""
+_TOOL_ACTION_CLAIM = """
+UPDATE tool_action
+SET status = 'DISPATCHED'
+WHERE action_id = ? AND status = 'PREPARED'
 """
 
 
@@ -321,6 +380,98 @@ class SqliteEnforcementRepository:
             connection.close()
 
 
+class SqliteToolActionRepository:
+    """Persist action-binding metadata without raw arguments or outputs."""
+
+    def __init__(self, path: Path) -> None:
+        """Initialize the action table in the shared local database."""
+        self._path = path
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as connection:
+            connection.execute(_TOOL_ACTION_SCHEMA)
+
+    def save(self, record: ToolActionRecord) -> ToolActionRecord:
+        """Insert or safely advance one action state."""
+        values = (
+            record.action_id,
+            record.created_at.isoformat(),
+            record.enforcement_id,
+            record.evaluation_id,
+            record.call_id,
+            record.tool_name,
+            record.tool_schema_version,
+            record.tool_schema_digest,
+            record.arguments_digest,
+            record.workload_identity,
+            record.idempotency_key_digest,
+            record.action_digest,
+            record.status.value,
+            _action_approval_receipt_json(record.approval_receipt),
+            record.tool_execution_id,
+            record.output_digest,
+        )
+        with self._connect() as connection:
+            connection.execute(_TOOL_ACTION_UPSERT, values)
+        stored = self.get(record.action_id)
+        if stored is None:
+            raise RuntimeError("Tool-action insert did not produce a record")
+        return stored
+
+    def get(self, action_id: str) -> ToolActionRecord | None:
+        """Return one metadata-only action record."""
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM tool_action WHERE action_id = ?", (action_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        from datetime import datetime
+
+        return ToolActionRecord(
+            action_id=str(row[0]),
+            created_at=datetime.fromisoformat(str(row[1])),
+            enforcement_id=str(row[2]),
+            evaluation_id=str(row[3]),
+            call_id=str(row[4]),
+            tool_name=str(row[5]),
+            tool_schema_version=str(row[6]),
+            tool_schema_digest=str(row[7]),
+            arguments_digest=str(row[8]),
+            workload_identity=str(row[9]),
+            idempotency_key_digest=str(row[10]),
+            action_digest=str(row[11]),
+            status=ToolActionStatus(str(row[12])),
+            approval_receipt=_action_approval_receipt(row[13]),
+            tool_execution_id=None if row[14] is None else str(row[14]),
+            output_digest=None if row[15] is None else str(row[15]),
+        )
+
+    def claim_execution(self, record: ToolActionRecord) -> tuple[ToolActionRecord, bool]:
+        """Atomically claim one prepared action before crossing the boundary."""
+        if record.status is not ToolActionStatus.DISPATCHED:
+            raise ValueError("Tool-action claim requires DISPATCHED status")
+        with self._connect() as connection:
+            cursor = connection.execute(_TOOL_ACTION_CLAIM, (record.action_id,))
+            claimed = cursor.rowcount == 1
+        stored = self.get(record.action_id)
+        if stored is None:
+            raise RuntimeError("Tool-action claim has no record")
+        return stored, claimed
+
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(self._path, timeout=5.0)
+        connection.execute("PRAGMA busy_timeout = 5000")
+        try:
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+
 def _receipts_json(receipts: tuple[TransformationReceipt, ...]) -> str:
     return json.dumps(
         [
@@ -489,6 +640,56 @@ def _approval_receipt(value: object) -> ApprovalReceipt | None:
         actor_id=parsed["actor_id"],
         decision_digest=parsed["decision_digest"],
         enforcement_id=parsed["enforcement_id"],
+        issued_at=datetime.fromisoformat(parsed["issued_at"]),
+        expires_at=datetime.fromisoformat(parsed["expires_at"]),
+        consumed_at=datetime.fromisoformat(parsed["consumed_at"]),
+    )
+
+
+def _action_approval_receipt_json(receipt: ActionApprovalReceipt | None) -> str | None:
+    if receipt is None:
+        return None
+    return json.dumps(
+        {
+            "action_digest": receipt.action_digest,
+            "action_id": receipt.action_id,
+            "actor_id": receipt.actor_id,
+            "approval_id": receipt.approval_id,
+            "consumed_at": receipt.consumed_at.isoformat(),
+            "expires_at": receipt.expires_at.isoformat(),
+            "issued_at": receipt.issued_at.isoformat(),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _action_approval_receipt(value: object) -> ActionApprovalReceipt | None:
+    if value is None:
+        return None
+    parsed = json.loads(str(value))
+    expected = {
+        "action_digest",
+        "action_id",
+        "actor_id",
+        "approval_id",
+        "consumed_at",
+        "expires_at",
+        "issued_at",
+    }
+    if (
+        not isinstance(parsed, dict)
+        or set(parsed) != expected
+        or not all(isinstance(parsed[key], str) for key in expected)
+    ):
+        raise ValueError("Stored action approval receipt is invalid")
+    from datetime import datetime
+
+    return ActionApprovalReceipt(
+        approval_id=parsed["approval_id"],
+        actor_id=parsed["actor_id"],
+        action_digest=parsed["action_digest"],
+        action_id=parsed["action_id"],
         issued_at=datetime.fromisoformat(parsed["issued_at"]),
         expires_at=datetime.fromisoformat(parsed["expires_at"]),
         consumed_at=datetime.fromisoformat(parsed["consumed_at"]),

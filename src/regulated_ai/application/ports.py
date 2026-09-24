@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Protocol
 
 from regulated_ai.domain import (
+    ActionApprovalGrant,
+    ActionApprovalReceipt,
     ApprovalGrant,
     ApprovalReceipt,
     AuthorizedTool,
@@ -16,6 +18,9 @@ from regulated_ai.domain import (
     ProviderCapabilityRecord,
     ProviderExecutionReceipt,
     ProviderTarget,
+    ToolActionPlan,
+    ToolActionRecord,
+    ToolExecutionReceipt,
 )
 
 
@@ -89,6 +94,22 @@ class EnforcementRepository(Protocol):
         ...
 
 
+class ToolActionRepository(Protocol):
+    """Persist and atomically claim metadata-only tool actions."""
+
+    def save(self, record: ToolActionRecord) -> ToolActionRecord:
+        """Insert or advance one action while preserving immutable binding metadata."""
+        ...
+
+    def claim_execution(self, record: ToolActionRecord) -> tuple[ToolActionRecord, bool]:
+        """Atomically advance PREPARED to DISPATCHED and report claim ownership."""
+        ...
+
+    def get(self, action_id: str) -> ToolActionRecord | None:
+        """Return one metadata-only action record by identifier."""
+        ...
+
+
 class DataClassifier(Protocol):
     """Apply only deterministic classification supported by the MVP."""
 
@@ -129,6 +150,30 @@ class ApprovalPort(Protocol):
         ...
 
 
+class ActionApprovalPort(Protocol):
+    """Validate and consume authority bound to an exact action digest."""
+
+    def inspect(
+        self,
+        assertion: str,
+        *,
+        action_digest: str,
+        now: datetime,
+    ) -> ActionApprovalGrant:
+        """Verify an action assertion without consuming it."""
+        ...
+
+    def consume(
+        self,
+        grant: ActionApprovalGrant,
+        *,
+        action_id: str,
+        now: datetime,
+    ) -> ActionApprovalReceipt:
+        """Consume one verified action grant exactly once."""
+        ...
+
+
 class TokenizationPort(Protocol):
     """Transform sensitive values without exposing key material to the application."""
 
@@ -146,4 +191,12 @@ class InferenceExecutionPort(Protocol):
 
     def execute(self, plan: ExecutionPlan) -> ProviderExecutionReceipt:
         """Execute only a transformed, evidence-backed decision plan."""
+        ...
+
+
+class ToolExecutionPort(Protocol):
+    """Boundary for an exact, approved and idempotent tool action."""
+
+    def execute(self, plan: ToolActionPlan) -> ToolExecutionReceipt:
+        """Execute one action using explicit downstream identity and idempotency."""
         ...

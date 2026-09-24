@@ -1,6 +1,8 @@
 """RegulaAI framework-free business entities and invariants."""
 
 from regulated_ai.domain.models import (
+    ActionApprovalGrant,
+    ActionApprovalReceipt,
     ApprovalGrant,
     ApprovalReceipt,
     AssuranceLevel,
@@ -32,6 +34,11 @@ from regulated_ai.domain.models import (
     ProviderTarget,
     Purpose,
     Sector,
+    ToolActionPlan,
+    ToolActionRecord,
+    ToolActionResult,
+    ToolActionStatus,
+    ToolExecutionReceipt,
     ToolProposal,
     ToolRequest,
     TransformationReceipt,
@@ -39,6 +46,8 @@ from regulated_ai.domain.models import (
 )
 
 __all__ = [
+    "ActionApprovalGrant",
+    "ActionApprovalReceipt",
     "ApprovalGrant",
     "ApprovalReceipt",
     "AssuranceLevel",
@@ -70,6 +79,11 @@ __all__ = [
     "ProviderTarget",
     "Purpose",
     "Sector",
+    "ToolActionPlan",
+    "ToolActionRecord",
+    "ToolActionResult",
+    "ToolActionStatus",
+    "ToolExecutionReceipt",
     "ToolProposal",
     "ToolRequest",
     "TransformationReceipt",

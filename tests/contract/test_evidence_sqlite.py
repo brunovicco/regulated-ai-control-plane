@@ -7,8 +7,10 @@ from pathlib import Path
 from regulated_ai.adapters.evidence_sqlite import (
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
+    SqliteToolActionRepository,
 )
 from regulated_ai.domain import (
+    ActionApprovalReceipt,
     ApprovalReceipt,
     DataClassification,
     DecisionOutcome,
@@ -17,6 +19,8 @@ from regulated_ai.domain import (
     EvidenceMetadata,
     ObligationType,
     ProviderCallMetadata,
+    ToolActionRecord,
+    ToolActionStatus,
     ToolProposal,
     TransformationReceipt,
 )
@@ -176,3 +180,59 @@ def test_enforcement_repository_migrates_phase_three_schema(tmp_path: Path) -> N
         columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(enforcement)")}
     assert "approval_receipt" in columns
     assert "tool_proposals" in columns
+
+
+def test_tool_action_round_trip_claims_once_without_ephemeral_values(tmp_path: Path) -> None:
+    path = tmp_path / "actions.sqlite3"
+    repository = SqliteToolActionRepository(path)
+    waiting = ToolActionRecord(
+        action_id="act_test",
+        created_at=datetime(2026, 9, 23, tzinfo=UTC),
+        enforcement_id="enf_test",
+        evaluation_id="eval_test",
+        call_id="call_test",
+        tool_name="cards.unblock",
+        tool_schema_version="1",
+        tool_schema_digest="sha256:schema",
+        arguments_digest="sha256:arguments",
+        workload_identity="workload.test",
+        idempotency_key_digest="sha256:idempotency",
+        action_digest="sha256:action",
+        status=ToolActionStatus.WAITING_APPROVAL,
+    )
+    repository.save(waiting)
+    prepared = repository.save(replace(waiting, status=ToolActionStatus.PREPARED))
+
+    dispatched, claimed = repository.claim_execution(
+        replace(prepared, status=ToolActionStatus.DISPATCHED)
+    )
+    replayed, replay_claimed = repository.claim_execution(
+        replace(prepared, status=ToolActionStatus.DISPATCHED)
+    )
+    completed = repository.save(
+        replace(
+            dispatched,
+            status=ToolActionStatus.EXECUTED,
+            approval_receipt=ActionApprovalReceipt(
+                approval_id="action-approval-test",
+                actor_id="approver-test",
+                action_digest=waiting.action_digest,
+                action_id=waiting.action_id,
+                issued_at=datetime(2026, 9, 23, 11, 55, tzinfo=UTC),
+                expires_at=datetime(2026, 9, 23, 12, 5, tzinfo=UTC),
+                consumed_at=datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
+            ),
+            tool_execution_id="mocktool_test",
+            output_digest="sha256:output",
+        )
+    )
+
+    assert claimed
+    assert not replay_claimed
+    assert replayed.status is ToolActionStatus.DISPATCHED
+    assert completed.status is ToolActionStatus.EXECUTED
+    assert completed.approval_receipt is not None
+    assert repository.save(waiting).status is ToolActionStatus.EXECUTED
+    stored = path.read_bytes().decode(errors="ignore")
+    assert "raw-arguments-sentinel" not in stored
+    assert "raw-idempotency-sentinel" not in stored

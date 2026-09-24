@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -20,21 +21,32 @@ from regulated_ai.adapters import (
     FileToolCatalogRepository,
     GovernedGatewayExecutionAdapter,
     GovernedGatewayExecutionConfig,
+    HmacActionApprovalAdapter,
     HmacApprovalAdapter,
     HmacTokenizationAdapter,
     MockInferenceExecutionAdapter,
+    MockToolExecutionAdapter,
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
+    SqliteToolActionRepository,
     StructuredEvaluationObserver,
 )
-from regulated_ai.application import EnforceAiOperation, EvaluateAiOperation, EvaluationError
+from regulated_ai.application import (
+    EnforceAiOperation,
+    EvaluateAiOperation,
+    EvaluationError,
+    ExecuteToolAction,
+)
 from regulated_ai.application.ports import (
     EnforcementRepository,
     EvidenceRepository,
     InferenceExecutionPort,
     ProviderCapabilityRepository,
+    ToolActionRepository,
+    ToolExecutionPort,
 )
 from regulated_ai.domain import (
+    ActionApprovalReceipt,
     ApprovalReceipt,
     AssuranceLevel,
     DataClassification,
@@ -49,6 +61,8 @@ from regulated_ai.domain import (
     ProviderTarget,
     Purpose,
     Sector,
+    ToolActionRecord,
+    ToolActionResult,
     ToolProposal,
     ToolRequest,
     TransformationReceipt,
@@ -111,6 +125,21 @@ class EnforcementRequest(EvaluationRequest):
     approval_assertion: SecretStr | None = Field(default=None, min_length=1, max_length=4096)
 
 
+ToolArgumentValue = Annotated[str, Field(strict=True, max_length=4096)]
+
+
+class ToolActionRequest(_TransportModel):
+    """Ephemeral exact arguments plus downstream authority context."""
+
+    call_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:@-]*$")
+    arguments: dict[str, ToolArgumentValue] = Field(max_length=128)
+    workload_identity: str = Field(
+        min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:@-]*$"
+    )
+    idempotency_key: SecretStr = Field(min_length=1, max_length=256)
+    approval_assertion: SecretStr | None = Field(default=None, min_length=1, max_length=4096)
+
+
 @dataclass(frozen=True, slots=True)
 class Runtime:
     """Initialized application services exposed to transport handlers."""
@@ -122,6 +151,10 @@ class Runtime:
     enforcement: EnforcementRepository
     execution: InferenceExecutionPort
     mock_execution: MockInferenceExecutionAdapter | None
+    action_executor: ExecuteToolAction
+    actions: ToolActionRepository
+    tool_execution: ToolExecutionPort
+    mock_tool_execution: MockToolExecutionAdapter
 
 
 def build_runtime(
@@ -151,6 +184,7 @@ def build_runtime(
     database_path = evidence_path or Path(configured_path or "var/regulaai-evidence.sqlite3")
     repository = SqliteEvidenceRepository(database_path)
     enforcement = SqliteEnforcementRepository(database_path)
+    actions = SqliteToolActionRepository(database_path)
     observer = StructuredEvaluationObserver()
     evaluator = EvaluateAiOperation(
         policies=policies,
@@ -185,6 +219,33 @@ def build_runtime(
         approval=approval,
         observer=observer,
     )
+    configured_action_approval_key = os.environ.get("REGULAAI_ACTION_APPROVAL_HMAC_KEY")
+    if (
+        configured_action_approval_key is not None
+        and configured_action_approval_key == configured_approval_key
+    ):
+        raise ValueError("Decision and action approval HMAC keys must differ")
+    action_approval = (
+        None
+        if configured_action_approval_key is None
+        else HmacActionApprovalAdapter(
+            database_path,
+            configured_action_approval_key.encode(),
+            max_lifetime_seconds=_integer_environment(
+                "REGULAAI_ACTION_APPROVAL_MAX_LIFETIME_SECONDS", 3600
+            ),
+        )
+    )
+    mock_tool_execution = MockToolExecutionAdapter()
+    action_executor = ExecuteToolAction(
+        enforcement=enforcement,
+        evidence=repository,
+        tools=tools,
+        actions=actions,
+        execution=mock_tool_execution,
+        approval=action_approval,
+        observer=observer,
+    )
     return Runtime(
         evaluator=evaluator,
         evidence=repository,
@@ -193,6 +254,10 @@ def build_runtime(
         enforcement=enforcement,
         execution=execution,
         mock_execution=mock_execution,
+        action_executor=action_executor,
+        actions=actions,
+        tool_execution=mock_tool_execution,
+        mock_tool_execution=mock_tool_execution,
     )
 
 
@@ -272,8 +337,18 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
             status = 404
         elif exc.code == "INVALID_EVALUATION_CONTEXT":
             status = 422
-        elif exc.code in {"APPROVAL_FAILED", "TOOL_NOT_AUTHORIZED"}:
+        elif exc.code in {
+            "ACTION_APPROVAL_FAILED",
+            "APPROVAL_FAILED",
+            "TOOL_NOT_AUTHORIZED",
+        }:
             status = 403
+        elif exc.code == "TOOL_ACTION_NOT_FOUND":
+            status = 404
+        elif exc.code == "INVALID_TOOL_ACTION":
+            status = 422
+        elif exc.code == "TOOL_ACTION_CONFLICT":
+            status = 409
         else:
             status = 503
         return _error_response(status, exc.code, str(exc))
@@ -313,6 +388,30 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
         if record is None:
             return _error_response(404, "ENFORCEMENT_NOT_FOUND", "Enforcement record was not found")
         return _enforcement_record_payload(record)
+
+    @application.post("/v1/enforcements/{enforcement_id}/tool-actions")
+    def execute_tool_action(enforcement_id: str, request: ToolActionRequest) -> dict[str, object]:
+        assertion = (
+            None
+            if request.approval_assertion is None
+            else request.approval_assertion.get_secret_value()
+        )
+        result = _runtime(application).action_executor.execute(
+            enforcement_id=enforcement_id,
+            call_id=request.call_id,
+            arguments=request.arguments,
+            workload_identity=request.workload_identity,
+            idempotency_key=request.idempotency_key.get_secret_value(),
+            approval_assertion=assertion,
+        )
+        return _tool_action_result_payload(result)
+
+    @application.get("/v1/tool-actions/{action_id}", response_model=None)
+    def get_tool_action(action_id: str) -> JSONResponse | dict[str, object]:
+        record = _runtime(application).actions.get(action_id)
+        if record is None:
+            return _error_response(404, "TOOL_ACTION_NOT_FOUND", "Tool action was not found")
+        return _tool_action_record_payload(record)
 
     @application.get("/v1/providers")
     def get_providers() -> dict[str, object]:
@@ -534,6 +633,61 @@ def _tool_proposal_payload(proposal: ToolProposal) -> dict[str, object]:
         "tool_schema_digest": proposal.tool_schema_digest,
         "arguments_digest": proposal.arguments_digest,
         "execution_authorized": False,
+    }
+
+
+def _tool_action_result_payload(result: ToolActionResult) -> dict[str, object]:
+    return {
+        "action_id": result.action_id,
+        "enforcement_id": result.enforcement_id,
+        "call_id": result.call_id,
+        "tool_name": result.tool_name,
+        "workload_identity": result.workload_identity,
+        "action_digest": result.action_digest,
+        "status": result.status.value,
+        "approval_receipt": _action_approval_receipt_payload(result.approval_receipt),
+        "tool_execution_id": result.tool_execution_id,
+        "output_digest": result.output_digest,
+    }
+
+
+def _tool_action_record_payload(record: ToolActionRecord) -> dict[str, object]:
+    result = ToolActionResult(
+        action_id=record.action_id,
+        enforcement_id=record.enforcement_id,
+        call_id=record.call_id,
+        tool_name=record.tool_name,
+        workload_identity=record.workload_identity,
+        action_digest=record.action_digest,
+        status=record.status,
+        approval_receipt=record.approval_receipt,
+        tool_execution_id=record.tool_execution_id,
+        output_digest=record.output_digest,
+    )
+    return {
+        **_tool_action_result_payload(result),
+        "created_at": record.created_at.isoformat(),
+        "evaluation_id": record.evaluation_id,
+        "tool_schema_version": record.tool_schema_version,
+        "tool_schema_digest": record.tool_schema_digest,
+        "arguments_digest": record.arguments_digest,
+        "idempotency_key_digest": record.idempotency_key_digest,
+    }
+
+
+def _action_approval_receipt_payload(
+    receipt: ActionApprovalReceipt | None,
+) -> dict[str, object] | None:
+    if receipt is None:
+        return None
+    return {
+        "approval_id": receipt.approval_id,
+        "actor_id": receipt.actor_id,
+        "action_digest": receipt.action_digest,
+        "action_id": receipt.action_id,
+        "issued_at": receipt.issued_at.isoformat(),
+        "expires_at": receipt.expires_at.isoformat(),
+        "consumed_at": receipt.consumed_at.isoformat(),
     }
 
 
