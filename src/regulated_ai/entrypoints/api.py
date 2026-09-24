@@ -36,6 +36,7 @@ from regulated_ai.application import (
     EvaluateAiOperation,
     EvaluationError,
     ExecuteToolAction,
+    GetOperatorTimeline,
 )
 from regulated_ai.application.ports import (
     EnforcementRepository,
@@ -57,6 +58,7 @@ from regulated_ai.domain import (
     EvaluationResult,
     EvidenceMetadata,
     Jurisdiction,
+    OperatorTimeline,
     ProviderCallMetadata,
     ProviderTarget,
     Purpose,
@@ -153,6 +155,7 @@ class Runtime:
     mock_execution: MockInferenceExecutionAdapter | None
     action_executor: ExecuteToolAction
     actions: ToolActionRepository
+    operator_timeline: GetOperatorTimeline
     tool_execution: ToolExecutionPort
     mock_tool_execution: MockToolExecutionAdapter
 
@@ -246,6 +249,11 @@ def build_runtime(
         approval=action_approval,
         observer=observer,
     )
+    operator_timeline = GetOperatorTimeline(
+        evidence=repository,
+        enforcement=enforcement,
+        actions=actions,
+    )
     return Runtime(
         evaluator=evaluator,
         evidence=repository,
@@ -256,6 +264,7 @@ def build_runtime(
         mock_execution=mock_execution,
         action_executor=action_executor,
         actions=actions,
+        operator_timeline=operator_timeline,
         tool_execution=mock_tool_execution,
         mock_tool_execution=mock_tool_execution,
     )
@@ -343,7 +352,7 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
             "TOOL_NOT_AUTHORIZED",
         }:
             status = 403
-        elif exc.code == "TOOL_ACTION_NOT_FOUND":
+        elif exc.code in {"OPERATOR_TIMELINE_NOT_FOUND", "TOOL_ACTION_NOT_FOUND"}:
             status = 404
         elif exc.code == "INVALID_TOOL_ACTION":
             status = 422
@@ -414,6 +423,11 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
         if record is None:
             return _error_response(404, "TOOL_ACTION_NOT_FOUND", "Tool action was not found")
         return _tool_action_record_payload(record)
+
+    @application.get("/v1/operator/enforcements/{enforcement_id}/timeline", response_model=None)
+    def get_operator_timeline(enforcement_id: str) -> dict[str, object]:
+        timeline = _runtime(application).operator_timeline.execute(enforcement_id)
+        return _operator_timeline_payload(timeline)
 
     @application.get("/v1/providers")
     def get_providers() -> dict[str, object]:
@@ -683,6 +697,40 @@ def _tool_action_record_payload(record: ToolActionRecord) -> dict[str, object]:
         "tool_schema_digest": record.tool_schema_digest,
         "arguments_digest": record.arguments_digest,
         "idempotency_key_digest": record.idempotency_key_digest,
+    }
+
+
+def _operator_timeline_payload(timeline: OperatorTimeline) -> dict[str, object]:
+    return {
+        "timeline_version": "1",
+        "enforcement_id": timeline.enforcement_id,
+        "evaluation_id": timeline.evaluation_id,
+        "evidence_id": timeline.evidence_id,
+        "correlation_id": timeline.correlation_id,
+        "policy_set_version": timeline.policy_set_version,
+        "provider_registry_version": timeline.provider_registry_version,
+        "tool_catalog_version": timeline.tool_catalog_version,
+        "classification_labels": [item.value for item in timeline.classification_labels],
+        "obligation_types": [item.value for item in timeline.obligation_types],
+        "input_digest": timeline.input_digest,
+        "output_digest": timeline.output_digest,
+        "event_digest": timeline.event_digest,
+        "attention_required": bool(timeline.attention_codes),
+        "attention_codes": [item.value for item in timeline.attention_codes],
+        "actions_truncated": timeline.actions_truncated,
+        "stages": [
+            {
+                "sequence": stage.sequence,
+                "kind": stage.kind.value,
+                "record_id": stage.record_id,
+                "created_at": stage.created_at.isoformat(),
+                "status": stage.status,
+                "attention_codes": [item.value for item in stage.attention_codes],
+                "tool_name": stage.tool_name,
+                "call_id": stage.call_id,
+            }
+            for stage in timeline.stages
+        ],
     }
 
 

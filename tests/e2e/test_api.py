@@ -21,7 +21,12 @@ from regulated_ai.adapters import (
     SqliteEvidenceRepository,
     SqliteToolActionRepository,
 )
-from regulated_ai.application import EnforceAiOperation, EvaluateAiOperation, ExecuteToolAction
+from regulated_ai.application import (
+    EnforceAiOperation,
+    EvaluateAiOperation,
+    ExecuteToolAction,
+    GetOperatorTimeline,
+)
 from regulated_ai.domain import ToolProposal
 from regulated_ai.entrypoints.api import (
     EvaluationRequest,
@@ -96,6 +101,11 @@ def _runtime(
         mock_execution=mock,
         action_executor=action_executor,
         actions=actions,
+        operator_timeline=GetOperatorTimeline(
+            evidence=evidence,
+            enforcement=enforcement,
+            actions=actions,
+        ),
         tool_execution=mock_tool_execution,
         mock_tool_execution=mock_tool_execution,
     )
@@ -362,6 +372,9 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
             json={**action_request, "approval_assertion": action_assertion},
         )
         stored_action = client.get(f"/v1/tool-actions/{completed_action.json()['action_id']}")
+        operator_timeline = client.get(
+            f"/v1/operator/enforcements/{completed_enforcement['enforcement_id']}/timeline"
+        )
 
     assert waiting_action.status_code == 200
     assert waiting_action.json()["status"] == "WAITING_APPROVAL"
@@ -379,11 +392,20 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
     assert completed_action.json()["safe_output_digest"].startswith("sha256:")
     assert stored_action.json()["status"] == "EXECUTED"
     assert stored_action.json()["safe_result"] is None
+    assert operator_timeline.status_code == 200
+    assert operator_timeline.json()["attention_required"] is False
+    assert [stage["kind"] for stage in operator_timeline.json()["stages"]] == [
+        "EVALUATION",
+        "ENFORCEMENT",
+        "TOOL_ACTION",
+    ]
+    assert operator_timeline.json()["stages"][-1]["status"] == "EXECUTED"
     assert runtime.mock_tool_execution.call_count == 1
     database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
     for raw_value in (*arguments.values(), idempotency_key, action_assertion):
         assert raw_value not in database
         assert raw_value not in completed_action.text
+        assert raw_value not in operator_timeline.text
     for raw_result in (
         "synthetic-operation-reference",
         "synthetic-diagnostic",
@@ -438,17 +460,23 @@ def test_action_api_rejects_untrusted_result_without_persisting_it(tmp_path: Pat
             json={**action_request, "approval_assertion": action_assertion},
         )
         stored = client.get(f"/v1/tool-actions/{waiting_action.json()['action_id']}")
+        operator_timeline = client.get(
+            f"/v1/operator/enforcements/{completed_enforcement['enforcement_id']}/timeline"
+        )
 
     assert rejected.status_code == 502
     assert rejected.json()["error"]["code"] == "TOOL_RESULT_REJECTED"
     assert stored.json()["status"] == "RESULT_REJECTED"
     assert stored.json()["safe_result"] is None
     assert stored.json()["output_digest"] is None
+    assert operator_timeline.json()["attention_codes"] == ["TOOL_RESULT_REJECTED"]
+    assert operator_timeline.json()["stages"][-1]["status"] == "RESULT_REJECTED"
     assert runtime.mock_tool_execution.call_count == 1
     database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
     for raw_result in rejected_output.values():
         assert raw_result not in database
         assert raw_result not in rejected.text
+        assert raw_result not in operator_timeline.text
 
 
 def test_invalid_external_approval_fails_closed_without_echoing_it(tmp_path: Path) -> None:
@@ -501,6 +529,7 @@ def test_api_returns_stable_errors_without_echoing_sensitive_content(tmp_path: P
         )
         missing_evidence = client.get("/v1/evidence/ev_missing")
         missing_enforcement = client.get("/v1/enforcements/enf_missing")
+        missing_timeline = client.get("/v1/operator/enforcements/enf_missing/timeline")
         request = _request()
         request["policy_set_version"] = "missing@1"
         missing_policy = client.post("/v1/evaluations", json=request)
@@ -510,6 +539,8 @@ def test_api_returns_stable_errors_without_echoing_sensitive_content(tmp_path: P
     assert sentinel not in invalid.text
     assert missing_evidence.json()["error"]["code"] == "EVIDENCE_NOT_FOUND"
     assert missing_enforcement.json()["error"]["code"] == "ENFORCEMENT_NOT_FOUND"
+    assert missing_timeline.status_code == 404
+    assert missing_timeline.json()["error"]["code"] == "OPERATOR_TIMELINE_NOT_FOUND"
     assert missing_policy.status_code == 404
     assert missing_policy.json()["error"]["code"] == "POLICY_SET_NOT_FOUND"
 

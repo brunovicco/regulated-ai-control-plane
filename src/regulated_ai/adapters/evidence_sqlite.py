@@ -454,34 +454,25 @@ class SqliteToolActionRepository:
             row = connection.execute(
                 "SELECT * FROM tool_action WHERE action_id = ?", (action_id,)
             ).fetchone()
-        if row is None:
-            return None
-        from datetime import datetime
+        return None if row is None else _tool_action_record(row)
 
-        return ToolActionRecord(
-            action_id=str(row[0]),
-            created_at=datetime.fromisoformat(str(row[1])),
-            enforcement_id=str(row[2]),
-            evaluation_id=str(row[3]),
-            call_id=str(row[4]),
-            tool_name=str(row[5]),
-            tool_schema_version=str(row[6]),
-            tool_schema_digest=str(row[7]),
-            arguments_digest=str(row[8]),
-            workload_identity=str(row[9]),
-            idempotency_key_digest=str(row[10]),
-            action_digest=str(row[11]),
-            status=ToolActionStatus(str(row[12])),
-            approval_receipt=_action_approval_receipt(row[13]),
-            tool_execution_id=None if row[14] is None else str(row[14]),
-            output_digest=None if row[15] is None else str(row[15]),
-            output_schema_digest=None if row[16] is None else str(row[16]),
-            safe_output_digest=None if row[17] is None else str(row[17]),
-            result_classifications=tuple(
-                ToolResultClassification(item) for item in _string_tuple(row[18])
-            ),
-            exposed_result_fields=_string_tuple(row[19]),
-        )
+    def list_for_enforcement(
+        self, enforcement_id: str, *, limit: int
+    ) -> tuple[ToolActionRecord, ...]:
+        """Return a bounded action list ordered by creation time and identifier."""
+        if limit < 1 or limit > 129:
+            raise ValueError("Tool-action list limit is invalid")
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM tool_action
+                WHERE enforcement_id = ?
+                ORDER BY created_at, action_id
+                LIMIT ?
+                """,
+                (enforcement_id, limit),
+            ).fetchall()
+        return tuple(_tool_action_record(row) for row in rows)
 
     def claim_execution(self, record: ToolActionRecord) -> tuple[ToolActionRecord, bool]:
         """Atomically claim one prepared action before crossing the boundary."""
@@ -507,6 +498,36 @@ class SqliteToolActionRepository:
             raise
         finally:
             connection.close()
+
+
+def _tool_action_record(row: tuple[object, ...]) -> ToolActionRecord:
+    """Translate one allowlisted SQLite row into immutable metadata."""
+    from datetime import datetime
+
+    return ToolActionRecord(
+        action_id=str(row[0]),
+        created_at=datetime.fromisoformat(str(row[1])),
+        enforcement_id=str(row[2]),
+        evaluation_id=str(row[3]),
+        call_id=str(row[4]),
+        tool_name=str(row[5]),
+        tool_schema_version=str(row[6]),
+        tool_schema_digest=str(row[7]),
+        arguments_digest=str(row[8]),
+        workload_identity=str(row[9]),
+        idempotency_key_digest=str(row[10]),
+        action_digest=str(row[11]),
+        status=ToolActionStatus(str(row[12])),
+        approval_receipt=_action_approval_receipt(row[13]),
+        tool_execution_id=None if row[14] is None else str(row[14]),
+        output_digest=None if row[15] is None else str(row[15]),
+        output_schema_digest=None if row[16] is None else str(row[16]),
+        safe_output_digest=None if row[17] is None else str(row[17]),
+        result_classifications=tuple(
+            ToolResultClassification(item) for item in _string_tuple(row[18])
+        ),
+        exposed_result_fields=_string_tuple(row[19]),
+    )
 
 
 def _receipts_json(receipts: tuple[TransformationReceipt, ...]) -> str:

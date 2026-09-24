@@ -205,6 +205,22 @@ Raw and safe values exist only during the successful request. Replays and action
 recover them. No result is supplied to a model in this phase. See
 [ADR-0010](adr/0010-trusted-tool-result-handling.md).
 
+## Phase 5a components
+
+- `application/get_operator_timeline.py`: exact-ID metadata correlation, integrity validation,
+  stable attention codes and bounded stage composition.
+- `adapters/evidence_sqlite.py`: deterministic action listing scoped to one enforcement.
+- `entrypoints/api.py`: read-only operator timeline endpoint.
+
+```text
+exact enforcement id -> enforcement + immutable evidence + bounded actions
+    -> integrity checks -> ordered current-state stages -> attention codes
+```
+
+This is a current-state control timeline, not an append-only transition ledger. It neither lists
+activity globally nor mutates approval, execution or reconciliation state. See
+[ADR-0011](adr/0011-metadata-only-operator-timeline.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.

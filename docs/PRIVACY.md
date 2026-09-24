@@ -46,6 +46,10 @@ Complete this document before processing personal or regulated data.
   `RETURN`, `MASK` or `DROP` before the immediate response. RegulaAI persists only trusted
   identities, statuses, approval metadata, schema/result digests, classifications and exposed
   field names. Execution still uses only a network-silent mock tool adapter.
+- The Phase 5a operator timeline requires one exact enforcement ID and composes only metadata
+  already allowlisted in evidence/enforcement/action records. It does not list activity globally or
+  recover payloads. Deployments must protect this operator surface with their existing access and
+  network controls until product authentication and tenant isolation are implemented.
 - Incident-response owner:
 
 ## Prohibited logging

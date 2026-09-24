@@ -239,6 +239,47 @@ identity, status, classifications, exposed field names and metadata-only approva
 receipts. `safe_result` is always `null`; raw and minimized result values are never persisted or
 recoverable from this endpoint.
 
+## GET /v1/operator/enforcements/{enforcement_id}/timeline
+
+Returns a bounded, read-only current-state timeline for one exact enforcement identifier. It
+correlates metadata already available from evaluation evidence, enforcement and tool actions; it
+does not provide global listing or search.
+
+```json
+{
+  "timeline_version": "1",
+  "enforcement_id": "enf_...",
+  "evaluation_id": "eval_...",
+  "evidence_id": "ev_...",
+  "correlation_id": "demo-001",
+  "policy_set_version": "br-financial-demo@1.0.0",
+  "provider_registry_version": "2026-09-22.1",
+  "tool_catalog_version": "br-financial-tools@1.1.0",
+  "classification_labels": ["BRAZIL_CPF"],
+  "obligation_types": ["TOKENIZE", "REQUIRE_HUMAN_APPROVAL"],
+  "attention_required": true,
+  "attention_codes": ["TOOL_RESULT_REJECTED"],
+  "actions_truncated": false,
+  "stages": [
+    {
+      "sequence": 1,
+      "kind": "EVALUATION",
+      "record_id": "ev_...",
+      "created_at": "2026-09-24T12:00:00+00:00",
+      "status": "REQUIRE_APPROVAL",
+      "attention_codes": [],
+      "tool_name": null,
+      "call_id": null
+    }
+  ]
+}
+```
+
+Stages reflect architectural order and current state, not complete transition history. At most 128
+tool-action stages are returned. When more exist, `actions_truncated` is true and
+`ACTION_LIST_TRUNCATED` appears in `attention_codes`. The endpoint never returns prompts, data
+values, tool arguments, approval assertions or raw/safe tool results, and it cannot mutate state.
+
 Status behavior:
 
 - `DENY` -> `BLOCKED_DENY`, with no transformation or execution;

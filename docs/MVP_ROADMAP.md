@@ -109,6 +109,9 @@ Deliver:
 
 ## Phase 5 — Operator dashboard
 
+Status: Phase 5a implements the bounded metadata-only operator timeline API. Global discovery,
+complete transition history, reconciliation mutations and a visual dashboard remain pending.
+
 Show:
 - decision timeline;
 - detected labels (not values);
@@ -117,6 +120,13 @@ Show:
 - matched policies/control objectives;
 - approval state;
 - evidence chain.
+
+Implemented in Phase 5a:
+- exact-enforcement current-state timeline;
+- deterministic evaluation/enforcement/action stage ordering;
+- stable attention codes for approval, failure, reconciliation and rejected results;
+- bounded action correlation with explicit truncation;
+- no payload recovery or administrative mutation.
 
 ## Phase 6 — Maintained intelligence
 

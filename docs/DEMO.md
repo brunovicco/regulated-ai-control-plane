@@ -153,3 +153,16 @@ The demo never persists arguments, idempotency keys, raw assertions, raw tool ou
 result. Schema-invalid output becomes terminal `RESULT_REJECTED`; it is not retried because the
 downstream effect may already have occurred. Live enterprise-system connectors and model
 continuation remain disabled.
+
+## Inspect the operator timeline
+
+Use the exact enforcement identifier returned by the demo:
+
+```bash
+curl http://127.0.0.1:8000/v1/operator/enforcements/enf_REPLACE_WITH_RETURNED_ID/timeline
+```
+
+The response orders evaluation, enforcement and tool-action current states and highlights stable
+attention codes such as `ENFORCEMENT_APPROVAL_REQUIRED`,
+`TOOL_ACTION_RECONCILIATION_REQUIRED` or `TOOL_RESULT_REJECTED`. It is bounded, read-only and
+metadata-only; it is not a complete transition history and cannot approve or retry work.
