@@ -15,7 +15,7 @@ _EVENTS = frozenset(
         "enforcement.started",
         "transformation.applied",
         "enforcement.blocked",
-        "execution.mocked",
+        "execution.completed",
         "enforcement.completed",
         "enforcement.failed",
     }

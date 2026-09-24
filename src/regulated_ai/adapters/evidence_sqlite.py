@@ -13,6 +13,7 @@ from regulated_ai.domain import (
     EnforcementStatus,
     EvidenceMetadata,
     ObligationType,
+    ProviderCallMetadata,
     TransformationReceipt,
 )
 
@@ -52,19 +53,46 @@ CREATE TABLE IF NOT EXISTS enforcement (
     reason_codes TEXT NOT NULL,
     input_digest TEXT NOT NULL,
     output_digest TEXT,
-    provider_execution_id TEXT
+    provider_execution_id TEXT,
+    provider_call_metadata TEXT
 )
 """
 _ENFORCEMENT_UPSERT = """
-INSERT INTO enforcement VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+INSERT INTO enforcement (
+    enforcement_id,
+    created_at,
+    evaluation_id,
+    evaluation_evidence_id,
+    decision,
+    status,
+    policy_set_version,
+    provider_registry_version,
+    provider_target,
+    transformation_receipts,
+    reason_codes,
+    input_digest,
+    output_digest,
+    provider_execution_id,
+    provider_call_metadata
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(enforcement_id) DO UPDATE SET
     created_at=excluded.created_at,
     status=excluded.status,
     transformation_receipts=excluded.transformation_receipts,
     reason_codes=excluded.reason_codes,
     output_digest=excluded.output_digest,
-    provider_execution_id=excluded.provider_execution_id
-WHERE enforcement.status != 'EXECUTED'
+    provider_execution_id=excluded.provider_execution_id,
+    provider_call_metadata=excluded.provider_call_metadata
+WHERE enforcement.status NOT IN ('DISPATCHED', 'EXECUTED', 'EXECUTION_FAILED')
+   OR (
+       enforcement.status = 'DISPATCHED'
+       AND excluded.status IN ('EXECUTED', 'EXECUTION_FAILED')
+   )
+"""
+_ENFORCEMENT_CLAIM = """
+UPDATE enforcement
+SET status = 'DISPATCHED'
+WHERE enforcement_id = ? AND status = 'PREPARED'
 """
 
 
@@ -170,6 +198,9 @@ class SqliteEnforcementRepository:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute(_ENFORCEMENT_SCHEMA)
+            columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(enforcement)")}
+            if "provider_call_metadata" not in columns:
+                connection.execute("ALTER TABLE enforcement ADD COLUMN provider_call_metadata TEXT")
 
     def save(self, record: EnforcementRecord) -> EnforcementRecord:
         """Insert or advance the state of one enforcement attempt."""
@@ -188,6 +219,7 @@ class SqliteEnforcementRepository:
             record.input_digest,
             record.output_digest,
             record.provider_execution_id,
+            _provider_call_json(record.provider_call_metadata),
         )
         with self._connect() as connection:
             connection.execute(_ENFORCEMENT_UPSERT, values)
@@ -221,7 +253,20 @@ class SqliteEnforcementRepository:
             input_digest=str(row[11]),
             output_digest=None if row[12] is None else str(row[12]),
             provider_execution_id=None if row[13] is None else str(row[13]),
+            provider_call_metadata=_provider_call_metadata(row[14]),
         )
+
+    def claim_execution(self, record: EnforcementRecord) -> tuple[EnforcementRecord, bool]:
+        """Atomically claim one prepared attempt before external execution."""
+        if record.status is not EnforcementStatus.DISPATCHED:
+            raise ValueError("Execution claim requires DISPATCHED status")
+        with self._connect() as connection:
+            cursor = connection.execute(_ENFORCEMENT_CLAIM, (record.enforcement_id,))
+            claimed = cursor.rowcount == 1
+        stored = self.get(record.enforcement_id)
+        if stored is None:
+            raise RuntimeError("Execution claim has no enforcement record")
+        return stored, claimed
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -284,3 +329,78 @@ def _receipts(value: str) -> tuple[TransformationReceipt, ...]:
             )
         )
     return tuple(receipts)
+
+
+def _provider_call_json(metadata: ProviderCallMetadata | None) -> str | None:
+    if metadata is None:
+        return None
+    return json.dumps(
+        {
+            "attempt_number": metadata.attempt_number,
+            "cached": metadata.cached,
+            "deployment": metadata.deployment,
+            "fallback_index": metadata.fallback_index,
+            "gateway_request_id": metadata.gateway_request_id,
+            "latency_ms": metadata.latency_ms,
+            "model": metadata.model,
+            "policy_id": metadata.policy_id,
+            "policy_version": metadata.policy_version,
+            "provider": metadata.provider,
+            "routing_decision_id": metadata.routing_decision_id,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _provider_call_metadata(value: object) -> ProviderCallMetadata | None:
+    if value is None:
+        return None
+    parsed = json.loads(str(value))
+    expected = {
+        "attempt_number",
+        "cached",
+        "deployment",
+        "fallback_index",
+        "gateway_request_id",
+        "latency_ms",
+        "model",
+        "policy_id",
+        "policy_version",
+        "provider",
+        "routing_decision_id",
+    }
+    if not isinstance(parsed, dict) or set(parsed) != expected:
+        raise ValueError("Stored provider call metadata is invalid")
+    string_fields = (
+        "deployment",
+        "gateway_request_id",
+        "model",
+        "policy_id",
+        "policy_version",
+        "provider",
+        "routing_decision_id",
+    )
+    integer_fields = ("attempt_number", "fallback_index", "latency_ms")
+    if (
+        not all(isinstance(parsed[key], str) for key in string_fields)
+        or not all(
+            isinstance(parsed[key], int) and not isinstance(parsed[key], bool)
+            for key in integer_fields
+        )
+        or not isinstance(parsed["cached"], bool)
+    ):
+        raise ValueError("Stored provider call metadata is invalid")
+    return ProviderCallMetadata(
+        gateway_request_id=parsed["gateway_request_id"],
+        routing_decision_id=parsed["routing_decision_id"],
+        policy_id=parsed["policy_id"],
+        policy_version=parsed["policy_version"],
+        provider=parsed["provider"],
+        model=parsed["model"],
+        deployment=parsed["deployment"],
+        latency_ms=parsed["latency_ms"],
+        attempt_number=parsed["attempt_number"],
+        fallback_index=parsed["fallback_index"],
+        cached=parsed["cached"],
+    )

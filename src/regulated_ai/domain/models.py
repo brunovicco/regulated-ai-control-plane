@@ -58,9 +58,10 @@ class AssuranceLevel(StrEnum):
 
 
 class EnforcementStatus(StrEnum):
-    """Lifecycle state for local enforcement and mock execution."""
+    """Lifecycle state for local enforcement and bounded execution."""
 
     PREPARED = "PREPARED"
+    DISPATCHED = "DISPATCHED"
     EXECUTED = "EXECUTED"
     BLOCKED_DENY = "BLOCKED_DENY"
     WAITING_APPROVAL = "WAITING_APPROVAL"
@@ -345,11 +346,31 @@ class ExecutionPlan:
     plan_id: str
     evaluation_id: str
     decision_digest: str
+    operation_kind: str
+    purpose: str
+    assurance_level: AssuranceLevel
     provider: ProviderTarget
     data_items: tuple[DataItem, ...]
     tools: tuple[ToolRequest, ...]
     transformation_receipts: tuple[TransformationReceipt, ...]
     output_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderCallMetadata:
+    """Metadata-only routing and execution evidence from an external boundary."""
+
+    gateway_request_id: str
+    routing_decision_id: str
+    policy_id: str
+    policy_version: str
+    provider: str
+    model: str
+    deployment: str
+    latency_ms: int
+    attempt_number: int
+    fallback_index: int
+    cached: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -360,6 +381,7 @@ class ProviderExecutionReceipt:
     provider_target: str
     plan_id: str
     output_digest: str
+    call_metadata: ProviderCallMetadata | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -380,6 +402,7 @@ class EnforcementRecord:
     input_digest: str
     output_digest: str | None
     provider_execution_id: str | None
+    provider_call_metadata: ProviderCallMetadata | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -395,6 +418,7 @@ class EnforcementResult:
     reason_codes: tuple[str, ...]
     output_digest: str | None
     provider_execution_id: str | None
+    provider_call_metadata: ProviderCallMetadata | None = None
 
 
 _PRECEDENCE = {
