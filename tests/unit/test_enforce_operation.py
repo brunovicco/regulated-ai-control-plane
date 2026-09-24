@@ -37,6 +37,7 @@ from ..helpers import (
     MemoryEnforcementRepository,
     MemoryEvidenceRepository,
     MemoryPolicyRepository,
+    MemoryToolCatalogRepository,
     context,
 )
 
@@ -75,6 +76,7 @@ def _enforcer(
         capabilities=MemoryCapabilityRepository(()),
         evidence=MemoryEvidenceRepository(),
         classifier=DeterministicDataClassifier(),
+        tools=MemoryToolCatalogRepository(),
         clock=lambda: NOW,
     )
     records = enforcement or MemoryEnforcementRepository()
@@ -387,6 +389,7 @@ def test_execution_failure_is_recorded_and_fails_closed() -> None:
         capabilities=MemoryCapabilityRepository(()),
         evidence=MemoryEvidenceRepository(),
         classifier=DeterministicDataClassifier(),
+        tools=MemoryToolCatalogRepository(),
         clock=lambda: NOW,
     )
     records = MemoryEnforcementRepository()
@@ -425,6 +428,7 @@ def test_untrusted_execution_receipt_is_validated() -> None:
         capabilities=MemoryCapabilityRepository(()),
         evidence=MemoryEvidenceRepository(),
         classifier=DeterministicDataClassifier(),
+        tools=MemoryToolCatalogRepository(),
         clock=lambda: NOW,
     )
     records = MemoryEnforcementRepository()

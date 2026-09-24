@@ -1,5 +1,42 @@
 # Implementation plan
 
+## Phase 4b — trusted tool authority and proposal boundary
+
+### Goal
+
+Remove caller control over tool risk classification, bind authorized tool schemas to the
+deterministic decision and allow the governed gateway to return metadata-only tool proposals
+without granting authority to execute them.
+
+### Work
+
+1. Add immutable authorized-tool and tool-proposal domain types plus a trusted tool-catalog port.
+2. Load one strict, versioned YAML catalog with closed JSON object schemas and stable schema
+   digests.
+3. Resolve requested tool names in `EvaluateAiOperation`; reject unknown, duplicate or conflicting
+   caller risk claims and use only catalog risk classes for policy matching.
+4. Bind catalog version, tool identifiers and schema digests to evaluation/enforcement digests and
+   metadata-only evidence.
+5. Translate trusted schemas to the governed gateway and accept only proposals for authorized
+   definitions. Persist call identity and argument digests, never arguments.
+6. Keep proposal execution out of scope. The existing approval authorizes the evaluated request,
+   not model-generated arguments or an external side effect.
+7. Add boundary, application, gateway, persistence and API tests; update architecture, security and
+   operator documentation and run the complete quality gate.
+
+### Decisions and assumptions
+
+- Clients request tools by name. An optional legacy `risk_class` claim must exactly match the
+  catalog but never supplies authority.
+- Tool schemas are organization-owned control-plane data and use a deliberately small, closed
+  JSON-object shape in this slice.
+- Gateway tool names are deterministic aliases because the gateway contract has narrower name
+  syntax than RegulaAI catalog identifiers.
+- A returned tool call is a proposal only. RegulaAI exposes metadata and a digest but does not
+  execute it or treat prior approval as action-specific authority.
+- A future phase must validate exact arguments and bind a new approval to the action digest before
+  any external side effect.
+
 ## Phase 4a — digest-bound external approval
 
 ### Goal

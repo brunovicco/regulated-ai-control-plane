@@ -1,4 +1,4 @@
-# Phase 1 through 3a local demo
+# Phase 1 through 4b local demo
 
 The demo evaluates and locally enforces a synthetic Brazilian financial-services operation. It
 performs no provider or network call and needs no cloud credentials.
@@ -12,9 +12,9 @@ uv sync --frozen --all-groups --extra observability
 uv run uvicorn regulated_ai.entrypoints.api:app --host 127.0.0.1 --port 8000
 ```
 
-The service validates its packaged policy and provider registry before accepting traffic. Evidence
-is written to `var/regulaai-evidence.sqlite3` by default. Set `REGULAAI_EVIDENCE_DB` to another
-local path when needed.
+The service validates its packaged policy, provider registry and trusted tool catalog before
+accepting traffic. Evidence is written to `var/regulaai-evidence.sqlite3` by default. Set
+`REGULAAI_EVIDENCE_DB` to another local path when needed.
 
 The default tokenization key is generated per process. To keep demo tokens stable across restarts,
 set `REGULAAI_TOKENIZATION_KEY` to a local value of at least 32 bytes. Production key material must
@@ -54,8 +54,8 @@ curl --request POST http://127.0.0.1:8000/v1/evaluations \
       }
     ],
     "tools": [
-      {"name": "cards.read", "risk_class": "read_only"},
-      {"name": "cards.unblock", "risk_class": "high_impact_state_change"}
+      {"name": "cards.read"},
+      {"name": "cards.unblock"}
     ],
     "policy_set_version": "br-financial-demo@1.0.0"
   }'
@@ -84,6 +84,8 @@ digests. It must not contain either synthetic field value from the request.
   `DENY` rather than weakening the original requirement.
 - Advance the evaluation date beyond the policy's `max_age_days`: high-assurance capability data
   becomes stale and the decision becomes `DENY`.
+- Add `"risk_class": "read_only"` to `cards.unblock`: the caller claim conflicts with the trusted
+  catalog and fails closed with `TOOL_NOT_AUTHORIZED`.
 
 These are organization-policy outcomes, not statements of legal compliance or certification.
 
@@ -124,10 +126,11 @@ metadata receipt. RegulaAI intentionally provides no endpoint or CLI for creatin
 ## Optional governed gateway execution
 
 Set `REGULAAI_EXECUTION_MODE=gateway` and provide every gateway variable documented in
-`.env.example` before process startup. Use a request without tools: Phase 3a rejects tool-bearing
-plans before network access. The configured gateway workload must be reviewed to authorize only
+`.env.example` before process startup. Phase 4b forwards only definitions resolved from the trusted
+catalog. The configured gateway workload must be reviewed to authorize only
 deployments compatible with `REGULAAI_GATEWAY_ALLOWED_TARGET` and
 `REGULAAI_GATEWAY_EXPECTED_PROVIDER`.
 
 Gateway mode sends the sanitized text payload to the configured service and may incur provider
-cost. The response remains metadata-only; model output is discarded and never stored by RegulaAI.
+cost. Model output is discarded. A returned tool call is exposed only as metadata and an arguments
+digest with `execution_authorized: false`; RegulaAI does not execute the proposed action.

@@ -7,6 +7,7 @@ from typing import Protocol
 from regulated_ai.domain import (
     ApprovalGrant,
     ApprovalReceipt,
+    AuthorizedTool,
     DataItem,
     EnforcementRecord,
     EvidenceMetadata,
@@ -40,6 +41,23 @@ class ProviderCapabilityRepository(Protocol):
 
     def list(self) -> tuple[ProviderCapabilityRecord, ...]:
         """Return all loaded records in stable order."""
+        ...
+
+
+class ToolCatalogRepository(Protocol):
+    """Resolve immutable organization-owned tool definitions."""
+
+    @property
+    def catalog_version(self) -> str:
+        """Return the immutable tool-catalog release version."""
+        ...
+
+    def get(self, name: str) -> AuthorizedTool | None:
+        """Return one trusted tool definition by normalized name."""
+        ...
+
+    def list(self) -> tuple[AuthorizedTool, ...]:
+        """Return every trusted definition in stable order."""
         ...
 
 

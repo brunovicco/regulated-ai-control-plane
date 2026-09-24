@@ -44,6 +44,20 @@ Mitigations:
 - tools are permission-gated;
 - model cannot mutate policy/provider registry;
 - approval state is external and explicit.
+- tool risk, description and schema come from a versioned organization catalog, never model output
+  or caller claims;
+- gateway tool calls are proposals only and cannot invoke an external side effect in Phase 4b.
+
+### Caller downgrades tool risk
+
+Threat:
+caller labels a state-changing operation as read-only to avoid approval policy.
+
+Mitigations:
+- callers request tools by name and do not define authority;
+- an optional risk claim must exactly match the trusted catalog;
+- unknown, duplicate and mismatched tools fail closed before evidence or provider execution;
+- catalog version, tool schema version and schema digest are bound to the deterministic decision.
 
 ### Provider downgrade/fallback
 
@@ -164,3 +178,6 @@ future asymmetric or OIDC adapter should remove signing capability from the enfo
 - malformed, failed or content-free terminal gateway response.
 - malformed, tampered, expired, future, wrong-digest or replayed approval assertion;
 - approval consumption fails after the execution claim;
+- caller supplies a false tool risk class or unknown tool name;
+- gateway proposes an unlisted tool, duplicate call id or non-JSON/oversized arguments;
+- tool proposal metadata leaks raw arguments or is mistaken for execution authority.

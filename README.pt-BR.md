@@ -1,6 +1,6 @@
 # Regulated AI Control Plane
 
-[![Python 3.12-3.14](https://img.shields.io/badge/Python-3.12--3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.13-3.14](https://img.shields.io/badge/Python-3.13--3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Licença: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status: Pre-Alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status-do-projeto)
 
@@ -37,7 +37,9 @@ Aplicação/Agente corporativo
    OpenAI      Bedrock  Futuros
 ```
 
-A primeira fase de implementação termina deliberadamente **antes da inferência real**. O objetivo é validar os contratos de decisão, enforcement e evidência antes de adicionar SDKs de provedores ou roteamento de modelos.
+O modo padrão termina deliberadamente **antes da inferência real**. O modo gateway é opt-in e
+existe para validar a integração sem tornar credenciais, roteamento ou resiliência responsabilidade
+deste serviço.
 
 ## Por que este projeto existe
 
@@ -92,13 +94,14 @@ Obrigações iniciais:
 ## Status do projeto
 
 **Pre-alpha com avaliação determinística, enforcement local, aprovação externa vinculada ao
-digest e adapter opt-in de execução via gateway governado.**
+digest, catálogo confiável de ferramentas e adapter opt-in de execução via gateway governado.**
 
 Objetivo atual:
 
 ```text
 Contexto
   -> Classificação
+  -> Resolução de ferramentas pelo catálogo confiável
   -> Matching de políticas
   -> Resolução de capacidades do provider
   -> Decisão
@@ -113,8 +116,10 @@ Contexto
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`, `GET /v1/providers` e
 `GET /health`. O modo padrão continua sem rede. Quando configurado explicitamente, o modo gateway
-executa somente planos textuais sem ferramentas, usa timeouts limitados, não realiza retry local e
-descarta a saída do modelo após registrar metadados permitidos de roteamento/execução.
+usa timeouts limitados, não realiza retry local, descarta a saída do modelo e aceita somente
+definições de ferramentas resolvidas pelo catálogo versionado da organização. Chamadas de
+ferramentas retornadas pelo modelo são propostas apenas com metadados e não são executadas; somente
+metadados permitidos de roteamento e execução são registrados.
 As asserções de aprovação são emitidas fora do serviço, vinculadas ao digest determinístico da
 decisão, recebidas apenas de forma efêmera e consumidas uma única vez antes da execução.
 
@@ -122,7 +127,7 @@ Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
 - retorno de completion pela API;
-- encaminhamento de ferramentas ao gateway governado;
+- execução de efeitos de ferramentas e aprovação vinculada ao digest exato da ação;
 - LLM decidindo política;
 - frontend/dashboard;
 - SaaS multi-tenant;
@@ -149,7 +154,21 @@ capacidade high-assurance desatualizada
 
 fallback reduz controle obrigatório
     -> rejeitar fallback
+
+ferramenta ausente do catálogo ou com risk_class divergente
+    -> rejeitar solicitação
 ```
+
+### Autoridade sobre ferramentas
+
+Clientes solicitam ferramentas por nome, mas não definem sua autoridade. A classe de risco, a
+descrição e o schema vêm de um catálogo YAML versionado e validado no startup. Um `risk_class`
+enviado pelo cliente é tratado apenas como uma alegação não confiável e deve corresponder
+exatamente ao catálogo.
+
+O gateway pode retornar uma proposta de chamada para uma ferramenta autorizada. O serviço registra
+somente o identificador da ferramenta, a versão e o digest do schema e o digest dos argumentos. Os
+argumentos brutos não são persistidos ou retornados, e a proposta não produz efeito externo.
 
 ### Provider Capability Registry
 
@@ -170,7 +189,8 @@ unknown
 
 A trilha de evidências pode registrar decisão, reason codes, classificações, versões de políticas e registry, tipos de obrigações, referências de controles, timestamps e hashes criptográficos.
 
-Ela não deve registrar prompts completos, respostas de modelos, valores de dados pessoais, credenciais, API keys, tokens ou payloads de ferramentas sem sanitização.
+Ela não deve registrar prompts completos, respostas de modelos, valores de dados pessoais,
+credenciais, API keys, tokens, argumentos brutos ou outputs de ferramentas.
 
 ### Portabilidade entre providers
 
@@ -217,11 +237,12 @@ regulated-ai-control-plane/
 │   ├── THREAT_MODEL.md
 │   ├── EVAL_STRATEGY.md
 │   ├── MVP_ROADMAP.md
-│   └── ADRs/
+│   └── adr/
 ├── examples/
 │   ├── policies/
 │   ├── provider-capabilities/
-│   └── scenarios/
+│   ├── scenarios/
+│   └── tools/
 ├── governance/
 ├── src/
 └── tests/
@@ -233,7 +254,7 @@ O repositório utiliza como baseline o [`brunovicco/codex-python-engineering-har
 
 Requisitos:
 
-- Python 3.12+
+- Python 3.13+
 - [`uv`](https://docs.astral.sh/uv/)
 
 Instalação e quality gate:
@@ -243,6 +264,15 @@ uv lock --check
 uv sync --frozen --all-groups --extra observability
 uv run python scripts/quality_gate.py
 ```
+
+Execute a API local:
+
+```bash
+uv run uvicorn regulated_ai.entrypoints.api:app --host 127.0.0.1 --port 8000
+```
+
+Consulte [docs/DEMO.md](docs/DEMO.md) para uma requisição sintética ponta a ponta, as obrigações
+esperadas e a inspeção das evidências.
 
 O `AGENTS.md` gerado pelo harness é o contrato principal para workflow de desenvolvimento, arquitetura, testes e segurança.
 

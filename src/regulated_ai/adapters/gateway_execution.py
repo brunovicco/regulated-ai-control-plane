@@ -1,9 +1,10 @@
 """Opt-in execution adapter for the provider-neutral Governed LLM Gateway."""
 
 import asyncio
+import hashlib
 import json
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import NAMESPACE_URL, UUID, uuid5
@@ -19,6 +20,9 @@ from governed_llm_gateway_contracts import (
     MessageRole,
     RiskLevel,
 )
+from governed_llm_gateway_contracts import (
+    ToolDefinition as GatewayToolDefinition,
+)
 
 from regulated_ai.domain import (
     AssuranceLevel,
@@ -26,6 +30,7 @@ from regulated_ai.domain import (
     ExecutionPlan,
     ProviderCallMetadata,
     ProviderExecutionReceipt,
+    ToolProposal,
 )
 
 _SAFE_IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]*\Z")
@@ -44,6 +49,7 @@ class _GatewayClient(Protocol):
         max_output_tokens: int,
         provider_timeout_seconds: float,
         request_id: UUID,
+        tools: Sequence[GatewayToolDefinition] = (),
     ) -> GatewayResponse:
         """Execute one provider-neutral request."""
         ...
@@ -119,8 +125,6 @@ class GovernedGatewayExecutionAdapter:
     async def _execute(self, plan: ExecutionPlan) -> ProviderExecutionReceipt:
         if plan.provider.identifier != self._config.allowed_target:
             raise ValueError("Execution target is not bound to the configured gateway workload")
-        if plan.tools:
-            raise ValueError("Gateway execution does not support tool requests in this phase")
         _require_secret_transformations(plan)
         content = _message_content(plan)
         encoded = content.encode("utf-8")
@@ -139,6 +143,7 @@ class GovernedGatewayExecutionAdapter:
                 max_output_tokens=self._config.max_output_tokens,
                 provider_timeout_seconds=self._config.provider_timeout_seconds,
                 request_id=request_id,
+                tools=_tool_definitions(plan),
             )
         finally:
             await client.aclose()
@@ -166,6 +171,24 @@ def _message_content(plan: ExecutionPlan) -> str:
         separators=(",", ":"),
         sort_keys=True,
     )
+
+
+def _tool_definitions(plan: ExecutionPlan) -> tuple[GatewayToolDefinition, ...]:
+    definitions: list[GatewayToolDefinition] = []
+    for tool in plan.tools:
+        decoded = json.loads(tool.input_schema_json)
+        if not isinstance(decoded, dict) or not all(isinstance(key, str) for key in decoded):
+            raise ValueError("Authorized tool schema is invalid")
+        schema: Mapping[str, object] = decoded
+        definitions.append(
+            GatewayToolDefinition(
+                name=_gateway_tool_name(tool.name),
+                description=tool.description,
+                input_schema=schema,
+                strict=True,
+            )
+        )
+    return tuple(definitions)
 
 
 def _require_secret_transformations(plan: ExecutionPlan) -> None:
@@ -204,8 +227,7 @@ def _receipt(
         or response.status is not ExecutionStatus.SUCCEEDED
         or response.error is not None
         or execution is None
-        or not response.content
-        or response.tool_calls
+        or (not response.content and not response.tool_calls)
         or response.structured_output is not None
     ):
         raise ValueError("Gateway returned an invalid terminal response")
@@ -235,4 +257,64 @@ def _receipt(
         plan_id=plan.plan_id,
         output_digest=plan.output_digest,
         call_metadata=metadata,
+        tool_proposals=_tool_proposals(response.tool_calls, plan),
     )
+
+
+def _tool_proposals(calls: Sequence[object], plan: ExecutionPlan) -> tuple[ToolProposal, ...]:
+    authorized = {_gateway_tool_name(tool.name): tool for tool in plan.tools}
+    proposals: list[ToolProposal] = []
+    call_ids: set[str] = set()
+    for value in calls:
+        call_id = getattr(value, "call_id", None)
+        name = getattr(value, "name", None)
+        arguments = getattr(value, "arguments", None)
+        if (
+            not isinstance(call_id, str)
+            or not isinstance(name, str)
+            or not isinstance(arguments, Mapping)
+            or call_id in call_ids
+        ):
+            raise ValueError("Gateway returned an invalid tool proposal")
+        definition = authorized.get(name)
+        if definition is None:
+            raise ValueError("Gateway proposed an unauthorized tool")
+        try:
+            canonical_arguments = json.dumps(
+                arguments,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Gateway returned invalid tool arguments") from exc
+        if len(canonical_arguments.encode()) > 32_768:
+            raise ValueError("Gateway tool arguments exceed the metadata digest limit")
+        argument_binding = json.dumps(
+            {
+                "arguments": json.loads(canonical_arguments),
+                "schema_digest": definition.input_schema_digest,
+                "tool": definition.name,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode()
+        proposals.append(
+            ToolProposal(
+                call_id=call_id,
+                tool_name=definition.name,
+                tool_schema_version=definition.schema_version,
+                tool_schema_digest=definition.input_schema_digest,
+                arguments_digest=f"sha256:{hashlib.sha256(argument_binding).hexdigest()}",
+            )
+        )
+        call_ids.add(call_id)
+    return tuple(proposals)
+
+
+def _gateway_tool_name(name: str) -> str:
+    """Map a catalog identifier to the gateway's narrower provider-neutral name syntax."""
+    stem = re.sub(r"[^A-Za-z0-9_-]", "_", name)[:91]
+    suffix = hashlib.sha256(name.encode()).hexdigest()[:32]
+    return f"ra_{stem}_{suffix}"

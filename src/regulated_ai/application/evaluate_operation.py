@@ -13,9 +13,11 @@ from regulated_ai.application.ports import (
     EvidenceRepository,
     PolicyRepository,
     ProviderCapabilityRepository,
+    ToolCatalogRepository,
 )
 from regulated_ai.domain import (
     AssuranceLevel,
+    AuthorizedTool,
     CapabilityRequirement,
     CapabilityState,
     DataItem,
@@ -30,6 +32,7 @@ from regulated_ai.domain import (
     PolicyRule,
     ProviderCapability,
     ProviderTarget,
+    ToolRequest,
     strongest_outcome,
 )
 
@@ -64,6 +67,12 @@ class InvalidEvaluationContextError(EvaluationError):
     code = "INVALID_EVALUATION_CONTEXT"
 
 
+class ToolAuthorizationError(EvaluationError):
+    """A requested tool is absent from or conflicts with the trusted catalog."""
+
+    code = "TOOL_NOT_AUTHORIZED"
+
+
 class NullEvaluationObserver:
     """Network-silent observer used when no metadata sink is configured."""
 
@@ -82,6 +91,7 @@ class EvaluateAiOperation:
         capabilities: ProviderCapabilityRepository,
         evidence: EvidenceRepository,
         classifier: DataClassifier,
+        tools: ToolCatalogRepository | None = None,
         observer: EvaluationObserver | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
@@ -90,6 +100,7 @@ class EvaluateAiOperation:
         self._capabilities = capabilities
         self._evidence = evidence
         self._classifier = classifier
+        self._tools = tools
         self._observer = observer or NullEvaluationObserver()
         self._clock = clock or (lambda: datetime.now(UTC))
 
@@ -98,16 +109,21 @@ class EvaluateAiOperation:
         try:
             normalized_input = normalize_evaluation_context(context)
             self._emit("evaluation.started", correlation_id=normalized_input.correlation_id)
+            authorized_tools = self._authorize_tools(normalized_input.tools)
             policy_set = self._policies.get(normalized_input.policy_set_version)
             if policy_set is None:
                 raise PolicySetNotFoundError("Requested policy set is unavailable")
             classified = self._classify(normalized_input.data_items)
             normalized = replace(normalized_input, data_items=classified)
-            matched = tuple(rule for rule in policy_set.rules if _matches(rule.match, normalized))
+            matched = tuple(
+                rule
+                for rule in policy_set.rules
+                if _matches(rule.match, normalized, authorized_tools)
+            )
             for rule in matched:
                 self._emit("policy.matched", policy_id=rule.identifier)
 
-            obligations = _expand_obligations(matched, normalized)
+            obligations = _expand_obligations(matched, normalized, authorized_tools)
             outcomes = tuple(rule.decision for rule in matched if rule.decision is not None)
             reasons = {rule.reason_code for rule in matched if rule.reason_code is not None}
             capability_ids: set[str] = set()
@@ -160,7 +176,9 @@ class EvaluateAiOperation:
             )
             capability_id_tuple = tuple(sorted(capability_ids))
             labels = tuple(sorted({label for item in classified for label in item.labels}, key=str))
-            input_digest = _digest(_canonical_context(normalized))
+            tool_ids = tuple(tool.identifier for tool in authorized_tools)
+            tool_catalog_version = self._tools.catalog_version if self._tools is not None else None
+            input_digest = _digest(_canonical_context(normalized, authorized_tools))
             output_payload = {
                 "decision": outcome.value,
                 "input_digest": input_digest,
@@ -170,6 +188,8 @@ class EvaluateAiOperation:
                 "provider_capability_ids": capability_id_tuple,
                 "provider_registry_version": registry_version,
                 "reason_codes": reason_codes,
+                "tool_catalog_version": tool_catalog_version,
+                "authorized_tool_ids": tool_ids,
             }
             output_digest = _digest(output_payload)
             evaluation_id = f"eval_{output_digest.removeprefix('sha256:')[:24]}"
@@ -197,6 +217,8 @@ class EvaluateAiOperation:
                 "provider_capability_ids": capability_id_tuple,
                 "provider_registry_version": registry_version,
                 "reason_codes": reason_codes,
+                "tool_catalog_version": tool_catalog_version,
+                "authorized_tool_ids": tool_ids,
             }
             evidence = EvidenceMetadata(
                 evidence_id=evidence_id,
@@ -216,6 +238,8 @@ class EvaluateAiOperation:
                 input_digest=input_digest,
                 output_digest=output_digest,
                 event_digest=_digest(event_payload),
+                tool_catalog_version=tool_catalog_version,
+                authorized_tool_ids=tool_ids,
             )
             try:
                 stored = self._evidence.save(evidence)
@@ -235,6 +259,8 @@ class EvaluateAiOperation:
                 evidence_id=stored.evidence_id,
                 input_digest=input_digest,
                 output_digest=output_digest,
+                authorized_tools=authorized_tools,
+                tool_catalog_version=tool_catalog_version,
             )
         except Exception as exc:
             self._emit("evaluation.failed", error_type=type(exc).__name__)
@@ -249,6 +275,30 @@ class EvaluateAiOperation:
         record = self._capabilities.get(target)
         return None if record is None else record.capability(requirement.key)
 
+    def _authorize_tools(self, requests: tuple[ToolRequest, ...]) -> tuple[AuthorizedTool, ...]:
+        if not requests:
+            return ()
+        if self._tools is None:
+            raise ToolAuthorizationError("Requested tool is not authorized")
+        names = [request.name for request in requests]
+        if len(names) != len(set(names)):
+            raise ToolAuthorizationError("Requested tool is not authorized")
+        authorized: list[AuthorizedTool] = []
+        for request in requests:
+            definition = self._tools.get(request.name)
+            if definition is None or (
+                request.claimed_risk_class is not None
+                and request.claimed_risk_class != definition.risk_class
+            ):
+                raise ToolAuthorizationError("Requested tool is not authorized")
+            authorized.append(definition)
+            self._emit(
+                "tool.authorized",
+                tool_name=definition.name,
+                tool_schema_version=definition.schema_version,
+            )
+        return tuple(sorted(authorized, key=lambda item: item.name))
+
     def _emit(self, event: str, **metadata: str) -> None:
         try:
             self._observer.emit(event, metadata)
@@ -256,7 +306,11 @@ class EvaluateAiOperation:
             return
 
 
-def _matches(match: PolicyMatch, context: EvaluationContext) -> bool:
+def _matches(
+    match: PolicyMatch,
+    context: EvaluationContext,
+    authorized_tools: tuple[AuthorizedTool, ...],
+) -> bool:
     scalar_checks = (
         (match.jurisdiction, context.jurisdiction.code),
         (match.sector, context.sector.name),
@@ -272,17 +326,19 @@ def _matches(match: PolicyMatch, context: EvaluationContext) -> bool:
     labels = {label for item in context.data_items for label in item.labels}
     if match.data_class_any and not labels.intersection(match.data_class_any):
         return False
-    risks = {tool.risk_class for tool in context.tools}
+    risks = {tool.risk_class for tool in authorized_tools}
     return not match.tool_risk_class_any or bool(risks.intersection(match.tool_risk_class_any))
 
 
 def _expand_obligations(
-    rules: tuple[PolicyRule, ...], context: EvaluationContext
+    rules: tuple[PolicyRule, ...],
+    context: EvaluationContext,
+    authorized_tools: tuple[AuthorizedTool, ...],
 ) -> list[Obligation]:
     expanded: list[Obligation] = []
     for rule in rules:
         for template in rule.obligations:
-            targets = _obligation_targets(template, rule.match, context)
+            targets = _obligation_targets(template, rule.match, context, authorized_tools)
             expanded.extend(
                 Obligation(
                     type=template.type,
@@ -297,7 +353,10 @@ def _expand_obligations(
 
 
 def _obligation_targets(
-    template: PolicyObligation, match: PolicyMatch, context: EvaluationContext
+    template: PolicyObligation,
+    match: PolicyMatch,
+    context: EvaluationContext,
+    authorized_tools: tuple[AuthorizedTool, ...],
 ) -> tuple[str | None, ...]:
     if template.target_class is not None:
         return tuple(
@@ -305,7 +364,7 @@ def _obligation_targets(
         )
     if template.target == "matched_tool":
         return tuple(
-            tool.name for tool in context.tools if tool.risk_class in match.tool_risk_class_any
+            tool.name for tool in authorized_tools if tool.risk_class in match.tool_risk_class_any
         )
     return (template.target,)
 
@@ -336,7 +395,9 @@ def _capability_failure(
     return None
 
 
-def _canonical_context(context: EvaluationContext) -> dict[str, object]:
+def _canonical_context(
+    context: EvaluationContext, authorized_tools: tuple[AuthorizedTool, ...]
+) -> dict[str, object]:
     return {
         "assurance_level": context.assurance_level.value,
         "correlation_id": context.correlation_id,
@@ -357,8 +418,15 @@ def _canonical_context(context: EvaluationContext) -> dict[str, object]:
         "purpose": context.purpose.name,
         "sector": context.sector.name,
         "tools": [
-            {"name": tool.name, "risk_class": tool.risk_class}
-            for tool in sorted(context.tools, key=lambda value: value.name)
+            {
+                "catalog_version": tool.catalog_version,
+                "definition_digest": tool.definition_digest,
+                "name": tool.name,
+                "risk_class": tool.risk_class,
+                "schema_digest": tool.input_schema_digest,
+                "schema_version": tool.schema_version,
+            }
+            for tool in authorized_tools
         ],
     }
 
@@ -405,7 +473,11 @@ def normalize_evaluation_context(context: EvaluationContext) -> EvaluationContex
             replace(
                 tool,
                 name=_identifier(tool.name),
-                risk_class=_identifier(tool.risk_class).casefold(),
+                claimed_risk_class=(
+                    None
+                    if tool.claimed_risk_class is None
+                    else _identifier(tool.claimed_risk_class).casefold()
+                ),
             )
             for tool in context.tools
         ),

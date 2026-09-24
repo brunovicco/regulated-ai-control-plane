@@ -17,8 +17,10 @@ from regulated_ai.adapters.yaml_files import (
     ConfigurationBoundaryError,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
+    FileToolCatalogRepository,
     MalformedYamlError,
     UnsupportedSchemaVersionError,
+    load_tool_catalog_file,
 )
 
 __all__ = [
@@ -27,6 +29,7 @@ __all__ = [
     "DeterministicDataClassifier",
     "FilePolicyRepository",
     "FileProviderCapabilityRepository",
+    "FileToolCatalogRepository",
     "GovernedGatewayExecutionAdapter",
     "GovernedGatewayExecutionConfig",
     "HmacApprovalAdapter",
@@ -37,4 +40,5 @@ __all__ = [
     "SqliteEvidenceRepository",
     "StructuredEvaluationObserver",
     "UnsupportedSchemaVersionError",
+    "load_tool_catalog_file",
 ]

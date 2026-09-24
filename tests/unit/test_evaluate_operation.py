@@ -9,6 +9,7 @@ from regulated_ai.application import (
     EvidencePersistenceError,
     InvalidEvaluationContextError,
     PolicySetNotFoundError,
+    ToolAuthorizationError,
 )
 from regulated_ai.application.ports import EvaluationObserver, EvidenceRepository
 from regulated_ai.domain import (
@@ -37,6 +38,7 @@ from ..helpers import (
     MemoryCapabilityRepository,
     MemoryEvidenceRepository,
     MemoryPolicyRepository,
+    MemoryToolCatalogRepository,
     capability_record,
     context,
     synthetic_cpf,
@@ -61,6 +63,7 @@ def _evaluator(
         ),
         evidence=evidence or MemoryEvidenceRepository(),
         classifier=DeterministicDataClassifier(),
+        tools=MemoryToolCatalogRepository(),
         observer=observer,
         clock=lambda: NOW,
     )
@@ -169,6 +172,51 @@ def test_repeatable_evaluation_preserves_transform_before_approval_and_metadata_
         "decision.produced",
         "evidence.persisted",
     }
+
+
+def test_tool_risk_is_resolved_from_catalog_and_bound_to_evidence() -> None:
+    approval = PolicyRule(
+        id="approval",
+        version="1",
+        match=PolicyMatch(tool_risk_class_any=("high_impact_state_change",)),
+        decision=DecisionOutcome.REQUIRE_APPROVAL,
+        obligations=(
+            PolicyObligation(
+                ObligationType.REQUIRE_HUMAN_APPROVAL,
+                "matched_tool",
+                None,
+                "APPROVAL_REQUIRED",
+            ),
+        ),
+        required_capabilities=(),
+        control_objective_ids=("CONTROL.AUTHORITY",),
+        regulatory_support_refs=(),
+    )
+    evidence = MemoryEvidenceRepository()
+    evaluator = _evaluator(_policy(approval), evidence=evidence)
+
+    result = evaluator.execute(context(tools=(ToolRequest("cards.unblock"),)))
+    stored = evidence.get(result.evidence_id)
+
+    assert result.decision is DecisionOutcome.REQUIRE_APPROVAL
+    assert result.authorized_tools[0].risk_class == "high_impact_state_change"
+    assert result.tool_catalog_version == "tools@test"
+    assert stored is not None
+    assert stored.authorized_tool_ids == ("cards.unblock@1.0.0",)
+
+
+@pytest.mark.parametrize(
+    "tool_request",
+    [
+        ToolRequest("cards.unknown"),
+        ToolRequest("cards.unblock", "read_only"),
+    ],
+)
+def test_unknown_tool_or_forged_risk_claim_fails_closed(tool_request: ToolRequest) -> None:
+    evaluator = _evaluator(_policy(_capability_rule()))
+
+    with pytest.raises(ToolAuthorizationError):
+        evaluator.execute(context(tools=(tool_request,)))
 
 
 @pytest.mark.parametrize(

@@ -127,7 +127,7 @@ class EnforceAiOperation:
             self._emit("enforcement.failed", error_type=type(exc).__name__)
             raise TransformationFailedError("A required transformation failed") from exc
 
-        output_digest = _execution_output_digest(transformed, normalized)
+        output_digest = _execution_output_digest(transformed, normalized, evaluation)
         approval_grant: ApprovalGrant | None = None
         if evaluation.decision is DecisionOutcome.REQUIRE_APPROVAL:
             if approval_assertion is None:
@@ -241,6 +241,7 @@ class EnforceAiOperation:
             status=EnforcementStatus.EXECUTED,
             provider_execution_id=provider_receipt.execution_id,
             provider_call_metadata=provider_receipt.call_metadata,
+            tool_proposals=provider_receipt.tool_proposals,
         )
         self._emit("execution.completed", provider_execution_id=provider_receipt.execution_id)
         stored = self._save(completed)
@@ -439,7 +440,7 @@ def _execution_plan(
         assurance_level=context.assurance_level,
         provider=context.provider,
         data_items=transformed,
-        tools=context.tools,
+        tools=evaluation.authorized_tools,
         transformation_receipts=receipts,
         output_digest=output_digest,
     )
@@ -473,7 +474,11 @@ def _transformation_receipt(
     )
 
 
-def _execution_output_digest(data_items: tuple[DataItem, ...], context: EvaluationContext) -> str:
+def _execution_output_digest(
+    data_items: tuple[DataItem, ...],
+    context: EvaluationContext,
+    evaluation: EvaluationResult,
+) -> str:
     return _digest(
         {
             "data": [
@@ -485,7 +490,17 @@ def _execution_output_digest(data_items: tuple[DataItem, ...], context: Evaluati
                 for item in data_items
             ],
             "provider": context.provider.identifier,
-            "tools": [{"name": tool.name, "risk_class": tool.risk_class} for tool in context.tools],
+            "tools": [
+                {
+                    "catalog_version": tool.catalog_version,
+                    "definition_digest": tool.definition_digest,
+                    "name": tool.name,
+                    "risk_class": tool.risk_class,
+                    "schema_digest": tool.input_schema_digest,
+                    "schema_version": tool.schema_version,
+                }
+                for tool in evaluation.authorized_tools
+            ],
         }
     )
 
@@ -516,6 +531,7 @@ def _to_result(record: EnforcementRecord) -> EnforcementResult:
         provider_execution_id=record.provider_execution_id,
         provider_call_metadata=record.provider_call_metadata,
         approval_receipt=record.approval_receipt,
+        tool_proposals=record.tool_proposals,
     )
 
 
@@ -533,6 +549,20 @@ def _validate_provider_receipt(receipt: ProviderExecutionReceipt, plan: Executio
         raise ValueError("Execution adapter returned an invalid receipt")
     if receipt.call_metadata is not None:
         _validate_provider_call_metadata(receipt.call_metadata)
+    authorized = {tool.name: tool for tool in plan.tools}
+    if len(receipt.tool_proposals) != len({item.call_id for item in receipt.tool_proposals}):
+        raise ValueError("Execution adapter returned duplicate tool proposals")
+    for proposal in receipt.tool_proposals:
+        definition = authorized.get(proposal.tool_name)
+        if (
+            definition is None
+            or proposal.tool_schema_version != definition.schema_version
+            or proposal.tool_schema_digest != definition.input_schema_digest
+            or len(proposal.call_id) > 128
+            or _SAFE_EXECUTION_ID.fullmatch(proposal.call_id) is None
+            or re.fullmatch(r"sha256:[0-9a-f]{64}", proposal.arguments_digest) is None
+        ):
+            raise ValueError("Execution adapter returned an invalid tool proposal")
 
 
 def _validate_approval_grant(
