@@ -7,7 +7,7 @@
 - approval decisions;
 - evidence integrity;
 - customer personal/sensitive data;
-- provider credentials;
+- gateway/provider credentials;
 - tool/action authority;
 - tenant/customer configuration;
 - audit correlation metadata.
@@ -17,7 +17,7 @@
 1. caller -> enforcement API;
 2. enforcement service -> local transform/tokenization;
 3. enforcement service -> evidence persistence;
-4. enforcement service -> future provider execution;
+4. enforcement service -> governed gateway/provider execution;
 5. enforcement service -> future approval system;
 6. control-plane policy/registry release -> runtime enforcement plane.
 
@@ -54,6 +54,9 @@ Mitigations:
 - fallback must be evaluated against the same mandatory requirements;
 - no implicit provider substitution;
 - capability registry version in decision/evidence.
+- gateway mode binds one reviewed workload to one allowed RegulaAI target and expected provider;
+- the gateway workload must constrain its authorized model group to compatible deployments;
+- terminal provider mismatch fails closed and local retry/fallback is prohibited.
 
 ### Stale provider documentation
 
@@ -101,13 +104,33 @@ Mitigations:
 
 Not Phase 1, but architecture must not make tenant id optional once SaaS mode exists.
 
-### SSRF/arbitrary outbound access (future execution)
+### SSRF/arbitrary outbound access
 
 Mitigations:
 - explicit provider adapters/endpoints;
 - allowlisted egress;
 - bounded timeouts;
+- gateway URL is deployment configuration, never request input;
+- the gateway SDK accepts HTTPS or literal loopback HTTP and rejects userinfo/query/fragment;
 - no user-supplied arbitrary provider URL in production mode.
+
+### Gateway credential or response leakage
+
+Mitigations:
+- credential comes from an environment variable and is excluded from representations, evidence,
+  errors and logs;
+- the pinned gateway client normalizes transport/protocol failures without raw response bodies;
+- response content is used only ephemerally and discarded;
+- only allowlisted routing/execution metadata is persisted or returned.
+
+### Duplicate execution after crash or concurrent replay
+
+Mitigations:
+- persist `PREPARED` before external I/O;
+- atomically claim `DISPATCHED` before the gateway call;
+- never automatically execute a record already observed as `DISPATCHED`, `EXECUTION_FAILED` or
+  `EXECUTED`;
+- require operational reconciliation for an interrupted, uncertain `DISPATCHED` record.
 
 ### Approval spoofing (future)
 
@@ -128,3 +151,7 @@ Mitigations:
 - transform fails;
 - attempted log injection with secret-looking values;
 - fallback attempts weaker provider.
+- partial/unsafe gateway configuration;
+- gateway terminal provider differs from the configured provider boundary;
+- tool-bearing plan reaches the text-only gateway adapter;
+- malformed, failed or content-free terminal gateway response.

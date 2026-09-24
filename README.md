@@ -91,7 +91,8 @@ Initial obligations include:
 
 ## Project status
 
-**Pre-alpha with deterministic evaluation and Phase 2 local enforcement implemented.**
+**Pre-alpha with deterministic evaluation, local enforcement and an opt-in Phase 3a gateway
+execution adapter.**
 
 Current local flow:
 
@@ -105,19 +106,22 @@ Context
   -> Local transformations
   -> Metadata-only transformation receipts
   -> Persisted PREPARED enforcement state
-  -> Network-silent mock execution
+  -> Network-silent mock (default) or governed gateway (opt-in)
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`, `GET /v1/providers` and
 `GET /health`. It validates versioned YAML control-plane records at startup, applies transformations
 inside the local trust boundary and stores only metadata evidence in SQLite. It still stops before
-real provider inference.
+real provider inference unless gateway mode is explicitly configured. Gateway mode supports only
+text plans without tools, uses bounded timeouts, performs no local retry and discards model output
+after recording allowlisted routing/execution metadata.
 
 Not implemented in the first slice:
 
-- live OpenAI calls;
-- live Amazon Bedrock calls;
+- direct provider SDK adapters;
+- completion-returning API behavior;
+- tool forwarding and approval execution;
 - LLM-based policy judging;
 - frontend/dashboard;
 - SaaS multi-tenancy;
@@ -171,7 +175,11 @@ Evidence must not contain raw prompts, raw model responses, personal-data values
 
 ### Provider portability
 
-The long-term architecture keeps regulatory and enterprise policy above the inference provider. A future execution port may integrate with [`governed-llm-gateway`](https://github.com/brunovicco/governed-llm-gateway) instead of duplicating routing, resilience and provider-normalization capabilities.
+The architecture keeps regulatory and enterprise policy above the inference provider. The first
+real execution adapter integrates with
+[`governed-llm-gateway`](https://github.com/brunovicco/governed-llm-gateway) instead of duplicating
+routing, resilience, provider credentials and provider normalization. It is opt-in; mock mode is
+the default.
 
 ## Decision precedence
 

@@ -9,7 +9,11 @@ execution plan plus metadata-only evidence. Phase 1 does not call an AI provider
 
 Phase 2 adds local enforcement. It applies field transformations, persists a metadata-only
 `PREPARED` record and then calls a network-silent mock execution port. No real provider SDK or
-external inference is present.
+external inference is present in the default runtime.
+
+Phase 3a adds an opt-in adapter for `governed-llm-gateway`. It sends only the sanitized in-memory
+execution plan, delegates provider routing/retry/fallback to the gateway and persists allowlisted
+provider-call metadata. The public enforcement response remains content-free.
 
 ## Layers
 
@@ -71,7 +75,7 @@ domain      -> no outer layer
 - `adapters/evaluation_observability.py`: stable, allowlisted structured lifecycle events.
 - `entrypoints/api.py`: HTTP validation, error mapping, composition root and Phase 1 endpoints.
 
-Transform obligations are returned before any future execution port can be called. Capability
+Transform obligations are returned before any configured execution port can be called. Capability
 requirements selected for the primary target are also applied to every explicit fallback target.
 High-assurance freshness is policy data (`max_age_days`), not a global domain constant.
 
@@ -89,12 +93,27 @@ decision and [the demo](DEMO.md) for the end-to-end flow.
 The enforcement sequence is:
 
 ```text
-evaluate -> transform locally -> persist PREPARED -> execute mock -> persist EXECUTED
+evaluate -> transform locally -> persist PREPARED -> claim DISPATCHED -> execute -> persist EXECUTED
 ```
 
 `DENY`, missing approval, conflicting transformations, transformation failure and evidence failure
 all stop before execution. See
 [ADR-0005](adr/0005-local-enforcement-before-execution.md).
+
+## Phase 3a components
+
+- `adapters/gateway_execution.py`: bounded provider-neutral request translation and terminal
+  provenance validation.
+- `entrypoints/api.py`: explicit mock/gateway composition selected at startup.
+- `adapters/evidence_sqlite.py`: optional provider-call metadata stored with enforcement state.
+
+The gateway path is text-only and rejects tools before network access. Separate transport and
+provider timeouts are configured, while retry and fallback remain gateway-owned. The configured
+gateway workload must be constrained to the provider already evaluated by RegulaAI; terminal
+provider mismatch fails closed. An atomic `PREPARED -> DISPATCHED` claim prevents concurrent or
+post-crash replay from issuing a second external request; interrupted `DISPATCHED` records require
+operational reconciliation. See
+[ADR-0006](adr/0006-governed-gateway-execution-adapter.md).
 
 ## Diagrams
 

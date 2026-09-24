@@ -55,6 +55,9 @@ Still allow a mock provider.
 
 ## Phase 3 — Provider execution adapters
 
+Status: Phase 3a implemented as an opt-in, text-only `governed-llm-gateway` adapter. Mock execution
+remains the default; tools and live composition proof remain pending.
+
 Goal:
 execute a sanitized request without duplicating gateway responsibilities.
 
@@ -72,6 +75,14 @@ Deliver:
 - config assertions;
 - no policy downgrade on fallback;
 - provider-call metadata evidence.
+
+Implemented in Phase 3a:
+- Git-pinned thin gateway client;
+- explicit workload/target/provider configuration assertions;
+- bounded transport/provider timeouts and no consumer-side retry;
+- conservative request translation and metadata-only gateway provenance;
+- fail-closed tool rejection and terminal provider validation;
+- network-silent fake-client tests.
 
 ## Phase 4 — Approval and agent authority
 

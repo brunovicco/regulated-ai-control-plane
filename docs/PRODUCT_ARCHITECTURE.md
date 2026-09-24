@@ -29,8 +29,8 @@ flowchart LR
 ```
 
 Phase 1 stops before `GW`: it evaluates and returns obligations. Phase 2 builds a locally
-transformed execution plan and sends it only to a network-silent mock port. Real provider/gateway
-execution remains Phase 3 scope.
+transformed execution plan and sends it to a network-silent mock port. Phase 3a adds an opt-in,
+text-only integration with `governed-llm-gateway`; mock execution remains the default.
 
 ## Control plane vs enforcement plane
 
@@ -123,7 +123,7 @@ Potential ports:
 - `EvidenceRepository`
 - `DataClassifier`
 - future `ApprovalPort`
-- future `InferenceExecutionPort`
+- `InferenceExecutionPort`
 
 ### Adapters
 
@@ -157,17 +157,17 @@ sequenceDiagram
     API-->>Client: decision + obligations + evidence_id
 ```
 
-## Future execution integration
+## Execution integration
 
-Execution is intentionally a later slice.
-
-The application should expose a future `InferenceExecutionPort` so the product can:
+The application exposes an `InferenceExecutionPort` so the product can:
 - integrate with `governed-llm-gateway`;
 - call a direct provider adapter;
 - call a hyperscaler adapter;
 - keep provider fallback constrained by the same decision plan.
 
-Do not copy gateway functionality into this repository.
+The first real adapter uses `governed-llm-gateway` and does not copy its routing, retry, fallback or
+provider credential handling into this repository. Direct provider adapters remain optional future
+work.
 
 ## Local enforcement flow
 
