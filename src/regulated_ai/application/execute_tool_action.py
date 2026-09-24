@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
 from regulated_ai.application.evaluate_operation import EvaluationError
@@ -27,7 +27,10 @@ from regulated_ai.domain import (
     ToolActionResult,
     ToolActionStatus,
     ToolExecutionReceipt,
+    ToolExecutionResult,
     ToolProposal,
+    ToolResultClassification,
+    ToolResultHandling,
 )
 
 _SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}\Z")
@@ -68,6 +71,21 @@ class ToolActionPersistenceError(EvaluationError):
     """Tool-action metadata could not be persisted."""
 
     code = "TOOL_ACTION_PERSISTENCE_FAILED"
+
+
+class ToolResultRejectedError(EvaluationError):
+    """The action completed but its untrusted result failed safe handling."""
+
+    code = "TOOL_RESULT_REJECTED"
+
+
+@dataclass(frozen=True, slots=True)
+class _ProcessedOutput:
+    output_digest: str
+    safe_output_digest: str
+    classifications: tuple[ToolResultClassification, ...]
+    exposed_fields: tuple[str, ...]
+    safe_output: tuple[tuple[str, str], ...]
 
 
 class ExecuteToolAction:
@@ -157,6 +175,7 @@ class ExecuteToolAction:
             idempotency_key_digest=idempotency_key_digest,
             action_digest=action_digest,
             status=ToolActionStatus.WAITING_APPROVAL,
+            output_schema_digest=tool.output_schema_digest,
         )
         stored = self._save(candidate)
         _require_same_binding(stored, candidate)
@@ -198,7 +217,8 @@ class ExecuteToolAction:
             approval_receipt=approval_receipt,
         )
         try:
-            receipt = self._execution.execute(plan)
+            execution_result = self._execution.execute(plan)
+            receipt = execution_result.receipt
             _validate_execution_receipt(receipt, plan)
         except Exception as exc:
             failed = replace(active_record, status=ToolActionStatus.RECONCILIATION_REQUIRED)
@@ -207,15 +227,31 @@ class ExecuteToolAction:
             raise ToolActionExecutionFailedError(
                 "Tool execution outcome requires reconciliation"
             ) from exc
+        try:
+            processed = _validated_output(execution_result, tool=tool, plan=plan)
+        except Exception as exc:
+            rejected = replace(
+                active_record,
+                status=ToolActionStatus.RESULT_REJECTED,
+                tool_execution_id=receipt.execution_id,
+                output_schema_digest=tool.output_schema_digest,
+            )
+            self._save(rejected)
+            self._emit("tool_result.rejected", action_id=action_id)
+            raise ToolResultRejectedError("Tool result failed safe validation") from exc
         completed = replace(
             active_record,
             status=ToolActionStatus.EXECUTED,
             tool_execution_id=receipt.execution_id,
-            output_digest=receipt.output_digest,
+            output_digest=processed.output_digest,
+            safe_output_digest=processed.safe_output_digest,
+            result_classifications=processed.classifications,
+            exposed_result_fields=processed.exposed_fields,
         )
         stored_completed = self._save(completed)
+        self._emit("tool_result.accepted", action_id=action_id)
         self._emit("tool_action.completed", action_id=action_id)
-        return _to_result(stored_completed)
+        return _to_result(stored_completed, safe_output=processed.safe_output)
 
     def _inspect_approval(self, assertion: str, action_digest: str) -> ActionApprovalGrant:
         try:
@@ -352,9 +388,10 @@ def _action_digest(
             "enforcement_id": enforcement_id,
             "evaluation_id": evaluation_id,
             "idempotency_key_digest": idempotency_key_digest,
-            "schema_version": "1",
+            "schema_version": "2",
             "tool_definition_digest": tool.definition_digest,
             "tool_name": tool.name,
+            "tool_output_schema_digest": tool.output_schema_digest,
             "tool_schema_digest": tool.input_schema_digest,
             "tool_schema_version": tool.schema_version,
             "workload_identity": workload_identity,
@@ -400,6 +437,7 @@ def _require_same_binding(stored: ToolActionRecord, candidate: ToolActionRecord)
         "workload_identity",
         "idempotency_key_digest",
         "action_digest",
+        "output_schema_digest",
     )
     if any(getattr(stored, field) != getattr(candidate, field) for field in fields):
         raise ToolActionConflictError("A different action binding already exists for this proposal")
@@ -443,15 +481,153 @@ def _validate_approval_receipt(
 
 
 def _validate_execution_receipt(receipt: ToolExecutionReceipt, plan: ToolActionPlan) -> None:
-    if (
-        receipt.action_id != plan.action_id
-        or _SAFE_ID.fullmatch(receipt.execution_id) is None
-        or _DIGEST.fullmatch(receipt.output_digest) is None
-    ):
+    if receipt.action_id != plan.action_id or _SAFE_ID.fullmatch(receipt.execution_id) is None:
         raise ValueError("Tool execution adapter returned an invalid receipt")
 
 
-def _to_result(record: ToolActionRecord) -> ToolActionResult:
+def _validated_output(
+    execution_result: ToolExecutionResult,
+    *,
+    tool: AuthorizedTool,
+    plan: ToolActionPlan,
+) -> _ProcessedOutput:
+    output = execution_result.output
+    if not isinstance(output, Mapping) or len(output) > 128:
+        raise ValueError("Tool result is not a bounded object")
+    try:
+        parsed_schema: object = json.loads(tool.output_schema_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Trusted tool output schema is invalid") from exc
+    if (
+        not isinstance(parsed_schema, dict)
+        or parsed_schema.get("type") != "object"
+        or parsed_schema.get("additionalProperties") is not False
+    ):
+        raise ValueError("Trusted tool output schema is invalid")
+    properties = parsed_schema.get("properties")
+    required = parsed_schema.get("required")
+    if (
+        not isinstance(properties, dict)
+        or not properties
+        or len(properties) > 128
+        or not isinstance(required, list)
+        or len(required) != len(set(required))
+        or any(not isinstance(field, str) for field in required)
+        or not set(required).issubset(properties)
+    ):
+        raise ValueError("Trusted tool output schema is invalid")
+    if (
+        any(not isinstance(key, str) for key in output)
+        or set(output) - set(properties)
+        or not set(required).issubset(output)
+    ):
+        raise ValueError("Tool result does not satisfy the trusted schema")
+
+    policies: dict[str, tuple[ToolResultClassification, ToolResultHandling]] = {}
+    for field_name, constraints in properties.items():
+        if (
+            not isinstance(field_name, str)
+            or not isinstance(constraints, dict)
+            or constraints.get("type") != "string"
+        ):
+            raise ValueError("Trusted tool output schema is invalid")
+        raw_classification = constraints.get("classification")
+        raw_handling = constraints.get("handling")
+        if not isinstance(raw_classification, str) or not isinstance(raw_handling, str):
+            raise ValueError("Trusted tool output policy is invalid")
+        try:
+            classification = ToolResultClassification(raw_classification)
+            handling = ToolResultHandling(raw_handling)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Trusted tool output policy is invalid") from exc
+        _validate_output_policy(classification, handling, constraints)
+        policies[field_name] = (classification, handling)
+
+    normalized: dict[str, str] = {}
+    safe: dict[str, str] = {}
+    classifications: set[ToolResultClassification] = set()
+    for key, value in output.items():
+        constraints = properties.get(key)
+        if (
+            not isinstance(key, str)
+            or not isinstance(value, str)
+            or not isinstance(constraints, dict)
+        ):
+            raise ValueError("Tool result does not satisfy the trusted schema")
+        _validate_string(value, constraints)
+        classification, handling = policies[key]
+        classifications.add(classification)
+        normalized[key] = value
+        if handling is ToolResultHandling.RETURN:
+            safe[key] = value
+        elif handling is ToolResultHandling.MASK:
+            safe[key] = "***MASKED***"
+        elif handling is not ToolResultHandling.DROP:
+            raise ValueError("Trusted tool output policy is invalid")
+
+    canonical_output = json.dumps(
+        normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    )
+    if len(canonical_output.encode()) > 32_768:
+        raise ValueError("Tool result exceeds the safe handling limit")
+    output_digest = _digest_payload(
+        {
+            "action_digest": plan.action_digest,
+            "execution_id": execution_result.receipt.execution_id,
+            "output": json.loads(canonical_output),
+            "output_schema_digest": tool.output_schema_digest,
+            "tool": tool.name,
+        }
+    )
+    safe_output_digest = _digest_payload(
+        {
+            "output_digest": output_digest,
+            "output_schema_digest": tool.output_schema_digest,
+            "safe_output": safe,
+        }
+    )
+    return _ProcessedOutput(
+        output_digest=output_digest,
+        safe_output_digest=safe_output_digest,
+        classifications=tuple(sorted(classifications, key=str)),
+        exposed_fields=tuple(sorted(safe)),
+        safe_output=tuple(sorted(safe.items())),
+    )
+
+
+def _digest_payload(value: Mapping[str, object]) -> str:
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return f"sha256:{hashlib.sha256(canonical.encode()).hexdigest()}"
+
+
+def _validate_output_policy(
+    classification: ToolResultClassification,
+    handling: ToolResultHandling,
+    constraints: Mapping[object, object],
+) -> None:
+    if handling is ToolResultHandling.RETURN and not isinstance(constraints.get("enum"), list):
+        raise ValueError("Returned tool result fields must use a closed enum")
+    if (
+        classification
+        in {
+            ToolResultClassification.PERSONAL,
+            ToolResultClassification.FINANCIAL,
+        }
+        and handling is ToolResultHandling.RETURN
+    ):
+        raise ValueError("Sensitive tool result fields cannot be returned")
+    if (
+        classification is ToolResultClassification.AUTHENTICATION_SECRET
+        and handling is not ToolResultHandling.DROP
+    ):
+        raise ValueError("Authentication-secret result fields must be dropped")
+
+
+def _to_result(
+    record: ToolActionRecord,
+    *,
+    safe_output: tuple[tuple[str, str], ...] | None = None,
+) -> ToolActionResult:
     return ToolActionResult(
         action_id=record.action_id,
         enforcement_id=record.enforcement_id,
@@ -460,7 +636,12 @@ def _to_result(record: ToolActionRecord) -> ToolActionResult:
         workload_identity=record.workload_identity,
         action_digest=record.action_digest,
         status=record.status,
+        output_schema_digest=record.output_schema_digest,
         approval_receipt=record.approval_receipt,
         tool_execution_id=record.tool_execution_id,
         output_digest=record.output_digest,
+        safe_output_digest=record.safe_output_digest,
+        result_classifications=record.result_classifications,
+        exposed_result_fields=record.exposed_result_fields,
+        safe_output=safe_output,
     )

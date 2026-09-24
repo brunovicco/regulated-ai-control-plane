@@ -1,4 +1,4 @@
-# API contract — Phases 1 through 4b
+# API contract — Phases 1 through 4d
 
 The exact wire schema may be refined during implementation, but behavior and privacy boundaries
 must remain stable.
@@ -205,14 +205,39 @@ Resend the identical request with an externally issued `approval_assertion` usin
 `action_digest`, `issued_at` and `expires_at`. `ra1` decision approvals are rejected.
 
 After an atomic `DISPATCHED` claim, authority is consumed once and the network-silent mock tool
-port executes. Success returns `EXECUTED`; an ambiguous failure becomes terminal
-`RECONCILIATION_REQUIRED`. Responses and persistence exclude raw arguments, idempotency keys,
-assertions and tool output.
+port executes. Success is accepted only when the untrusted output exactly matches the trusted,
+action-bound closed output schema. Per-field catalog rules return a closed enum, replace a value
+with `***MASKED***`, or drop the field. Personal/financial values cannot be returned directly and
+authentication secrets are always dropped.
+
+The immediate successful response includes the minimized result and metadata:
+
+```json
+{
+  "status": "EXECUTED",
+  "output_schema_digest": "sha256:...",
+  "output_digest": "sha256:...",
+  "safe_output_digest": "sha256:...",
+  "result_classifications": ["FINANCIAL", "INTERNAL"],
+  "exposed_result_fields": ["operation_reference", "operation_status"],
+  "safe_result": {
+    "operation_reference": "***MASKED***",
+    "operation_status": "SUCCEEDED"
+  }
+}
+```
+
+`safe_result` is ephemeral and appears only on that immediate success response. An ambiguous
+execution failure becomes terminal `RECONCILIATION_REQUIRED`. Invalid, extra, missing, mistyped,
+oversized or disallowed result content becomes terminal `RESULT_REJECTED` with HTTP 502. Neither
+state is automatically retried because the downstream effect may already have occurred.
 
 ## GET /v1/tool-actions/{action_id}
 
-Returns action identity, trusted schema/argument/action digests, workload identity, status,
-metadata-only approval receipt and execution/output digests. It never returns execution payloads.
+Returns action identity, trusted input/output schema, argument, action and result digests, workload
+identity, status, classifications, exposed field names and metadata-only approval/execution
+receipts. `safe_result` is always `null`; raw and minimized result values are never persisted or
+recoverable from this endpoint.
 
 Status behavior:
 
@@ -230,6 +255,8 @@ Status behavior:
   fail-closed state requires operational reconciliation after an interrupted process;
 - `EXECUTION_FAILED` is also terminal for automatic replay because a timeout or transport failure
   may be ambiguous after external processing;
+- `RESULT_REJECTED` is terminal after a completed tool call whose untrusted output failed the
+  trusted schema/handling contract; content is discarded and the action is not retried;
 - transformation or execution error -> fail closed with a stable error code.
 
 ## GET /v1/enforcements/{enforcement_id}
@@ -255,6 +282,7 @@ Use stable machine-readable codes, for example:
 - `EXECUTION_FAILED`
 - `APPROVAL_FAILED`
 - `TOOL_NOT_AUTHORIZED`
+- `TOOL_RESULT_REJECTED`
 - `ENFORCEMENT_PERSISTENCE_FAILED`
 
 Error messages must not echo raw sensitive input.

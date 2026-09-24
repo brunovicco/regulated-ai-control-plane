@@ -19,6 +19,7 @@ from regulated_ai.domain import (
     ToolActionRecord,
     ToolActionStatus,
     ToolProposal,
+    ToolResultClassification,
     TransformationReceipt,
 )
 
@@ -133,6 +134,10 @@ CREATE TABLE IF NOT EXISTS tool_action (
     approval_receipt TEXT,
     tool_execution_id TEXT,
     output_digest TEXT,
+    output_schema_digest TEXT,
+    safe_output_digest TEXT,
+    result_classifications TEXT NOT NULL DEFAULT '[]',
+    exposed_result_fields TEXT NOT NULL DEFAULT '[]',
     UNIQUE(enforcement_id, call_id)
 )
 """
@@ -141,13 +146,17 @@ INSERT INTO tool_action (
     action_id, created_at, enforcement_id, evaluation_id, call_id, tool_name,
     tool_schema_version, tool_schema_digest, arguments_digest, workload_identity,
     idempotency_key_digest, action_digest, status, approval_receipt,
-    tool_execution_id, output_digest
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    tool_execution_id, output_digest, output_schema_digest, safe_output_digest,
+    result_classifications, exposed_result_fields
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(action_id) DO UPDATE SET
     status=excluded.status,
     approval_receipt=excluded.approval_receipt,
     tool_execution_id=excluded.tool_execution_id,
-    output_digest=excluded.output_digest
+    output_digest=excluded.output_digest,
+    safe_output_digest=excluded.safe_output_digest,
+    result_classifications=excluded.result_classifications,
+    exposed_result_fields=excluded.exposed_result_fields
 WHERE tool_action.enforcement_id=excluded.enforcement_id
   AND tool_action.evaluation_id=excluded.evaluation_id
   AND tool_action.call_id=excluded.call_id
@@ -158,11 +167,14 @@ WHERE tool_action.enforcement_id=excluded.enforcement_id
   AND tool_action.workload_identity=excluded.workload_identity
   AND tool_action.idempotency_key_digest=excluded.idempotency_key_digest
   AND tool_action.action_digest=excluded.action_digest
+  AND tool_action.output_schema_digest IS excluded.output_schema_digest
   AND (
       (tool_action.status='WAITING_APPROVAL' AND excluded.status IN ('WAITING_APPROVAL','PREPARED'))
       OR (
           tool_action.status='DISPATCHED'
-          AND excluded.status IN ('EXECUTED','APPROVAL_FAILED','RECONCILIATION_REQUIRED')
+          AND excluded.status IN (
+              'EXECUTED','APPROVAL_FAILED','RECONCILIATION_REQUIRED','RESULT_REJECTED'
+          )
       )
   )
 """
@@ -389,6 +401,21 @@ class SqliteToolActionRepository:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute(_TOOL_ACTION_SCHEMA)
+            columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(tool_action)")}
+            if "output_schema_digest" not in columns:
+                connection.execute("ALTER TABLE tool_action ADD COLUMN output_schema_digest TEXT")
+            if "safe_output_digest" not in columns:
+                connection.execute("ALTER TABLE tool_action ADD COLUMN safe_output_digest TEXT")
+            if "result_classifications" not in columns:
+                connection.execute(
+                    "ALTER TABLE tool_action ADD COLUMN "
+                    "result_classifications TEXT NOT NULL DEFAULT '[]'"
+                )
+            if "exposed_result_fields" not in columns:
+                connection.execute(
+                    "ALTER TABLE tool_action ADD COLUMN "
+                    "exposed_result_fields TEXT NOT NULL DEFAULT '[]'"
+                )
 
     def save(self, record: ToolActionRecord) -> ToolActionRecord:
         """Insert or safely advance one action state."""
@@ -409,6 +436,10 @@ class SqliteToolActionRepository:
             _action_approval_receipt_json(record.approval_receipt),
             record.tool_execution_id,
             record.output_digest,
+            record.output_schema_digest,
+            record.safe_output_digest,
+            _json(tuple(item.value for item in record.result_classifications)),
+            _json(record.exposed_result_fields),
         )
         with self._connect() as connection:
             connection.execute(_TOOL_ACTION_UPSERT, values)
@@ -444,6 +475,12 @@ class SqliteToolActionRepository:
             approval_receipt=_action_approval_receipt(row[13]),
             tool_execution_id=None if row[14] is None else str(row[14]),
             output_digest=None if row[15] is None else str(row[15]),
+            output_schema_digest=None if row[16] is None else str(row[16]),
+            safe_output_digest=None if row[17] is None else str(row[17]),
+            result_classifications=tuple(
+                ToolResultClassification(item) for item in _string_tuple(row[18])
+            ),
+            exposed_result_fields=_string_tuple(row[19]),
         )
 
     def claim_execution(self, record: ToolActionRecord) -> tuple[ToolActionRecord, bool]:

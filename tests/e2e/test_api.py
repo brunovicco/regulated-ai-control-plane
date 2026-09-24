@@ -37,7 +37,12 @@ APPROVAL_KEY = b"p" * 32
 ACTION_APPROVAL_KEY = b"r" * 32
 
 
-def _runtime(tmp_path: Path, *, tool_proposals: tuple[ToolProposal, ...] = ()) -> Runtime:
+def _runtime(
+    tmp_path: Path,
+    *,
+    tool_proposals: tuple[ToolProposal, ...] = (),
+    tool_output: object | None = None,
+) -> Runtime:
     root = Path(__file__).resolve().parents[2]
     policies = FilePolicyRepository(
         (root / "examples/policies/br-financial-external-inference.yaml",)
@@ -71,7 +76,7 @@ def _runtime(tmp_path: Path, *, tool_proposals: tuple[ToolProposal, ...] = ()) -
         approval=approval,
         clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
     )
-    mock_tool_execution = MockToolExecutionAdapter()
+    mock_tool_execution = MockToolExecutionAdapter(output=tool_output)
     action_executor = ExecuteToolAction(
         enforcement=enforcement,
         evidence=evidence,
@@ -174,8 +179,8 @@ def test_end_to_end_card_unblock_evaluation_and_evidence_privacy(tmp_path: Path)
         "REQUIRE_EVIDENCE",
     }
     assert evidence.status_code == 200
-    assert body["tool_catalog_version"] == "br-financial-tools@1.0.0"
-    assert body["authorized_tools"] == ["cards.read@1.0.0", "cards.unblock@1.0.0"]
+    assert body["tool_catalog_version"] == "br-financial-tools@1.1.0"
+    assert body["authorized_tools"] == ["cards.read@1.1.0", "cards.unblock@1.1.0"]
     serialized_evidence = evidence.text
     data = request["data"]
     assert isinstance(data, list)
@@ -362,12 +367,88 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
     assert waiting_action.json()["status"] == "WAITING_APPROVAL"
     assert completed_action.status_code == 200
     assert completed_action.json()["status"] == "EXECUTED"
+    assert completed_action.json()["safe_result"] == {
+        "operation_reference": "***MASKED***",
+        "operation_status": "SUCCEEDED",
+    }
+    assert completed_action.json()["result_classifications"] == ["FINANCIAL", "INTERNAL"]
+    assert completed_action.json()["exposed_result_fields"] == [
+        "operation_reference",
+        "operation_status",
+    ]
+    assert completed_action.json()["safe_output_digest"].startswith("sha256:")
     assert stored_action.json()["status"] == "EXECUTED"
+    assert stored_action.json()["safe_result"] is None
     assert runtime.mock_tool_execution.call_count == 1
     database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
     for raw_value in (*arguments.values(), idempotency_key, action_assertion):
         assert raw_value not in database
         assert raw_value not in completed_action.text
+    for raw_result in (
+        "synthetic-operation-reference",
+        "synthetic-diagnostic",
+    ):
+        assert raw_result not in database
+        assert raw_result not in completed_action.text
+
+
+def test_action_api_rejects_untrusted_result_without_persisting_it(tmp_path: Path) -> None:
+    arguments = {
+        "account_token": "tok_synthetic_account",
+        "reason_code": "CUSTOMER_VERIFIED",
+    }
+    rejected_output = {
+        "operation_status": "UNTRUSTED_STATUS",
+        "operation_reference": "sensitive-result-sentinel",
+        "diagnostic": "diagnostic-result-sentinel",
+    }
+    runtime = _runtime(
+        tmp_path,
+        tool_proposals=(_proposal(arguments),),
+        tool_output=rejected_output,
+    )
+    app = create_app(lambda: runtime)
+    request = _request()
+
+    with TestClient(app) as client:
+        waiting_enforcement = client.post("/v1/enforcements", json=request).json()
+        evidence = client.get(
+            f"/v1/evidence/{waiting_enforcement['evaluation_evidence_id']}"
+        ).json()
+        decision_assertion = approval_assertion(APPROVAL_KEY, evidence["output_digest"])
+        completed_enforcement = client.post(
+            "/v1/enforcements",
+            json={**request, "approval_assertion": decision_assertion},
+        ).json()
+        action_request = {
+            "call_id": "call_unblock_test",
+            "arguments": arguments,
+            "workload_identity": "workload.cards-synthetic",
+            "idempotency_key": "idempotency-rejected-result",
+        }
+        waiting_action = client.post(
+            f"/v1/enforcements/{completed_enforcement['enforcement_id']}/tool-actions",
+            json=action_request,
+        )
+        action_assertion = action_approval_assertion(
+            ACTION_APPROVAL_KEY, waiting_action.json()["action_digest"]
+        )
+        rejected = client.post(
+            f"/v1/enforcements/{completed_enforcement['enforcement_id']}/tool-actions",
+            json={**action_request, "approval_assertion": action_assertion},
+        )
+        stored = client.get(f"/v1/tool-actions/{waiting_action.json()['action_id']}")
+
+    assert rejected.status_code == 502
+    assert rejected.json()["error"]["code"] == "TOOL_RESULT_REJECTED"
+    assert stored.json()["status"] == "RESULT_REJECTED"
+    assert stored.json()["safe_result"] is None
+    assert stored.json()["output_digest"] is None
+    assert runtime.mock_tool_execution.call_count == 1
+    database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
+    for raw_result in rejected_output.values():
+        assert raw_result not in database
+        assert raw_result not in rejected.text
 
 
 def test_invalid_external_approval_fails_closed_without_echoing_it(tmp_path: Path) -> None:

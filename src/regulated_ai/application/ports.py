@@ -20,7 +20,7 @@ from regulated_ai.domain import (
     ProviderTarget,
     ToolActionPlan,
     ToolActionRecord,
-    ToolExecutionReceipt,
+    ToolExecutionResult,
 )
 
 
@@ -197,6 +197,6 @@ class InferenceExecutionPort(Protocol):
 class ToolExecutionPort(Protocol):
     """Boundary for an exact, approved and idempotent tool action."""
 
-    def execute(self, plan: ToolActionPlan) -> ToolExecutionReceipt:
+    def execute(self, plan: ToolActionPlan) -> ToolExecutionResult:
         """Execute one action using explicit downstream identity and idempotency."""
         ...

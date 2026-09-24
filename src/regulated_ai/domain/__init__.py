@@ -39,8 +39,11 @@ from regulated_ai.domain.models import (
     ToolActionResult,
     ToolActionStatus,
     ToolExecutionReceipt,
+    ToolExecutionResult,
     ToolProposal,
     ToolRequest,
+    ToolResultClassification,
+    ToolResultHandling,
     TransformationReceipt,
     strongest_outcome,
 )
@@ -84,8 +87,11 @@ __all__ = [
     "ToolActionResult",
     "ToolActionStatus",
     "ToolExecutionReceipt",
+    "ToolExecutionResult",
     "ToolProposal",
     "ToolRequest",
+    "ToolResultClassification",
+    "ToolResultHandling",
     "TransformationReceipt",
     "strongest_outcome",
 ]

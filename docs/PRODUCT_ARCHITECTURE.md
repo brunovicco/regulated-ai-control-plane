@@ -31,7 +31,8 @@ flowchart LR
 Phase 1 stops before `GW`: it evaluates and returns obligations. Phase 2 builds a locally
 transformed execution plan and sends it to a network-silent mock port. Phase 3a adds an opt-in
 integration with `governed-llm-gateway`; Phase 4b permits only trusted catalog definitions and
-proposal-only tool results. Mock execution remains the default.
+proposal-only tool calls. Phases 4c–4d add action-bound mock execution and trusted, ephemeral
+result minimization. Mock execution remains the default; no result is supplied to a model.
 
 ## Control plane vs enforcement plane
 

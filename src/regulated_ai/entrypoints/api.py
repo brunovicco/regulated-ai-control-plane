@@ -349,6 +349,8 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
             status = 422
         elif exc.code == "TOOL_ACTION_CONFLICT":
             status = 409
+        elif exc.code == "TOOL_RESULT_REJECTED":
+            status = 502
         else:
             status = 503
         return _error_response(status, exc.code, str(exc))
@@ -645,9 +647,14 @@ def _tool_action_result_payload(result: ToolActionResult) -> dict[str, object]:
         "workload_identity": result.workload_identity,
         "action_digest": result.action_digest,
         "status": result.status.value,
+        "output_schema_digest": result.output_schema_digest,
         "approval_receipt": _action_approval_receipt_payload(result.approval_receipt),
         "tool_execution_id": result.tool_execution_id,
         "output_digest": result.output_digest,
+        "safe_output_digest": result.safe_output_digest,
+        "result_classifications": [item.value for item in result.result_classifications],
+        "exposed_result_fields": list(result.exposed_result_fields),
+        "safe_result": None if result.safe_output is None else dict(result.safe_output),
     }
 
 
@@ -660,9 +667,13 @@ def _tool_action_record_payload(record: ToolActionRecord) -> dict[str, object]:
         workload_identity=record.workload_identity,
         action_digest=record.action_digest,
         status=record.status,
+        output_schema_digest=record.output_schema_digest,
         approval_receipt=record.approval_receipt,
         tool_execution_id=record.tool_execution_id,
         output_digest=record.output_digest,
+        safe_output_digest=record.safe_output_digest,
+        result_classifications=record.result_classifications,
+        exposed_result_fields=record.exposed_result_fields,
     )
     return {
         **_tool_action_result_payload(result),

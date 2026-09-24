@@ -1,5 +1,35 @@
 # Implementation plan
 
+## Phase 4d — trusted tool-result handling
+
+### Goal
+
+Treat every tool result as untrusted, validate it against an action-bound organization schema and
+expose only an ephemeral minimized view without expanding persisted evidence into content storage.
+
+### Work
+
+1. Add closed output schemas with per-field classification and `RETURN`, `MASK` or `DROP` handling
+   to the trusted catalog; bind their canonical digests into tool definitions and actions.
+2. Validate complete output shape, types, constraints and size after execution. Require returned
+   text to be a closed enum, prevent direct personal/financial exposure and always drop secrets.
+3. Compute control-plane-owned raw/safe result digests and persist only digests, classifications,
+   exposed field names and execution identity.
+4. Return the minimized result only in the immediate successful action response. Never persist or
+   recover raw or safe content through replay or the action inspection endpoint.
+5. Record invalid output as terminal `RESULT_REJECTED`, emit bounded lifecycle metadata and never
+   retry the already completed side effect automatically.
+6. Add boundary, application, persistence, migration and end-to-end privacy tests; document
+   ADR-0010.
+
+### Decisions and assumptions
+
+- Tool output, including adapter output, is untrusted external input.
+- Masking is presentation minimization, not anonymization; masked content is not retained.
+- The phase does not continue a model turn or enable a live enterprise connector.
+- `RESULT_REJECTED` describes rejected content after execution, not proof that the downstream side
+  effect failed.
+
 ## Phase 4c — action-bound approval and bounded tool execution
 
 ### Goal

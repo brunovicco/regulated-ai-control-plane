@@ -1,6 +1,6 @@
 """Framework-free domain types and deterministic policy invariants."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
 
@@ -79,6 +79,25 @@ class ToolActionStatus(StrEnum):
     EXECUTED = "EXECUTED"
     APPROVAL_FAILED = "APPROVAL_FAILED"
     RECONCILIATION_REQUIRED = "RECONCILIATION_REQUIRED"
+    RESULT_REJECTED = "RESULT_REJECTED"
+
+
+class ToolResultClassification(StrEnum):
+    """Organization-owned sensitivity class for one tool-result field."""
+
+    PUBLIC = "PUBLIC"
+    INTERNAL = "INTERNAL"
+    PERSONAL = "PERSONAL"
+    FINANCIAL = "FINANCIAL"
+    AUTHENTICATION_SECRET = "AUTHENTICATION_SECRET"  # noqa: S105  # nosec B105
+
+
+class ToolResultHandling(StrEnum):
+    """Deterministic exposure treatment for one validated result field."""
+
+    RETURN = "RETURN"
+    MASK = "MASK"
+    DROP = "DROP"
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +154,8 @@ class AuthorizedTool:
     schema_version: str
     input_schema_json: str
     input_schema_digest: str
+    output_schema_json: str
+    output_schema_digest: str
     definition_digest: str
     catalog_version: str
 
@@ -501,7 +522,14 @@ class ToolExecutionReceipt:
 
     execution_id: str
     action_id: str
-    output_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class ToolExecutionResult:
+    """Ephemeral untrusted output paired with metadata-only execution evidence."""
+
+    receipt: ToolExecutionReceipt
+    output: object = field(repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -521,9 +549,13 @@ class ToolActionRecord:
     idempotency_key_digest: str
     action_digest: str
     status: ToolActionStatus
+    output_schema_digest: str | None = None
     approval_receipt: ActionApprovalReceipt | None = None
     tool_execution_id: str | None = None
     output_digest: str | None = None
+    safe_output_digest: str | None = None
+    result_classifications: tuple[ToolResultClassification, ...] = ()
+    exposed_result_fields: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -537,9 +569,14 @@ class ToolActionResult:
     workload_identity: str
     action_digest: str
     status: ToolActionStatus
+    output_schema_digest: str | None = None
     approval_receipt: ActionApprovalReceipt | None = None
     tool_execution_id: str | None = None
     output_digest: str | None = None
+    safe_output_digest: str | None = None
+    result_classifications: tuple[ToolResultClassification, ...] = ()
+    exposed_result_fields: tuple[str, ...] = ()
+    safe_output: tuple[tuple[str, str], ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)

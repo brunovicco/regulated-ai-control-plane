@@ -33,7 +33,7 @@ def test_example_files_load_with_versions_and_sources() -> None:
     assert record.source_urls
     assert record.verified_at.isoformat() == "2026-09-22"
     assert len(registry.list()) == 2
-    assert tools.catalog_version == "br-financial-tools@1.0.0"
+    assert tools.catalog_version == "br-financial-tools@1.1.0"
     assert tools.get("cards.unblock") is not None
     assert tools.get("cards.unblock").risk_class == "high_impact_state_change"  # type: ignore[union-attr]
 
@@ -129,6 +129,16 @@ tools:
       properties:
         token:
           type: "string"
+    output_schema:
+      type: "object"
+      additionalProperties: false
+      properties:
+        status:
+          type: "string"
+          enum: ["OK"]
+          classification: "INTERNAL"
+          handling: "RETURN"
+      required: ["status"]
 """
     first_path = tmp_path / "first.yaml"
     second_path = tmp_path / "second.yaml"
@@ -143,3 +153,46 @@ tools:
     _, second = load_tool_catalog_file(second_path)
 
     assert first[0].definition_digest != second[0].definition_digest
+
+
+@pytest.mark.parametrize(
+    ("classification", "handling", "enum_line"),
+    [
+        ("FINANCIAL", "RETURN", '          enum: ["OK"]\n'),
+        ("AUTHENTICATION_SECRET", "MASK", ""),
+        ("INTERNAL", "RETURN", ""),
+    ],
+)
+def test_unsafe_tool_result_exposure_policy_is_rejected(
+    tmp_path: Path, classification: str, handling: str, enum_line: str
+) -> None:
+    path = tmp_path / "unsafe-output.yaml"
+    path.write_text(
+        f'''schema_version: "1"
+catalog_version: "tools@1"
+tools:
+  cards.read:
+    description: "Synthetic read tool."
+    risk_class: "read_only"
+    schema_version: "1"
+    input_schema:
+      type: "object"
+      additionalProperties: false
+      properties:
+        token:
+          type: "string"
+    output_schema:
+      type: "object"
+      additionalProperties: false
+      properties:
+        result:
+          type: "string"
+{enum_line}          classification: "{classification}"
+          handling: "{handling}"
+      required: ["result"]
+''',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(MalformedYamlError):
+        load_tool_catalog_file(path)

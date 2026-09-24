@@ -202,7 +202,7 @@ def test_tool_risk_is_resolved_from_catalog_and_bound_to_evidence() -> None:
     assert result.authorized_tools[0].risk_class == "high_impact_state_change"
     assert result.tool_catalog_version == "tools@test"
     assert stored is not None
-    assert stored.authorized_tool_ids == ("cards.unblock@1.0.0",)
+    assert stored.authorized_tool_ids == ("cards.unblock@1.1.0",)
 
 
 @pytest.mark.parametrize(

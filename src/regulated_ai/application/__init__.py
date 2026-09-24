@@ -26,6 +26,7 @@ from regulated_ai.application.execute_tool_action import (
     ToolActionExecutionFailedError,
     ToolActionNotFoundError,
     ToolActionPersistenceError,
+    ToolResultRejectedError,
 )
 
 __all__ = [
@@ -48,6 +49,7 @@ __all__ = [
     "ToolActionNotFoundError",
     "ToolActionPersistenceError",
     "ToolAuthorizationError",
+    "ToolResultRejectedError",
     "TransformationFailedError",
     "normalize_evaluation_context",
 ]
