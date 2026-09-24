@@ -5,9 +5,12 @@ from typing import Protocol
 
 from regulated_ai.domain import (
     DataItem,
+    EnforcementRecord,
     EvidenceMetadata,
+    ExecutionPlan,
     PolicySet,
     ProviderCapabilityRecord,
+    ProviderExecutionReceipt,
     ProviderTarget,
 )
 
@@ -49,6 +52,18 @@ class EvidenceRepository(Protocol):
         ...
 
 
+class EnforcementRepository(Protocol):
+    """Persist and retrieve metadata-only enforcement records."""
+
+    def save(self, record: EnforcementRecord) -> EnforcementRecord:
+        """Persist the latest state for one enforcement attempt."""
+        ...
+
+    def get(self, enforcement_id: str) -> EnforcementRecord | None:
+        """Return one enforcement record by id."""
+        ...
+
+
 class DataClassifier(Protocol):
     """Apply only deterministic classification supported by the MVP."""
 
@@ -73,9 +88,21 @@ class ApprovalPort(Protocol):
         ...
 
 
+class TokenizationPort(Protocol):
+    """Transform sensitive values without exposing key material to the application."""
+
+    def tokenize(self, value: str, *, field: str, decision_digest: str) -> str:
+        """Return a non-reversible local token for one value."""
+        ...
+
+    def pseudonymize(self, value: str, *, field: str, decision_digest: str) -> str:
+        """Return a stable scoped pseudonym for one value."""
+        ...
+
+
 class InferenceExecutionPort(Protocol):
     """Reserved boundary for future post-enforcement provider execution."""
 
-    def execute(self, decision_digest: str) -> None:
-        """Execute only a previously enforced and approved decision plan."""
+    def execute(self, plan: ExecutionPlan) -> ProviderExecutionReceipt:
+        """Execute only a transformed, evidence-backed decision plan."""
         ...

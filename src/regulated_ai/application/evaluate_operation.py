@@ -96,7 +96,7 @@ class EvaluateAiOperation:
     def execute(self, context: EvaluationContext) -> EvaluationResult:
         """Evaluate one normalized operation and store metadata-only evidence."""
         try:
-            normalized_input = _normalize_context(context)
+            normalized_input = normalize_evaluation_context(context)
             self._emit("evaluation.started", correlation_id=normalized_input.correlation_id)
             policy_set = self._policies.get(normalized_input.policy_set_version)
             if policy_set is None:
@@ -383,7 +383,8 @@ def _canonical_target(target: ProviderTarget) -> dict[str, str | None]:
 _SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@-]*\Z")
 
 
-def _normalize_context(context: EvaluationContext) -> EvaluationContext:
+def normalize_evaluation_context(context: EvaluationContext) -> EvaluationContext:
+    """Normalize and validate metadata identifiers at the application boundary."""
     return replace(
         context,
         correlation_id=_identifier(context.correlation_id),

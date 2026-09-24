@@ -8,6 +8,8 @@ from regulated_ai.domain import (
     AssuranceLevel,
     CapabilityState,
     DataItem,
+    EnforcementRecord,
+    EnforcementStatus,
     EvaluationContext,
     EvidenceMetadata,
     Jurisdiction,
@@ -56,6 +58,25 @@ class MemoryEvidenceRepository:
 
     def get(self, evidence_id: str) -> EvidenceMetadata | None:
         return self.items.get(evidence_id)
+
+
+class MemoryEnforcementRepository:
+    """In-memory metadata-only enforcement fake."""
+
+    def __init__(self) -> None:
+        self.items: dict[str, EnforcementRecord] = {}
+        self.saved_statuses: list[str] = []
+
+    def save(self, record: EnforcementRecord) -> EnforcementRecord:
+        existing = self.items.get(record.enforcement_id)
+        if existing is not None and existing.status is EnforcementStatus.EXECUTED:
+            return existing
+        self.items[record.enforcement_id] = record
+        self.saved_statuses.append(record.status.value)
+        return record
+
+    def get(self, enforcement_id: str) -> EnforcementRecord | None:
+        return self.items.get(enforcement_id)
 
 
 class MemoryPolicyRepository:
