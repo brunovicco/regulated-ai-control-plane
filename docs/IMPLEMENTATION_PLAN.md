@@ -1,5 +1,45 @@
 # Phase 1 implementation plan
 
+Phase 1 is complete. The following accepted iteration extends it without changing the deterministic
+decision contract.
+
+## Phase 2 — local enforcement
+
+### Goal
+
+Prove that field transformation is completed inside the customer trust boundary before any
+provider execution port can receive data. Keep API responses, logs, receipts and persisted
+enforcement records metadata-only.
+
+### Work
+
+1. Add immutable domain types for transformation receipts, execution plans, enforcement status,
+   execution results and metadata-only enforcement records.
+2. Add `EnforceAiOperation` to reuse `EvaluateAiOperation`, apply one deterministic transformation
+   per target field, fail closed on conflicts/errors and gate execution on the evaluation outcome.
+3. Define tokenization and enforcement-evidence ports. Implement local HMAC tokenization and a
+   network-silent mock inference adapter for demonstration and tests.
+4. Extend SQLite with a separate enforcement table containing only identifiers, status, reason
+   codes, transformation types and cryptographic digests.
+5. Add metadata-only `POST /v1/enforcements` and `GET /v1/enforcements/{enforcement_id}` endpoints.
+6. Add unit, contract and end-to-end tests proving transformations precede execution, raw values
+   never enter receipts/evidence/responses, `DENY` and pending approval never execute, ambiguous or
+   failed transformations fail closed, and the mock path requires no network access.
+7. Update architecture, API, demo, privacy and ADR documentation; run focused checks and the full
+   quality gate.
+
+### Decisions and assumptions
+
+- `REQUIRE_APPROVAL` may produce an in-memory transformed plan, but it never calls the execution
+  port until a future approval workflow explicitly authorizes the decision digest.
+- Multiple transformation obligations for one field are ambiguous and fail closed rather than
+  relying on an implicit ordering.
+- The default local HMAC key is generated per process and is demo-only. Production must inject a
+  stable secret from an approved key-management boundary; keys never appear in evidence or logs.
+- The mock inference adapter returns metadata only and never simulates model content.
+- Phase 2 does not add a real provider SDK, approval workflow, reversible token vault or external
+  network call.
+
 ## Goal
 
 Deliver one local, deterministic evaluation slice from normalized request through policy and

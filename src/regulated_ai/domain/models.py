@@ -57,6 +57,17 @@ class AssuranceLevel(StrEnum):
     HIGH = "high"
 
 
+class EnforcementStatus(StrEnum):
+    """Lifecycle state for local enforcement and mock execution."""
+
+    PREPARED = "PREPARED"
+    EXECUTED = "EXECUTED"
+    BLOCKED_DENY = "BLOCKED_DENY"
+    WAITING_APPROVAL = "WAITING_APPROVAL"
+    TRANSFORMATION_FAILED = "TRANSFORMATION_FAILED"
+    EXECUTION_FAILED = "EXECUTION_FAILED"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -313,6 +324,77 @@ class EvaluationResult:
     evidence_id: str
     input_digest: str
     output_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class TransformationReceipt:
+    """Metadata-only proof that one field transformation occurred."""
+
+    receipt_id: str
+    type: ObligationType
+    target: str
+    input_digest: str
+    output_digest: str
+    reason_code: str
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionPlan:
+    """Ephemeral sanitized payload suitable for an inference execution port."""
+
+    plan_id: str
+    evaluation_id: str
+    decision_digest: str
+    provider: ProviderTarget
+    data_items: tuple[DataItem, ...]
+    tools: tuple[ToolRequest, ...]
+    transformation_receipts: tuple[TransformationReceipt, ...]
+    output_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderExecutionReceipt:
+    """Metadata-only receipt returned by an inference execution adapter."""
+
+    execution_id: str
+    provider_target: str
+    plan_id: str
+    output_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class EnforcementRecord:
+    """Persisted metadata for one enforcement attempt."""
+
+    enforcement_id: str
+    created_at: datetime
+    evaluation_id: str
+    evaluation_evidence_id: str
+    decision: DecisionOutcome
+    status: EnforcementStatus
+    policy_set_version: str
+    provider_registry_version: str
+    provider_target: str
+    transformation_receipts: tuple[TransformationReceipt, ...]
+    reason_codes: tuple[str, ...]
+    input_digest: str
+    output_digest: str | None
+    provider_execution_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class EnforcementResult:
+    """Metadata-only result returned after local enforcement."""
+
+    enforcement_id: str
+    evaluation_id: str
+    evaluation_evidence_id: str
+    decision: DecisionOutcome
+    status: EnforcementStatus
+    transformation_receipts: tuple[TransformationReceipt, ...]
+    reason_codes: tuple[str, ...]
+    output_digest: str | None
+    provider_execution_id: str | None
 
 
 _PRECEDENCE = {

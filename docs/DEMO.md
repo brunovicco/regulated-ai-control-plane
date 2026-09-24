@@ -1,7 +1,7 @@
-# Phase 1 local demo
+# Phase 1 and 2 local demo
 
-The demo evaluates a synthetic Brazilian financial-services card-unblock operation. It performs no
-provider call and needs no cloud credentials.
+The demo evaluates and locally enforces a synthetic Brazilian financial-services operation. It
+performs no provider or network call and needs no cloud credentials.
 
 ## Start the service
 
@@ -13,6 +13,10 @@ uv run uvicorn regulated_ai.entrypoints.api:app --host 127.0.0.1 --port 8000
 The service validates its packaged policy and provider registry before accepting traffic. Evidence
 is written to `var/regulaai-evidence.sqlite3` by default. Set `REGULAAI_EVIDENCE_DB` to another
 local path when needed.
+
+The default tokenization key is generated per process. To keep demo tokens stable across restarts,
+set `REGULAAI_TOKENIZATION_KEY` to a local value of at least 32 bytes. Production key material must
+come from an approved secret-management boundary and must never be committed.
 
 ## Evaluate a synthetic operation
 
@@ -80,3 +84,21 @@ digests. It must not contain either synthetic field value from the request.
   becomes stale and the decision becomes `DENY`.
 
 These are organization-policy outcomes, not statements of legal compliance or certification.
+
+## Enforce locally
+
+Send the same request body to `POST /v1/enforcements`.
+
+- With `cards.unblock`, the result is `WAITING_APPROVAL`; the document is tokenized in memory, but
+  the mock execution port is not called.
+- Remove `cards.unblock` and retain only `cards.read` to obtain `EXECUTED`. The response contains a
+  metadata-only transformation receipt and `mockexec_...` execution ID, never either request value.
+
+Inspect the stored metadata with:
+
+```bash
+curl http://127.0.0.1:8000/v1/enforcements/enf_REPLACE_WITH_RETURNED_ID
+```
+
+The service persists `PREPARED` before invoking the mock port and then advances the same record to
+`EXECUTED`. A persistence or transformation failure stops before execution.

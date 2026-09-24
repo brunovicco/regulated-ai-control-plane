@@ -1,5 +1,11 @@
 """Application use cases, ports, commands, and queries."""
 
+from regulated_ai.application.enforce_operation import (
+    EnforceAiOperation,
+    EnforcementPersistenceError,
+    ExecutionFailedError,
+    TransformationFailedError,
+)
 from regulated_ai.application.evaluate_operation import (
     EvaluateAiOperation,
     EvaluationError,
@@ -8,14 +14,20 @@ from regulated_ai.application.evaluate_operation import (
     NullEvaluationObserver,
     PolicySetNotFoundError,
     ProviderRegistryError,
+    normalize_evaluation_context,
 )
 
 __all__ = [
+    "EnforceAiOperation",
+    "EnforcementPersistenceError",
     "EvaluateAiOperation",
     "EvaluationError",
     "EvidencePersistenceError",
+    "ExecutionFailedError",
     "InvalidEvaluationContextError",
     "NullEvaluationObserver",
     "PolicySetNotFoundError",
     "ProviderRegistryError",
+    "TransformationFailedError",
+    "normalize_evaluation_context",
 ]

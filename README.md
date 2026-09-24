@@ -91,7 +91,7 @@ Initial obligations include:
 
 ## Project status
 
-**Pre-alpha with the Phase 1 deterministic evaluation slice implemented.**
+**Pre-alpha with deterministic evaluation and Phase 2 local enforcement implemented.**
 
 Current local flow:
 
@@ -102,13 +102,17 @@ Context
   -> Provider capability resolution
   -> Decision
   -> Obligations
-  -> Metadata-only evidence
+  -> Local transformations
+  -> Metadata-only transformation receipts
+  -> Persisted PREPARED enforcement state
+  -> Network-silent mock execution
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
-`GET /v1/providers` and `GET /health`. It validates versioned YAML control-plane records at startup
-and stores only metadata evidence in local SQLite. It still stops before transformation execution
-or provider inference.
+`POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`, `GET /v1/providers` and
+`GET /health`. It validates versioned YAML control-plane records at startup, applies transformations
+inside the local trust boundary and stores only metadata evidence in SQLite. It still stops before
+real provider inference.
 
 Not implemented in the first slice:
 

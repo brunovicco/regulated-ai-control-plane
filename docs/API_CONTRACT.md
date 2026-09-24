@@ -1,4 +1,4 @@
-# API contract — Phase 1
+# API contract — Phases 1 and 2
 
 The exact wire schema may be refined during implementation, but behavior and privacy boundaries
 must remain stable.
@@ -131,6 +131,49 @@ Returns capability metadata suitable for debugging/demo:
 
 No credentials/config secrets.
 
+## POST /v1/enforcements
+
+Accepts the same normalized request as `POST /v1/evaluations`. It evaluates policy, applies local
+field transformations, persists metadata-only enforcement state and calls only the Phase 2
+network-silent mock execution port.
+
+The response never includes source or transformed values:
+
+```json
+{
+  "enforcement_id": "enf_...",
+  "evaluation_id": "eval_...",
+  "evaluation_evidence_id": "ev_...",
+  "decision": "ALLOW_WITH_TRANSFORMATION",
+  "status": "EXECUTED",
+  "transformation_receipts": [
+    {
+      "receipt_id": "tr_...",
+      "type": "TOKENIZE",
+      "target": "customer_document",
+      "input_digest": "sha256:...",
+      "output_digest": "sha256:...",
+      "reason_code": "MINIMIZE_EXTERNAL_IDENTIFIER"
+    }
+  ],
+  "reason_codes": [],
+  "output_digest": "sha256:...",
+  "provider_execution_id": "mockexec_..."
+}
+```
+
+Status behavior:
+
+- `DENY` -> `BLOCKED_DENY`, with no transformation or execution;
+- `REQUIRE_APPROVAL` -> `WAITING_APPROVAL`, transformed in memory but not executed;
+- allowed outcome -> `PREPARED` is persisted before the mock port, then `EXECUTED`;
+- transformation or execution error -> fail closed with a stable error code.
+
+## GET /v1/enforcements/{enforcement_id}
+
+Returns the persisted metadata-only enforcement record, including policy/provider versions,
+receipt digests and execution status. It never returns the execution payload.
+
 ## GET /health
 
 Returns `{"status": "ok"}` when the local HTTP process is available. Policy/registry validation
@@ -145,5 +188,8 @@ Use stable machine-readable codes, for example:
 - `PROVIDER_CAPABILITY_STALE`
 - `INVALID_EVALUATION_CONTEXT`
 - `EVIDENCE_PERSISTENCE_FAILED`
+- `TRANSFORMATION_FAILED`
+- `EXECUTION_FAILED`
+- `ENFORCEMENT_PERSISTENCE_FAILED`
 
 Error messages must not echo raw sensitive input.
