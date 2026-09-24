@@ -373,6 +373,20 @@ wheels = [
 ]
 
 [[package]]
+name = "governed-llm-gateway-client"
+version = "1.1.0"
+source = { git = "https://github.com/brunovicco/governed-llm-gateway.git?subdirectory=packages%2Fgateway-client&rev=751dda744fcb0ecadbf2aac7ce1c48b29334de17#751dda744fcb0ecadbf2aac7ce1c48b29334de17" }
+dependencies = [
+    { name = "governed-llm-gateway-contracts" },
+    { name = "httpx" },
+]
+
+[[package]]
+name = "governed-llm-gateway-contracts"
+version = "1.1.0"
+source = { git = "https://github.com/brunovicco/governed-llm-gateway.git?subdirectory=packages%2Fgateway-contracts&rev=751dda744fcb0ecadbf2aac7ce1c48b29334de17#751dda744fcb0ecadbf2aac7ce1c48b29334de17" }
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1012,6 +1026,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "governed-llm-gateway-client" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
@@ -1046,6 +1061,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.116" },
+    { name = "governed-llm-gateway-client", git = "https://github.com/brunovicco/governed-llm-gateway.git?subdirectory=packages%2Fgateway-client&rev=751dda744fcb0ecadbf2aac7ce1c48b29334de17" },
     { name = "langfuse", marker = "extra == 'tracing'", specifier = ">=3.0" },
     { name = "opentelemetry-api", marker = "extra == 'observability'", specifier = ">=1.36" },
     { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'observability'", specifier = ">=1.36" },
