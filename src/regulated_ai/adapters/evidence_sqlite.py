@@ -15,6 +15,7 @@ from regulated_ai.domain import (
     EvidenceMetadata,
     ObligationType,
     ProviderCallMetadata,
+    ToolProposal,
     TransformationReceipt,
 )
 
@@ -35,10 +36,20 @@ CREATE TABLE IF NOT EXISTS evidence (
     input_digest TEXT NOT NULL,
     output_digest TEXT NOT NULL,
     event_digest TEXT NOT NULL,
-    previous_event_digest TEXT
+    previous_event_digest TEXT,
+    tool_catalog_version TEXT,
+    authorized_tool_ids TEXT NOT NULL DEFAULT '[]'
 )
 """
-_INSERT = "INSERT OR IGNORE INTO evidence VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+_INSERT = """
+INSERT OR IGNORE INTO evidence (
+    evidence_id, created_at, correlation_id, decision, policy_set_version,
+    provider_registry_version, matched_policy_ids, provider_capability_ids,
+    control_objective_ids, obligation_types, classification_labels, reason_codes,
+    input_digest, output_digest, event_digest, previous_event_digest,
+    tool_catalog_version, authorized_tool_ids
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+"""
 _ENFORCEMENT_SCHEMA = """
 CREATE TABLE IF NOT EXISTS enforcement (
     enforcement_id TEXT PRIMARY KEY,
@@ -56,7 +67,8 @@ CREATE TABLE IF NOT EXISTS enforcement (
     output_digest TEXT,
     provider_execution_id TEXT,
     provider_call_metadata TEXT,
-    approval_receipt TEXT
+    approval_receipt TEXT,
+    tool_proposals TEXT NOT NULL DEFAULT '[]'
 )
 """
 _ENFORCEMENT_UPSERT = """
@@ -76,8 +88,9 @@ INSERT INTO enforcement (
     output_digest,
     provider_execution_id,
     provider_call_metadata,
-    approval_receipt
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    approval_receipt,
+    tool_proposals
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(enforcement_id) DO UPDATE SET
     created_at=excluded.created_at,
     status=excluded.status,
@@ -86,7 +99,8 @@ ON CONFLICT(enforcement_id) DO UPDATE SET
     output_digest=excluded.output_digest,
     provider_execution_id=excluded.provider_execution_id,
     provider_call_metadata=excluded.provider_call_metadata,
-    approval_receipt=excluded.approval_receipt
+    approval_receipt=excluded.approval_receipt,
+    tool_proposals=excluded.tool_proposals
 WHERE enforcement.status NOT IN ('DISPATCHED', 'EXECUTED', 'APPROVAL_FAILED', 'EXECUTION_FAILED')
    OR (
        enforcement.status = 'DISPATCHED'
@@ -109,6 +123,13 @@ class SqliteEvidenceRepository:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute(_SCHEMA)
+            columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(evidence)")}
+            if "tool_catalog_version" not in columns:
+                connection.execute("ALTER TABLE evidence ADD COLUMN tool_catalog_version TEXT")
+            if "authorized_tool_ids" not in columns:
+                connection.execute(
+                    "ALTER TABLE evidence ADD COLUMN authorized_tool_ids TEXT NOT NULL DEFAULT '[]'"
+                )
 
     def save(self, evidence: EvidenceMetadata) -> EvidenceMetadata:
         """Insert one immutable record, preserving an existing identical id."""
@@ -129,6 +150,8 @@ class SqliteEvidenceRepository:
             evidence.output_digest,
             evidence.event_digest,
             evidence.previous_event_digest,
+            evidence.tool_catalog_version,
+            _json(evidence.authorized_tool_ids),
         )
         with self._connect() as connection:
             connection.execute(_INSERT, values)
@@ -166,6 +189,8 @@ class SqliteEvidenceRepository:
             output_digest=str(row[13]),
             event_digest=str(row[14]),
             previous_event_digest=None if row[15] is None else str(row[15]),
+            tool_catalog_version=None if row[16] is None else str(row[16]),
+            authorized_tool_ids=_string_tuple(row[17]),
         )
 
     @contextmanager
@@ -207,6 +232,10 @@ class SqliteEnforcementRepository:
                 connection.execute("ALTER TABLE enforcement ADD COLUMN provider_call_metadata TEXT")
             if "approval_receipt" not in columns:
                 connection.execute("ALTER TABLE enforcement ADD COLUMN approval_receipt TEXT")
+            if "tool_proposals" not in columns:
+                connection.execute(
+                    "ALTER TABLE enforcement ADD COLUMN tool_proposals TEXT NOT NULL DEFAULT '[]'"
+                )
 
     def save(self, record: EnforcementRecord) -> EnforcementRecord:
         """Insert or advance the state of one enforcement attempt."""
@@ -227,6 +256,7 @@ class SqliteEnforcementRepository:
             record.provider_execution_id,
             _provider_call_json(record.provider_call_metadata),
             _approval_receipt_json(record.approval_receipt),
+            _tool_proposals_json(record.tool_proposals),
         )
         with self._connect() as connection:
             connection.execute(_ENFORCEMENT_UPSERT, values)
@@ -262,6 +292,7 @@ class SqliteEnforcementRepository:
             provider_execution_id=None if row[13] is None else str(row[13]),
             provider_call_metadata=_provider_call_metadata(row[14]),
             approval_receipt=_approval_receipt(row[15]),
+            tool_proposals=_tool_proposals(row[16]),
         )
 
     def claim_execution(self, record: EnforcementRecord) -> tuple[EnforcementRecord, bool]:
@@ -462,3 +493,51 @@ def _approval_receipt(value: object) -> ApprovalReceipt | None:
         expires_at=datetime.fromisoformat(parsed["expires_at"]),
         consumed_at=datetime.fromisoformat(parsed["consumed_at"]),
     )
+
+
+def _tool_proposals_json(proposals: tuple[ToolProposal, ...]) -> str:
+    return json.dumps(
+        [
+            {
+                "arguments_digest": item.arguments_digest,
+                "call_id": item.call_id,
+                "tool_name": item.tool_name,
+                "tool_schema_digest": item.tool_schema_digest,
+                "tool_schema_version": item.tool_schema_version,
+            }
+            for item in proposals
+        ],
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _tool_proposals(value: object) -> tuple[ToolProposal, ...]:
+    parsed = json.loads(str(value))
+    expected = {
+        "arguments_digest",
+        "call_id",
+        "tool_name",
+        "tool_schema_digest",
+        "tool_schema_version",
+    }
+    if not isinstance(parsed, list):
+        raise ValueError("Stored tool proposals are invalid")
+    proposals: list[ToolProposal] = []
+    for item in parsed:
+        if (
+            not isinstance(item, dict)
+            or set(item) != expected
+            or not all(isinstance(item[key], str) for key in expected)
+        ):
+            raise ValueError("Stored tool proposal is invalid")
+        proposals.append(
+            ToolProposal(
+                call_id=item["call_id"],
+                tool_name=item["tool_name"],
+                tool_schema_version=item["tool_schema_version"],
+                tool_schema_digest=item["tool_schema_digest"],
+                arguments_digest=item["arguments_digest"],
+            )
+        )
+    return tuple(proposals)

@@ -1,3 +1,4 @@
+import hashlib
 import json
 from collections.abc import Sequence
 from uuid import UUID
@@ -15,6 +16,8 @@ from governed_llm_gateway_contracts import (
     ProviderExecution,
     RiskLevel,
     RoutingProvenance,
+    ToolCall,
+    ToolDefinition,
 )
 
 from regulated_ai.adapters.gateway_execution import (
@@ -23,20 +26,27 @@ from regulated_ai.adapters.gateway_execution import (
 )
 from regulated_ai.domain import (
     AssuranceLevel,
+    AuthorizedTool,
     DataClassification,
     DataItem,
     ExecutionPlan,
     ObligationType,
     ProviderTarget,
-    ToolRequest,
     TransformationReceipt,
 )
 
 
 class FakeGatewayClient:
-    def __init__(self, *, provider: str = "openai", succeeded: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        provider: str = "openai",
+        succeeded: bool = True,
+        tool_calls: tuple[ToolCall, ...] = (),
+    ) -> None:
         self.provider = provider
         self.succeeded = succeeded
+        self.tool_calls = tool_calls
         self.calls: list[dict[str, object]] = []
         self.closed = False
 
@@ -51,6 +61,7 @@ class FakeGatewayClient:
         max_output_tokens: int,
         provider_timeout_seconds: float,
         request_id: UUID,
+        tools: Sequence[ToolDefinition] = (),
     ) -> GatewayResponse:
         self.calls.append(
             {
@@ -62,6 +73,7 @@ class FakeGatewayClient:
                 "max_output_tokens": max_output_tokens,
                 "provider_timeout_seconds": provider_timeout_seconds,
                 "request_id": request_id,
+                "tools": tuple(tools),
             }
         )
         policy = PolicyProvenance(
@@ -92,9 +104,10 @@ class FakeGatewayClient:
         return GatewayResponse(
             request_id=request_id,
             status=ExecutionStatus.SUCCEEDED if self.succeeded else ExecutionStatus.FAILED,
-            content="ephemeral response" if self.succeeded else None,
+            content=("ephemeral response" if self.succeeded and not self.tool_calls else None),
             routing=routing,
             execution=execution if self.succeeded else None,
+            tool_calls=self.tool_calls,
         )
 
     async def aclose(self) -> None:
@@ -115,7 +128,7 @@ def _config(**changes: object) -> GovernedGatewayExecutionConfig:
 
 def _plan(
     *,
-    tools: tuple[ToolRequest, ...] = (),
+    tools: tuple[AuthorizedTool, ...] = (),
     secret_receipt: bool = True,
 ) -> ExecutionPlan:
     receipt = TransformationReceipt(
@@ -180,13 +193,7 @@ def test_gateway_adapter_sends_only_sanitized_text_and_returns_metadata() -> Non
     assert "ephemeral response" not in repr(receipt)
 
 
-@pytest.mark.parametrize(
-    "plan",
-    [
-        _plan(tools=(ToolRequest("cards.read", "read_only"),)),
-        _plan(secret_receipt=False),
-    ],
-)
+@pytest.mark.parametrize("plan", [_plan(secret_receipt=False)])
 def test_gateway_adapter_rejects_unsupported_plan_before_client_creation(
     plan: ExecutionPlan,
 ) -> None:
@@ -203,6 +210,37 @@ def test_gateway_adapter_rejects_unsupported_plan_before_client_creation(
         adapter.execute(plan)
 
     assert not created
+
+
+def test_gateway_forwards_only_authorized_definitions_and_returns_metadata_only_proposal() -> None:
+    schema = (
+        '{"additionalProperties":false,"properties":{"token":{"type":"string"}},'
+        '"required":["token"],"type":"object"}'
+    )
+    tool = AuthorizedTool(
+        name="cards.read",
+        description="Read synthetic card status.",
+        risk_class="read_only",
+        schema_version="1.0.0",
+        input_schema_json=schema,
+        input_schema_digest="sha256:schema",
+        definition_digest="sha256:definition",
+        catalog_version="tools@test",
+    )
+    gateway_name = f"ra_cards_read_{hashlib.sha256(b'cards.read').hexdigest()[:32]}"
+    fake = FakeGatewayClient(
+        tool_calls=(ToolCall(call_id="call_1", name=gateway_name, arguments={"token": "x"}),)
+    )
+    adapter = GovernedGatewayExecutionAdapter(_config(), client_factory=lambda _config: fake)
+
+    receipt = adapter.execute(_plan(tools=(tool,)))
+
+    sent = fake.calls[0]["tools"]
+    assert isinstance(sent, tuple)
+    assert sent[0].name == gateway_name
+    assert receipt.tool_proposals[0].tool_name == "cards.read"
+    assert receipt.tool_proposals[0].arguments_digest.startswith("sha256:")
+    assert "token" not in repr(receipt)
 
 
 def test_gateway_adapter_fails_closed_on_provider_downgrade() -> None:

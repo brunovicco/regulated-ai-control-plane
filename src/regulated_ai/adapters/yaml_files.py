@@ -1,13 +1,18 @@
-"""Strict, safe YAML adapters for policy and provider registry files."""
+"""Strict, safe YAML adapters for policy, provider and tool control-plane files."""
 
+import hashlib
+import json
+import re
 from pathlib import Path
 from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
 from regulated_ai.domain import (
     AssuranceLevel,
+    AuthorizedTool,
     CapabilityRequirement,
     CapabilityState,
     DataClassification,
@@ -148,9 +153,85 @@ class _PolicyFileModel(_StrictModel):
     rules: tuple[_RuleModel, ...] = Field(min_length=1)
 
 
+class _ToolPropertyModel(_StrictModel):
+    type: Literal["string"]
+    description: str | None = Field(default=None, min_length=1, max_length=256)
+    minLength: int | None = Field(default=None, ge=0, le=4096)
+    maxLength: int | None = Field(default=None, ge=1, le=4096)
+    pattern: str | None = Field(default=None, min_length=1, max_length=256)
+    enum: tuple[str, ...] | None = Field(default=None, min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def valid_lengths(self) -> "_ToolPropertyModel":
+        """Reject contradictory string length constraints."""
+        if (
+            self.minLength is not None
+            and self.maxLength is not None
+            and self.minLength > self.maxLength
+        ):
+            raise ValueError("tool property length constraints are invalid")
+        return self
+
+
+class _ToolInputSchemaModel(_StrictModel):
+    type: Literal["object"]
+    additionalProperties: Literal[False]
+    properties: dict[str, _ToolPropertyModel] = Field(min_length=1, max_length=128)
+    required: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def valid_required_fields(self) -> "_ToolInputSchemaModel":
+        """Require normalized property names and a unique required subset."""
+        if (
+            any(_TOOL_NAME.fullmatch(name) is None for name in self.properties)
+            or len(self.required) != len(set(self.required))
+            or not set(self.required).issubset(self.properties)
+        ):
+            raise ValueError("tool input schema fields are invalid")
+        return self
+
+
+class _ToolModel(_StrictModel):
+    description: str = Field(min_length=1, max_length=512)
+    risk_class: str = Field(min_length=1, max_length=128, pattern=r"^[a-z0-9][a-z0-9._-]*$")
+    schema_version: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
+    input_schema: _ToolInputSchemaModel
+
+    @field_validator("description")
+    @classmethod
+    def normalized_description(cls, value: str) -> str:
+        """Reject surrounding whitespace and multiline prompt-like descriptions."""
+        if value != value.strip() or "\n" in value or "\r" in value:
+            raise ValueError("tool description must be one normalized line")
+        return value
+
+
+class _ToolCatalogFileModel(_StrictModel):
+    schema_version: Literal["1"]
+    catalog_version: str = Field(
+        min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._@-]*$"
+    )
+    tools: dict[str, _ToolModel] = Field(min_length=1)
+
+    @field_validator("tools")
+    @classmethod
+    def normalized_names(cls, value: dict[str, _ToolModel]) -> dict[str, _ToolModel]:
+        """Require unique normalized tool identifiers at the configuration boundary."""
+        if any(_TOOL_NAME.fullmatch(name) is None for name in value):
+            raise ValueError("tool name is invalid")
+        return value
+
+
+_TOOL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]*\Z")
+
+
 def _read_yaml(path: Path) -> dict[str, Any]:
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        content = path.read_text(encoding="utf-8")
+        syntax_tree = yaml.compose(content, Loader=yaml.SafeLoader)
+        if syntax_tree is not None:
+            _reject_duplicate_mapping_keys(syntax_tree)
+        raw = yaml.safe_load(content)
     except (OSError, yaml.YAMLError) as exc:
         raise MalformedYamlError(f"Invalid configuration file: {path.name}") from exc
     if not isinstance(raw, dict):
@@ -161,6 +242,23 @@ def _read_yaml(path: Path) -> dict[str, Any]:
             f"Unsupported schema version in configuration file: {path.name}"
         )
     return raw
+
+
+def _reject_duplicate_mapping_keys(node: Node) -> None:
+    """Reject duplicate or complex YAML mapping keys before safe construction."""
+    if isinstance(node, MappingNode):
+        seen: set[tuple[str, str]] = set()
+        for key, value in node.value:
+            if not isinstance(key, ScalarNode):
+                raise yaml.YAMLError("configuration mapping keys must be scalar")
+            identity = (key.tag, key.value)
+            if identity in seen:
+                raise yaml.YAMLError("configuration contains a duplicate mapping key")
+            seen.add(identity)
+            _reject_duplicate_mapping_keys(value)
+    elif isinstance(node, SequenceNode):
+        for value in node.value:
+            _reject_duplicate_mapping_keys(value)
 
 
 def load_policy_file(path: Path) -> PolicySet:
@@ -217,6 +315,57 @@ def load_capability_file(path: Path) -> ProviderCapabilityRecord:
         verified_at=verified_at,
         source_urls=document.sources,
         capabilities=capabilities,
+    )
+
+
+def load_tool_catalog_file(path: Path) -> tuple[str, tuple[AuthorizedTool, ...]]:
+    """Translate one strict tool catalog into immutable trusted definitions."""
+    try:
+        document = _ToolCatalogFileModel.model_validate(_read_yaml(path))
+    except UnsupportedSchemaVersionError:
+        raise
+    except (TypeError, ValidationError, ValueError) as exc:
+        raise MalformedYamlError(f"Tool catalog failed schema validation: {path.name}") from exc
+    tools = tuple(
+        _authorized_tool(document.catalog_version, name, item)
+        for name, item in sorted(document.tools.items())
+    )
+    return document.catalog_version, tools
+
+
+def _authorized_tool(catalog_version: str, name: str, item: _ToolModel) -> AuthorizedTool:
+    schema = item.input_schema.model_dump(exclude_none=True)
+    schema_json = json.dumps(
+        schema,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    if len(schema_json.encode()) > 32_768:
+        raise MalformedYamlError("Tool input schema exceeds the size limit")
+    schema_digest = f"sha256:{hashlib.sha256(schema_json.encode()).hexdigest()}"
+    definition_json = json.dumps(
+        {
+            "catalog_version": catalog_version,
+            "description": item.description,
+            "input_schema_digest": schema_digest,
+            "name": name,
+            "risk_class": item.risk_class,
+            "schema_version": item.schema_version,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return AuthorizedTool(
+        name=name,
+        description=item.description,
+        risk_class=item.risk_class,
+        schema_version=item.schema_version,
+        input_schema_json=schema_json,
+        input_schema_digest=schema_digest,
+        definition_digest=f"sha256:{hashlib.sha256(definition_json.encode()).hexdigest()}",
+        catalog_version=catalog_version,
     )
 
 
@@ -315,3 +464,27 @@ class FileProviderCapabilityRepository:
                 ),
             )
         )
+
+
+class FileToolCatalogRepository:
+    """Eagerly validated immutable organization tool catalog."""
+
+    def __init__(self, path: Path) -> None:
+        """Load one catalog and reject duplicate normalized names."""
+        self._catalog_version, loaded = load_tool_catalog_file(path)
+        self._items = {item.name: item for item in loaded}
+        if len(self._items) != len(loaded):
+            raise ConfigurationBoundaryError("Duplicate tool name")
+
+    @property
+    def catalog_version(self) -> str:
+        """Return the immutable tool-catalog release version."""
+        return self._catalog_version
+
+    def get(self, name: str) -> AuthorizedTool | None:
+        """Resolve one trusted tool definition."""
+        return self._items.get(name)
+
+    def list(self) -> tuple[AuthorizedTool, ...]:
+        """Return definitions in stable name order."""
+        return tuple(self._items[name] for name in sorted(self._items))

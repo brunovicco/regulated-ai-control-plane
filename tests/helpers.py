@@ -10,6 +10,7 @@ from datetime import UTC, date, datetime, timedelta
 from regulated_ai.application.ports import EvaluationObserver
 from regulated_ai.domain import (
     AssuranceLevel,
+    AuthorizedTool,
     CapabilityState,
     DataItem,
     EnforcementRecord,
@@ -157,6 +158,44 @@ class MemoryCapabilityRepository:
 
     def list(self) -> tuple[ProviderCapabilityRecord, ...]:
         return self.records
+
+
+class MemoryToolCatalogRepository:
+    """In-memory immutable trusted tool catalog fake."""
+
+    def __init__(self, tools: tuple[AuthorizedTool, ...] | None = None) -> None:
+        self.tools = tools or (
+            authorized_tool("cards.read", "read_only"),
+            authorized_tool("cards.unblock", "high_impact_state_change"),
+        )
+
+    @property
+    def catalog_version(self) -> str:
+        return "tools@test"
+
+    def get(self, name: str) -> AuthorizedTool | None:
+        return next((item for item in self.tools if item.name == name), None)
+
+    def list(self) -> tuple[AuthorizedTool, ...]:
+        return self.tools
+
+
+def authorized_tool(name: str, risk_class: str) -> AuthorizedTool:
+    """Build a synthetic trusted tool definition with no sensitive content."""
+    schema_json = (
+        '{"additionalProperties":false,"properties":{"token":{"type":"string"}},'
+        '"required":["token"],"type":"object"}'
+    )
+    return AuthorizedTool(
+        name=name,
+        description=f"Synthetic {name} tool.",
+        risk_class=risk_class,
+        schema_version="1.0.0",
+        input_schema_json=schema_json,
+        input_schema_digest=f"sha256:{hashlib.sha256(schema_json.encode()).hexdigest()}",
+        definition_digest=f"sha256:{hashlib.sha256(f'{name}:{risk_class}:{schema_json}'.encode()).hexdigest()}",
+        catalog_version="tools@test",
+    )
 
 
 class CapturingObserver(EvaluationObserver):

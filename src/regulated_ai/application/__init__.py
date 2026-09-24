@@ -15,6 +15,7 @@ from regulated_ai.application.evaluate_operation import (
     NullEvaluationObserver,
     PolicySetNotFoundError,
     ProviderRegistryError,
+    ToolAuthorizationError,
     normalize_evaluation_context,
 )
 
@@ -30,6 +31,7 @@ __all__ = [
     "NullEvaluationObserver",
     "PolicySetNotFoundError",
     "ProviderRegistryError",
+    "ToolAuthorizationError",
     "TransformationFailedError",
     "normalize_evaluation_context",
 ]

@@ -17,6 +17,7 @@ from regulated_ai.domain import (
     EvidenceMetadata,
     ObligationType,
     ProviderCallMetadata,
+    ToolProposal,
     TransformationReceipt,
 )
 
@@ -39,6 +40,8 @@ def test_sqlite_round_trip_contains_only_metadata(tmp_path: Path) -> None:
         input_digest="sha256:input",
         output_digest="sha256:output",
         event_digest="sha256:event",
+        tool_catalog_version="tools@1",
+        authorized_tool_ids=("cards.read@1",),
     )
 
     stored = repository.save(evidence)
@@ -111,6 +114,15 @@ def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path
                 fallback_index=0,
                 cached=False,
             ),
+            tool_proposals=(
+                ToolProposal(
+                    call_id="call_1",
+                    tool_name="cards.read",
+                    tool_schema_version="1",
+                    tool_schema_digest="sha256:schema",
+                    arguments_digest="sha256:arguments",
+                ),
+            ),
         )
     )
 
@@ -121,6 +133,7 @@ def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path
     assert completed.provider_call_metadata.routing_decision_id == "route_1"
     assert completed.approval_receipt is not None
     assert completed.approval_receipt.approval_id == "approval-test"
+    assert completed.tool_proposals[0].tool_name == "cards.read"
     replayed, replay_claimed = repository.claim_execution(
         replace(prepared, status=EnforcementStatus.DISPATCHED)
     )
@@ -162,3 +175,4 @@ def test_enforcement_repository_migrates_phase_three_schema(tmp_path: Path) -> N
     with closing(sqlite3.connect(path)) as connection:
         columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(enforcement)")}
     assert "approval_receipt" in columns
+    assert "tool_proposals" in columns

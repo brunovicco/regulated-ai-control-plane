@@ -17,6 +17,7 @@ from regulated_ai.adapters import (
     DeterministicDataClassifier,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
+    FileToolCatalogRepository,
     GovernedGatewayExecutionAdapter,
     GovernedGatewayExecutionConfig,
     HmacApprovalAdapter,
@@ -48,6 +49,7 @@ from regulated_ai.domain import (
     ProviderTarget,
     Purpose,
     Sector,
+    ToolProposal,
     ToolRequest,
     TransformationReceipt,
 )
@@ -76,10 +78,12 @@ class DataInput(_TransportModel):
 
 
 class ToolInput(_TransportModel):
-    """Requested tool/action and organization-defined risk class."""
+    """Requested tool name plus an optional claim checked against trusted control-plane data."""
 
     name: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
-    risk_class: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._-]+$")
+    risk_class: str | None = Field(
+        default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._-]+$"
+    )
 
 
 class EvaluationRequest(_TransportModel):
@@ -124,6 +128,7 @@ def build_runtime(
     *,
     policy_paths: tuple[Path, ...] | None = None,
     capability_paths: tuple[Path, ...] | None = None,
+    tool_catalog_path: Path | None = None,
     evidence_path: Path | None = None,
 ) -> Runtime:
     """Validate local control-plane files and compose the enforcement use case."""
@@ -139,6 +144,9 @@ def build_runtime(
             Path(str(resource_root.joinpath("provider-capabilities/aws-bedrock.yaml"))),
         )
     )
+    tools = FileToolCatalogRepository(
+        tool_catalog_path or Path(str(resource_root.joinpath("tools/br-financial-tools.yaml")))
+    )
     configured_path = os.environ.get("REGULAAI_EVIDENCE_DB")
     database_path = evidence_path or Path(configured_path or "var/regulaai-evidence.sqlite3")
     repository = SqliteEvidenceRepository(database_path)
@@ -149,6 +157,7 @@ def build_runtime(
         capabilities=capabilities,
         evidence=repository,
         classifier=DeterministicDataClassifier(),
+        tools=tools,
         observer=observer,
     )
     configured_key = os.environ.get("REGULAAI_TOKENIZATION_KEY")
@@ -263,7 +272,7 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
             status = 404
         elif exc.code == "INVALID_EVALUATION_CONTEXT":
             status = 422
-        elif exc.code == "APPROVAL_FAILED":
+        elif exc.code in {"APPROVAL_FAILED", "TOOL_NOT_AUTHORIZED"}:
             status = 403
         else:
             status = 503
@@ -358,7 +367,12 @@ def _to_context(request: EvaluationRequest) -> EvaluationContext:
             for item in request.data
         ),
         tools=tuple(
-            ToolRequest(name=item.name, risk_class=item.risk_class.casefold())
+            ToolRequest(
+                name=item.name,
+                claimed_risk_class=(
+                    None if item.risk_class is None else item.risk_class.casefold()
+                ),
+            )
             for item in request.tools
         ),
         policy_set_version=request.policy_set_version,
@@ -396,6 +410,8 @@ def _result_payload(result: EvaluationResult) -> dict[str, object]:
         "reason_codes": list(result.reason_codes),
         "policy_set_version": result.policy_set_version,
         "provider_registry_version": result.provider_registry_version,
+        "tool_catalog_version": result.tool_catalog_version,
+        "authorized_tools": [item.identifier for item in result.authorized_tools],
         "evidence_id": result.evidence_id,
     }
 
@@ -418,6 +434,8 @@ def _evidence_payload(evidence: EvidenceMetadata) -> dict[str, object]:
         "output_digest": evidence.output_digest,
         "event_digest": evidence.event_digest,
         "previous_event_digest": evidence.previous_event_digest,
+        "tool_catalog_version": evidence.tool_catalog_version,
+        "authorized_tools": list(evidence.authorized_tool_ids),
     }
 
 
@@ -436,6 +454,7 @@ def _enforcement_result_payload(result: EnforcementResult) -> dict[str, object]:
         "provider_execution_id": result.provider_execution_id,
         "provider_call_metadata": _provider_call_payload(result.provider_call_metadata),
         "approval_receipt": _approval_receipt_payload(result.approval_receipt),
+        "tool_proposals": [_tool_proposal_payload(item) for item in result.tool_proposals],
     }
 
 
@@ -452,6 +471,7 @@ def _enforcement_record_payload(record: EnforcementRecord) -> dict[str, object]:
         provider_execution_id=record.provider_execution_id,
         provider_call_metadata=record.provider_call_metadata,
         approval_receipt=record.approval_receipt,
+        tool_proposals=record.tool_proposals,
     )
     return {
         **_enforcement_result_payload(result),
@@ -503,6 +523,17 @@ def _approval_receipt_payload(receipt: ApprovalReceipt | None) -> dict[str, obje
         "issued_at": receipt.issued_at.isoformat(),
         "expires_at": receipt.expires_at.isoformat(),
         "consumed_at": receipt.consumed_at.isoformat(),
+    }
+
+
+def _tool_proposal_payload(proposal: ToolProposal) -> dict[str, object]:
+    return {
+        "call_id": proposal.call_id,
+        "tool_name": proposal.tool_name,
+        "tool_schema_version": proposal.tool_schema_version,
+        "tool_schema_digest": proposal.tool_schema_digest,
+        "arguments_digest": proposal.arguments_digest,
+        "execution_authorized": False,
     }
 
 

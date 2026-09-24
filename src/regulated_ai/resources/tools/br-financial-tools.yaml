@@ -1,0 +1,38 @@
+schema_version: "1"
+catalog_version: "br-financial-tools@1.0.0"
+
+tools:
+  cards.read:
+    description: "Read synthetic card status using a pre-tokenized account reference."
+    risk_class: "read_only"
+    schema_version: "1.0.0"
+    input_schema:
+      type: "object"
+      additionalProperties: false
+      properties:
+        account_token:
+          type: "string"
+          minLength: 1
+          maxLength: 128
+      required:
+        - "account_token"
+
+  cards.unblock:
+    description: "Propose unblocking a synthetic card using a pre-tokenized account reference."
+    risk_class: "high_impact_state_change"
+    schema_version: "1.0.0"
+    input_schema:
+      type: "object"
+      additionalProperties: false
+      properties:
+        account_token:
+          type: "string"
+          minLength: 1
+          maxLength: 128
+        reason_code:
+          type: "string"
+          minLength: 1
+          maxLength: 64
+      required:
+        - "account_token"
+        - "reason_code"

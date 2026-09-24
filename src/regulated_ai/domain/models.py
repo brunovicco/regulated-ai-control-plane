@@ -108,10 +108,40 @@ class DataItem:
 
 @dataclass(frozen=True, slots=True)
 class ToolRequest:
-    """Requested external action and its organization-defined risk class."""
+    """Untrusted caller request for one organization-defined tool."""
 
     name: str
+    claimed_risk_class: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AuthorizedTool:
+    """Trusted, versioned tool definition resolved from the control plane."""
+
+    name: str
+    description: str
     risk_class: str
+    schema_version: str
+    input_schema_json: str
+    input_schema_digest: str
+    definition_digest: str
+    catalog_version: str
+
+    @property
+    def identifier(self) -> str:
+        """Return the immutable catalog identity used in digests and evidence."""
+        return f"{self.name}@{self.schema_version}"
+
+
+@dataclass(frozen=True, slots=True)
+class ToolProposal:
+    """Metadata-only model proposal that has not been authorized for execution."""
+
+    call_id: str
+    tool_name: str
+    tool_schema_version: str
+    tool_schema_digest: str
+    arguments_digest: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -309,6 +339,8 @@ class EvidenceMetadata:
     output_digest: str
     event_digest: str
     previous_event_digest: str | None = None
+    tool_catalog_version: str | None = None
+    authorized_tool_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -326,6 +358,8 @@ class EvaluationResult:
     evidence_id: str
     input_digest: str
     output_digest: str
+    authorized_tools: tuple[AuthorizedTool, ...] = ()
+    tool_catalog_version: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -376,7 +410,7 @@ class ExecutionPlan:
     assurance_level: AssuranceLevel
     provider: ProviderTarget
     data_items: tuple[DataItem, ...]
-    tools: tuple[ToolRequest, ...]
+    tools: tuple[AuthorizedTool, ...]
     transformation_receipts: tuple[TransformationReceipt, ...]
     output_digest: str
     approval_receipt: ApprovalReceipt | None = None
@@ -408,6 +442,7 @@ class ProviderExecutionReceipt:
     plan_id: str
     output_digest: str
     call_metadata: ProviderCallMetadata | None = None
+    tool_proposals: tuple[ToolProposal, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -430,6 +465,7 @@ class EnforcementRecord:
     provider_execution_id: str | None
     provider_call_metadata: ProviderCallMetadata | None = None
     approval_receipt: ApprovalReceipt | None = None
+    tool_proposals: tuple[ToolProposal, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -447,6 +483,7 @@ class EnforcementResult:
     provider_execution_id: str | None
     provider_call_metadata: ProviderCallMetadata | None = None
     approval_receipt: ApprovalReceipt | None = None
+    tool_proposals: tuple[ToolProposal, ...] = ()
 
 
 _PRECEDENCE = {

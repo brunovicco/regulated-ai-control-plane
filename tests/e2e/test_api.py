@@ -8,6 +8,7 @@ from regulated_ai.adapters import (
     DeterministicDataClassifier,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
+    FileToolCatalogRepository,
     GovernedGatewayExecutionAdapter,
     HmacApprovalAdapter,
     HmacTokenizationAdapter,
@@ -40,6 +41,7 @@ def _runtime(tmp_path: Path) -> Runtime:
             root / "examples/provider-capabilities/aws-bedrock.yaml",
         )
     )
+    tools = FileToolCatalogRepository(root / "examples/tools/br-financial-tools.yaml")
     database_path = tmp_path / "evidence.sqlite3"
     evidence = SqliteEvidenceRepository(database_path)
     enforcement = SqliteEnforcementRepository(database_path)
@@ -48,6 +50,7 @@ def _runtime(tmp_path: Path) -> Runtime:
         capabilities=capabilities,
         evidence=evidence,
         classifier=DeterministicDataClassifier(),
+        tools=tools,
         clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
     )
     mock = MockInferenceExecutionAdapter()
@@ -124,6 +127,8 @@ def test_end_to_end_card_unblock_evaluation_and_evidence_privacy(tmp_path: Path)
         "REQUIRE_EVIDENCE",
     }
     assert evidence.status_code == 200
+    assert body["tool_catalog_version"] == "br-financial-tools@1.0.0"
+    assert body["authorized_tools"] == ["cards.read@1.0.0", "cards.unblock@1.0.0"]
     serialized_evidence = evidence.text
     data = request["data"]
     assert isinstance(data, list)
@@ -135,6 +140,19 @@ def test_end_to_end_card_unblock_evaluation_and_evidence_privacy(tmp_path: Path)
     assert providers.status_code == 200
     assert len(providers.json()["providers"]) == 2
     assert health.json() == {"status": "ok"}
+
+
+def test_api_rejects_forged_tool_risk_claim(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    app = create_app(lambda: runtime)
+    request = _request()
+    request["tools"] = [{"name": "cards.unblock", "risk_class": "read_only"}]
+
+    with TestClient(app) as client:
+        response = client.post("/v1/evaluations", json=request)
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "TOOL_NOT_AUTHORIZED"
 
 
 def test_packaged_runtime_records_are_loadable(tmp_path: Path) -> None:
