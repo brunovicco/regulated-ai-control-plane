@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from regulated_ai.domain import (
+    ApprovalReceipt,
     DataClassification,
     DecisionOutcome,
     EnforcementRecord,
@@ -54,7 +55,8 @@ CREATE TABLE IF NOT EXISTS enforcement (
     input_digest TEXT NOT NULL,
     output_digest TEXT,
     provider_execution_id TEXT,
-    provider_call_metadata TEXT
+    provider_call_metadata TEXT,
+    approval_receipt TEXT
 )
 """
 _ENFORCEMENT_UPSERT = """
@@ -73,8 +75,9 @@ INSERT INTO enforcement (
     input_digest,
     output_digest,
     provider_execution_id,
-    provider_call_metadata
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    provider_call_metadata,
+    approval_receipt
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(enforcement_id) DO UPDATE SET
     created_at=excluded.created_at,
     status=excluded.status,
@@ -82,11 +85,12 @@ ON CONFLICT(enforcement_id) DO UPDATE SET
     reason_codes=excluded.reason_codes,
     output_digest=excluded.output_digest,
     provider_execution_id=excluded.provider_execution_id,
-    provider_call_metadata=excluded.provider_call_metadata
-WHERE enforcement.status NOT IN ('DISPATCHED', 'EXECUTED', 'EXECUTION_FAILED')
+    provider_call_metadata=excluded.provider_call_metadata,
+    approval_receipt=excluded.approval_receipt
+WHERE enforcement.status NOT IN ('DISPATCHED', 'EXECUTED', 'APPROVAL_FAILED', 'EXECUTION_FAILED')
    OR (
        enforcement.status = 'DISPATCHED'
-       AND excluded.status IN ('EXECUTED', 'EXECUTION_FAILED')
+       AND excluded.status IN ('EXECUTED', 'APPROVAL_FAILED', 'EXECUTION_FAILED')
    )
 """
 _ENFORCEMENT_CLAIM = """
@@ -201,6 +205,8 @@ class SqliteEnforcementRepository:
             columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(enforcement)")}
             if "provider_call_metadata" not in columns:
                 connection.execute("ALTER TABLE enforcement ADD COLUMN provider_call_metadata TEXT")
+            if "approval_receipt" not in columns:
+                connection.execute("ALTER TABLE enforcement ADD COLUMN approval_receipt TEXT")
 
     def save(self, record: EnforcementRecord) -> EnforcementRecord:
         """Insert or advance the state of one enforcement attempt."""
@@ -220,6 +226,7 @@ class SqliteEnforcementRepository:
             record.output_digest,
             record.provider_execution_id,
             _provider_call_json(record.provider_call_metadata),
+            _approval_receipt_json(record.approval_receipt),
         )
         with self._connect() as connection:
             connection.execute(_ENFORCEMENT_UPSERT, values)
@@ -254,6 +261,7 @@ class SqliteEnforcementRepository:
             output_digest=None if row[12] is None else str(row[12]),
             provider_execution_id=None if row[13] is None else str(row[13]),
             provider_call_metadata=_provider_call_metadata(row[14]),
+            approval_receipt=_approval_receipt(row[15]),
         )
 
     def claim_execution(self, record: EnforcementRecord) -> tuple[EnforcementRecord, bool]:
@@ -403,4 +411,54 @@ def _provider_call_metadata(value: object) -> ProviderCallMetadata | None:
         attempt_number=parsed["attempt_number"],
         fallback_index=parsed["fallback_index"],
         cached=parsed["cached"],
+    )
+
+
+def _approval_receipt_json(receipt: ApprovalReceipt | None) -> str | None:
+    if receipt is None:
+        return None
+    return json.dumps(
+        {
+            "actor_id": receipt.actor_id,
+            "approval_id": receipt.approval_id,
+            "consumed_at": receipt.consumed_at.isoformat(),
+            "decision_digest": receipt.decision_digest,
+            "enforcement_id": receipt.enforcement_id,
+            "expires_at": receipt.expires_at.isoformat(),
+            "issued_at": receipt.issued_at.isoformat(),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _approval_receipt(value: object) -> ApprovalReceipt | None:
+    if value is None:
+        return None
+    parsed = json.loads(str(value))
+    expected = {
+        "actor_id",
+        "approval_id",
+        "consumed_at",
+        "decision_digest",
+        "enforcement_id",
+        "expires_at",
+        "issued_at",
+    }
+    if (
+        not isinstance(parsed, dict)
+        or set(parsed) != expected
+        or not all(isinstance(parsed[key], str) for key in expected)
+    ):
+        raise ValueError("Stored approval receipt is invalid")
+    from datetime import datetime
+
+    return ApprovalReceipt(
+        approval_id=parsed["approval_id"],
+        actor_id=parsed["actor_id"],
+        decision_digest=parsed["decision_digest"],
+        enforcement_id=parsed["enforcement_id"],
+        issued_at=datetime.fromisoformat(parsed["issued_at"]),
+        expires_at=datetime.fromisoformat(parsed["expires_at"]),
+        consumed_at=datetime.fromisoformat(parsed["consumed_at"]),
     )
