@@ -28,6 +28,11 @@ from regulated_ai.application.execute_tool_action import (
     ToolActionPersistenceError,
     ToolResultRejectedError,
 )
+from regulated_ai.application.get_operator_timeline import (
+    GetOperatorTimeline,
+    OperatorTimelineIntegrityError,
+    OperatorTimelineNotFoundError,
+)
 
 __all__ = [
     "ActionApprovalFailedError",
@@ -39,9 +44,12 @@ __all__ = [
     "EvidencePersistenceError",
     "ExecuteToolAction",
     "ExecutionFailedError",
+    "GetOperatorTimeline",
     "InvalidEvaluationContextError",
     "InvalidToolActionError",
     "NullEvaluationObserver",
+    "OperatorTimelineIntegrityError",
+    "OperatorTimelineNotFoundError",
     "PolicySetNotFoundError",
     "ProviderRegistryError",
     "ToolActionConflictError",

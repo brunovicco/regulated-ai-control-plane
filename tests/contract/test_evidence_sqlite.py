@@ -1,8 +1,10 @@
 import sqlite3
 from contextlib import closing
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 from regulated_ai.adapters.evidence_sqlite import (
     SqliteEnforcementRepository,
@@ -248,6 +250,34 @@ def test_tool_action_round_trip_claims_once_without_ephemeral_values(tmp_path: P
     )
     assert completed.exposed_result_fields == ("operation_reference", "operation_status")
     assert repository.save(waiting).status is ToolActionStatus.EXECUTED
+    second = repository.save(
+        replace(
+            waiting,
+            action_id="act_second",
+            created_at=waiting.created_at + timedelta(seconds=1),
+            call_id="call_second",
+            arguments_digest="sha256:second-arguments",
+            idempotency_key_digest="sha256:second-idempotency",
+            action_digest="sha256:second-action",
+        )
+    )
+    repository.save(
+        replace(
+            waiting,
+            action_id="act_other",
+            enforcement_id="enf_other",
+            evaluation_id="eval_other",
+            call_id="call_other",
+            arguments_digest="sha256:other-arguments",
+            idempotency_key_digest="sha256:other-idempotency",
+            action_digest="sha256:other-action",
+        )
+    )
+    assert repository.list_for_enforcement("enf_test", limit=129) == (completed, second)
+    assert repository.list_for_enforcement("enf_test", limit=1) == (completed,)
+    assert repository.list_for_enforcement("missing", limit=129) == ()
+    with pytest.raises(ValueError):
+        repository.list_for_enforcement("enf_test", limit=130)
     stored = path.read_bytes().decode(errors="ignore")
     assert "raw-arguments-sentinel" not in stored
     assert "raw-idempotency-sentinel" not in stored

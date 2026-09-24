@@ -100,6 +100,29 @@ class ToolResultHandling(StrEnum):
     DROP = "DROP"
 
 
+class OperatorTimelineStageKind(StrEnum):
+    """Control-plane stage exposed to the read-only operator view."""
+
+    EVALUATION = "EVALUATION"
+    ENFORCEMENT = "ENFORCEMENT"
+    TOOL_ACTION = "TOOL_ACTION"
+
+
+class OperatorAttentionCode(StrEnum):
+    """Stable reason that an operator-facing control timeline needs attention."""
+
+    ENFORCEMENT_APPROVAL_REQUIRED = "ENFORCEMENT_APPROVAL_REQUIRED"
+    ENFORCEMENT_APPROVAL_FAILED = "ENFORCEMENT_APPROVAL_FAILED"
+    ENFORCEMENT_RECONCILIATION_REQUIRED = "ENFORCEMENT_RECONCILIATION_REQUIRED"
+    ENFORCEMENT_TRANSFORMATION_FAILED = "ENFORCEMENT_TRANSFORMATION_FAILED"
+    ENFORCEMENT_EXECUTION_FAILED = "ENFORCEMENT_EXECUTION_FAILED"
+    TOOL_ACTION_APPROVAL_REQUIRED = "TOOL_ACTION_APPROVAL_REQUIRED"
+    TOOL_ACTION_APPROVAL_FAILED = "TOOL_ACTION_APPROVAL_FAILED"
+    TOOL_ACTION_RECONCILIATION_REQUIRED = "TOOL_ACTION_RECONCILIATION_REQUIRED"
+    TOOL_RESULT_REJECTED = "TOOL_RESULT_REJECTED"
+    ACTION_LIST_TRUNCATED = "ACTION_LIST_TRUNCATED"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -618,6 +641,41 @@ class EnforcementResult:
     provider_call_metadata: ProviderCallMetadata | None = None
     approval_receipt: ApprovalReceipt | None = None
     tool_proposals: tuple[ToolProposal, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorTimelineStage:
+    """One metadata-only stage in architectural execution order."""
+
+    sequence: int
+    kind: OperatorTimelineStageKind
+    record_id: str
+    created_at: datetime
+    status: str
+    attention_codes: tuple[OperatorAttentionCode, ...] = ()
+    tool_name: str | None = None
+    call_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorTimeline:
+    """Bounded current-state view for one exact enforcement."""
+
+    enforcement_id: str
+    evaluation_id: str
+    evidence_id: str
+    correlation_id: str
+    policy_set_version: str
+    provider_registry_version: str
+    tool_catalog_version: str | None
+    classification_labels: tuple[DataClassification, ...]
+    obligation_types: tuple[ObligationType, ...]
+    input_digest: str
+    output_digest: str
+    event_digest: str
+    stages: tuple[OperatorTimelineStage, ...]
+    attention_codes: tuple[OperatorAttentionCode, ...]
+    actions_truncated: bool = False
 
 
 _PRECEDENCE = {

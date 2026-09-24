@@ -109,6 +109,12 @@ class ToolActionRepository(Protocol):
         """Return one metadata-only action record by identifier."""
         ...
 
+    def list_for_enforcement(
+        self, enforcement_id: str, *, limit: int
+    ) -> tuple[ToolActionRecord, ...]:
+        """Return a bounded, stable action list for one exact enforcement."""
+        ...
+
 
 class DataClassifier(Protocol):
     """Apply only deterministic classification supported by the MVP."""
