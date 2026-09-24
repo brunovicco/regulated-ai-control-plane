@@ -92,7 +92,7 @@ Initial obligations include:
 ## Project status
 
 **Pre-alpha with deterministic evaluation, local enforcement, digest-bound decision/action
-approval, trusted tool proposals and an opt-in governed-gateway execution adapter.**
+approval, trusted tool proposals/results and an opt-in governed-gateway execution adapter.**
 
 Current local flow:
 
@@ -110,6 +110,7 @@ Context
   -> Network-silent mock (default) or governed gateway (opt-in)
   -> Exact tool-proposal validation and action-specific approval
   -> Network-silent tool execution mock
+  -> Closed output validation and ephemeral safe result
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -121,7 +122,10 @@ real provider inference unless gateway mode is explicitly configured. Gateway mo
 timeouts, performs no local retry, discards model output and accepts only tool definitions resolved
 from the versioned organization catalog. Returned tool calls remain unauthorized proposals until
 their exact arguments are resubmitted, validated and approved using separate action authority.
-Phase 4c tool execution is a network-silent mock. Approval assertions are issued
+Phase 4d validates untrusted mock results against closed catalog schemas, masks or drops classified
+fields and returns the minimized result only on the immediate successful response. Raw and safe
+result content are not persisted or recoverable on replay. Tool execution remains network-silent.
+Approval assertions are issued
 outside the service, bound to the decision digest, accepted only ephemerally and consumed once
 before execution.
 

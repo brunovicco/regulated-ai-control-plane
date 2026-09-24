@@ -144,5 +144,12 @@ proposal arguments, workload identity and idempotency key to
 domain-separated `ra2` assertion documented in `API_CONTRACT.md`; resend the identical request with
 that assertion to reach the network-silent mock tool boundary.
 
-The demo never persists or returns the arguments, idempotency key, raw assertion or tool output.
-Live enterprise-system connectors remain disabled.
+The mock result is validated against the trusted output schema. The immediate successful response
+contains only `safe_result`: a closed status enum may be returned, a financial reference is
+replaced with `***MASKED***`, and diagnostic content is dropped. `GET /v1/tool-actions/{action_id}`
+and action replay return metadata/digests only and set `safe_result` to `null`.
+
+The demo never persists arguments, idempotency keys, raw assertions, raw tool output or the safe
+result. Schema-invalid output becomes terminal `RESULT_REJECTED`; it is not retried because the
+downstream effect may already have occurred. Live enterprise-system connectors and model
+continuation remain disabled.

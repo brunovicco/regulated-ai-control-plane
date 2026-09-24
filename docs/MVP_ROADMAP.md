@@ -87,10 +87,11 @@ Implemented in Phase 3a:
 
 ## Phase 4 — Approval and agent authority
 
-Status: Phases 4a–4c implemented. Decision approval is bound to the pre-inference deterministic
+Status: Phases 4a–4d implemented. Decision approval is bound to the pre-inference deterministic
 digest; trusted tool proposals stop at metadata; exact resubmitted arguments require a separate,
 domain-separated action approval before a network-silent tool execution boundary is crossed.
-Live enterprise-system side effects remain deferred.
+Tool results are validated and minimized against action-bound output schemas, but live
+enterprise-system side effects and model continuation remain deferred.
 
 Deliver:
 - approval port; **implemented in Phase 4a**
@@ -101,6 +102,9 @@ Deliver:
 - exact argument/schema/digest validation; **implemented in Phase 4c**
 - action-digest-bound approval and single-use consumption; **implemented in Phase 4c**
 - atomic action claim and ambiguous-outcome reconciliation state; **implemented in Phase 4c**
+- trusted closed output schemas and per-field handling; **implemented in Phase 4d**
+- ephemeral safe results with metadata-only persistence; **implemented in Phase 4d**
+- terminal rejection of unsafe or schema-invalid results; **implemented in Phase 4d**
 - demo with read vs high-impact action. **implemented against the mock boundary**
 
 ## Phase 5 — Operator dashboard

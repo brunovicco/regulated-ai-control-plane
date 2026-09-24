@@ -113,6 +113,7 @@ Contexto
   -> Mock sem rede (padrão) ou gateway governado (opt-in)
   -> Validação exata da proposta e aprovação específica da ação
   -> Mock de execução de ferramenta sem rede
+  -> Validação fechada do output e resultado seguro efêmero
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -123,7 +124,10 @@ usa timeouts limitados, não realiza retry local, descarta a saída do modelo e 
 definições de ferramentas resolvidas pelo catálogo versionado da organização. Chamadas de
 ferramentas retornadas pelo modelo continuam sem autoridade até que os argumentos exatos sejam
 reenviados, validados e aprovados com uma autoridade de ação separada. A execução da Fase 4c usa
-somente um mock sem rede.
+somente um mock sem rede. A Fase 4d valida o resultado não confiável contra schemas fechados do
+catálogo, mascara ou remove campos classificados e retorna o resultado minimizado somente na
+resposta imediata de sucesso. Outputs brutos e seguros não são persistidos nem recuperáveis em
+replays.
 As asserções de aprovação são emitidas fora do serviço, vinculadas ao digest determinístico da
 decisão, recebidas apenas de forma efêmera e consumidas uma única vez antes da execução.
 

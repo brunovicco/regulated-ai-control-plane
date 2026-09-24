@@ -9,6 +9,7 @@ Complete this document before processing personal or regulated data.
 | Evaluation evidence metadata | Evaluation API | Reproduce policy decisions without content retention | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate the configured database under an approved evidence-retention procedure |
 | Approval consumption metadata | External approval workflow | Prove scoped human authority and prevent replay | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate under the same approved evidence-retention procedure |
 | Tool-action metadata | Tool-action API | Prove exact action authority and execution state without retaining payloads | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate under the same approved evidence-retention procedure |
+| Tool-result metadata | Tool execution port | Prove output-schema enforcement without retaining result content | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate under the same approved evidence-retention procedure |
 
 ## Controls
 
@@ -40,9 +41,11 @@ Complete this document before processing personal or regulated data.
   discarded by this service. Provider/model/deployment and bounded routing/execution provenance
   may be retained as evidence metadata.
 - Tool definitions contain organization-owned names, descriptions and schemas. Model-produced and
-  resubmitted arguments, idempotency keys, approval assertions and tool output remain ephemeral.
-  RegulaAI persists only trusted identities, statuses, approval metadata and cryptographic digests.
-  Phase 4c executes only through a network-silent mock tool adapter.
+  resubmitted arguments, idempotency keys, approval assertions and raw/safe tool output remain
+  ephemeral. Phase 4d validates output fields against trusted classifications and applies
+  `RETURN`, `MASK` or `DROP` before the immediate response. RegulaAI persists only trusted
+  identities, statuses, approval metadata, schema/result digests, classifications and exposed
+  field names. Execution still uses only a network-silent mock tool adapter.
 - Incident-response owner:
 
 ## Prohibited logging

@@ -22,6 +22,10 @@ Phase 4b removes caller control over tool risk. A versioned catalog supplies tru
 and closed input schemas. The gateway may propose an authorized tool call, but RegulaAI stores only
 its metadata/digest and performs no tool side effect.
 
+Phase 4c binds exact proposal arguments and separate approval to an atomic tool execution. Phase
+4d then validates the untrusted result against a trusted closed output schema and exposes only an
+ephemeral minimized result.
+
 ## Layers
 
 ```text
@@ -182,6 +186,24 @@ stored proposal + resubmitted arguments -> schema/digest validation -> action di
 Raw arguments and idempotency keys exist only in the request and ephemeral action plan. Phase 4c
 does not return tool output to a model or enable a live enterprise connector. See
 [ADR-0009](adr/0009-action-digest-bound-tool-execution.md).
+
+## Phase 4d components
+
+- `adapters/yaml_files.py`: closed output schemas with classifications and handling rules.
+- `application/execute_tool_action.py`: untrusted result validation, minimization and digesting.
+- `adapters/evidence_sqlite.py`: result metadata and schema migration without result content.
+- `entrypoints/api.py`: immediate-only `safe_result` and terminal result-rejection mapping.
+
+```text
+tool adapter output (untrusted) -> validate closed schema -> classify each field
+    -> RETURN closed enum | MASK value | DROP field -> immediate safe_result
+    -> persist digests/classifications/field names only
+    \-> invalid/disallowed output -> RESULT_REJECTED (terminal, no retry)
+```
+
+Raw and safe values exist only during the successful request. Replays and action inspection cannot
+recover them. No result is supplied to a model in this phase. See
+[ADR-0010](adr/0010-trusted-tool-result-handling.md).
 
 ## Diagrams
 

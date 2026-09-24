@@ -48,7 +48,9 @@ Mitigations:
 - tool risk, description and schema come from a versioned organization catalog, never model output
   or caller claims;
 - gateway tool calls are proposals only; Phase 4c requires exact argument validation and separate
-  action-specific authority before its network-silent tool boundary.
+  action-specific authority before its network-silent tool boundary;
+- Phase 4d treats tool output as untrusted content and allows only schema-defined, minimized fields
+  to leave the result boundary; no result is composed into a model turn.
 
 ### Model proposal gains excessive authority
 
@@ -63,6 +65,22 @@ Mitigations:
 - each proposal has one immutable action binding and one atomic execution claim;
 - approval is consumed before the tool port and ambiguous failures are never retried automatically;
 - Phase 4c exposes only a network-silent mock tool adapter.
+
+### Tool result injects instructions or exfiltrates data
+
+Threat:
+a compromised or drifting tool returns free-form instructions, unexpected fields, financial or
+personal values, credentials, or oversized content that is persisted or supplied to a model.
+
+Mitigations:
+- output schemas are closed, organization-owned and bound into tool/action digests;
+- every field has an explicit classification and `RETURN`, `MASK` or `DROP` rule;
+- directly returned strings are limited to trusted closed enums; personal/financial values cannot
+  be returned directly and authentication secrets must be dropped;
+- raw output is validated and minimized in memory, with only digests/classifications/field names
+  persisted;
+- invalid output becomes terminal `RESULT_REJECTED` and is not automatically retried;
+- safe output is immediate-response-only and is not supplied to a model in Phase 4d.
 
 ### Caller downgrades tool risk
 
@@ -201,3 +219,7 @@ future asymmetric or OIDC adapter should remove signing capability from the enfo
 - caller supplies a false tool risk class or unknown tool name;
 - gateway proposes an unlisted tool, duplicate call id or non-JSON/oversized arguments;
 - tool proposal metadata leaks raw arguments or is mistaken for execution authority.
+- tool result has missing/extra fields, invalid types/enums, oversized values or a disallowed
+  classification/handling combination;
+- raw or masked tool-result values appear in SQLite, replay/GET responses, errors or logs;
+- tool-result text attempts prompt injection or result-driven authority escalation.
