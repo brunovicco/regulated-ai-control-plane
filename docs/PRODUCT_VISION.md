@@ -12,13 +12,13 @@ a runtime layer that turns organization-approved constraints into deterministic 
 
 ## Primary users
 
-### AI platform / applied AI teams
+### AI platform/applied AI teams
 Need a consistent policy boundary across applications and providers.
 
 ### Security and privacy engineering
 Need enforceable controls at data and authority boundaries, not only documentation.
 
-### Architecture / cloud platform teams
+### Architecture/cloud platform teams
 Need a portable decision layer that avoids baking all governance logic into one hyperscaler.
 
 ### Risk, compliance and legal partners

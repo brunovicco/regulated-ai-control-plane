@@ -1,1 +1,1 @@
-"""Transport and process entrypoints."""
+"""Transport and process entrypoints for RegulaAI."""

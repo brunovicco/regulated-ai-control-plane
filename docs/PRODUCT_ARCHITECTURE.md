@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-    APP[Enterprise application / agent]
+    APP[Enterprise application/agent]
     EP[Regulatory Enforcement Point]
     PE[Policy Decision Engine]
     PCR[Provider Capability Registry]

@@ -1,0 +1,264 @@
+# Regulated AI Control Plane
+
+[![Python 3.12-3.14](https://img.shields.io/badge/Python-3.12--3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Licença: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Status: Pre-Alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status-do-projeto)
+
+> Control plane regulatório multi-provider para IA corporativa, começando por LGPD, ANPD e requisitos do setor financeiro brasileiro.
+
+[English](README.md)
+
+## Visão geral
+
+**Regulated AI Control Plane** é um projeto de infraestrutura para aplicar controles de privacidade, segurança, regulação e autoridade aprovados pela organização na fronteira de execução de IA.
+
+O primeiro recorte do produto é o Brasil, com foco inicial em ambientes regulados do setor financeiro. O projeto foi desenhado para operar entre aplicações ou agentes corporativos e provedores de IA. Ele avalia o contexto da operação, consulta capacidades do provedor, aplica políticas determinísticas, gera obrigações como transformação de dados ou aprovação humana e registra evidências apenas com metadados.
+
+```text
+Aplicação/Agente corporativo
+            |
+            v
++--------------------------------+
+| Regulatory Enforcement Point   |
+|--------------------------------|
+| Classificação de dados         |
+| Avaliação de políticas         |
+| Capacidades do provedor        |
+| Transformações necessárias     |
+| Autoridade sobre ferramentas   |
+| Geração de evidências          |
++--------------------------------+
+            |
+            v
+    Inference Execution Port
+            |
+      +-----+-----+------+
+      |           |      |
+   OpenAI      Bedrock  Futuros
+```
+
+A primeira fase de implementação termina deliberadamente **antes da inferência real**. O objetivo é validar os contratos de decisão, enforcement e evidência antes de adicionar SDKs de provedores ou roteamento de modelos.
+
+## Por que este projeto existe
+
+Adotar IA em produção em ambientes regulados envolve muito mais do que obter acesso a um LLM. Uma arquitetura corporativa pode precisar coordenar classificação e minimização de dados, políticas para transferência internacional, capacidades de provedor/serviço/região, identidade e fronteiras de autoridade, permissões para ferramentas e ações, aprovação humana, retenção, observabilidade e evidências para auditoria.
+
+Clouds e provedores de modelos oferecem vários desses componentes, mas o comportamento muda conforme provedor, serviço, endpoint, região e configuração contratual. A organização também precisa manter suas políticas de forma portável entre provedores.
+
+Este projeto explora essa camada de controle.
+
+## Modelo central
+
+Uma regra arquitetural fundamental é que o texto regulatório **não vira código diretamente**.
+
+```text
+Fonte regulatória oficial
+        |
+        v
+Objetivo de controle revisado por humanos
+        |
+        v
+Política corporativa executável
+        |
+        v
+Controle técnico
+        |
+        v
+Evidência apenas com metadados
+```
+
+O sistema não emite conclusões como `{"lgpd_compliant": true}`.
+
+## Escopo inicial
+
+- **Jurisdição:** Brasil
+- **Setor:** serviços financeiros
+- **Baseline regulatório:** LGPD, regulamentação da ANPD sobre transferência internacional e requisitos selecionados de segurança cibernética e contratação de cloud do CMN/BCB
+- **Exemplos de providers:** OpenAI API e Amazon Bedrock
+- **Decisões:** `ALLOW`, `ALLOW_WITH_TRANSFORMATION`, `REQUIRE_APPROVAL`, `DENY`
+- **Evidência:** versionada, reproduzível e sem conteúdo sensível
+
+Obrigações iniciais:
+
+- `REMOVE_FIELD`
+- `MASK`
+- `TOKENIZE`
+- `PSEUDONYMIZE`
+- `REQUIRE_PROVIDER_CAPABILITY`
+- `REQUIRE_HUMAN_APPROVAL`
+- `RESTRICT_TOOL`
+- `REQUIRE_EVIDENCE`
+
+## Status do projeto
+
+**Pre-alpha/desenho e implementação ativos.**
+
+Objetivo atual:
+
+```text
+Contexto
+  -> Classificação
+  -> Matching de políticas
+  -> Resolução de capacidades do provider
+  -> Decisão
+  -> Obrigações
+  -> Evidência apenas com metadados
+```
+
+Fora do primeiro ciclo:
+
+- chamadas reais à OpenAI;
+- chamadas reais ao Amazon Bedrock;
+- LLM decidindo política;
+- frontend/dashboard;
+- SaaS multi-tenant;
+- ingestão automática de legislação;
+- DLP completo;
+- certificação jurídica ou regulatória.
+
+Consulte [docs/MVP_ROADMAP.md](docs/MVP_ROADMAP.md).
+
+## Princípios de arquitetura
+
+### Enforcement determinístico
+
+O modelo de IA nunca decide se uma política de segurança, privacidade ou regulação deve ser cumprida. A mesma entrada normalizada, usando as mesmas versões de políticas e do provider registry, deve produzir a mesma decisão.
+
+### Fail closed
+
+```text
+capacidade obrigatória = unknown
+    -> fail closed
+
+capacidade high-assurance desatualizada
+    -> fail closed
+
+fallback reduz controle obrigatório
+    -> rejeitar fallback
+```
+
+### Provider Capability Registry
+
+O comportamento dos provedores é representado por fatos versionados e respaldados por fontes oficiais. Cada registro inclui provider, serviço, região quando aplicável, estado da capacidade, condições, fontes oficiais, data de verificação e versão.
+
+Estados possíveis:
+
+```text
+supported
+unsupported
+conditional
+unknown
+```
+
+`unknown` é um estado válido e importante.
+
+### Evidência sem conteúdo sensível
+
+A trilha de evidências pode registrar decisão, reason codes, classificações, versões de políticas e registry, tipos de obrigações, referências de controles, timestamps e hashes criptográficos.
+
+Ela não deve registrar prompts completos, respostas de modelos, valores de dados pessoais, credenciais, API keys, tokens ou payloads de ferramentas sem sanitização.
+
+### Portabilidade entre providers
+
+A visão de longo prazo mantém a inteligência regulatória e as políticas corporativas acima do provedor de inferência. Um futuro execution port poderá integrar com o [`governed-llm-gateway`](https://github.com/brunovicco/governed-llm-gateway), evitando duplicar roteamento, resiliência e normalização multi-provider.
+
+## Precedência de decisão
+
+```text
+DENY
+  >
+REQUIRE_APPROVAL
+  >
+ALLOW_WITH_TRANSFORMATION
+  >
+ALLOW
+```
+
+Uma decisão menos restritiva nunca pode sobrescrever uma restrição mais forte.
+
+## Estrutura do repositório
+
+```text
+regulated-ai-control-plane/
+├── AGENTS.md
+├── README.md
+├── README.pt-BR.md
+├── SECURITY.md
+├── LICENSE
+├── CHANGELOG.md
+├── SOURCES.md
+├── docs/
+│   ├── PROJECT_CONTEXT.md
+│   ├── PRODUCT_VISION.md
+│   ├── PRODUCT_ARCHITECTURE.md
+│   ├── DOMAIN_MODEL.md
+│   ├── REGULATORY_BASELINE_BR.md
+│   ├── PROVIDER_CAPABILITY_REGISTRY.md
+│   ├── POLICY_MODEL.md
+│   ├── API_CONTRACT.md
+│   ├── THREAT_MODEL.md
+│   ├── EVAL_STRATEGY.md
+│   ├── MVP_ROADMAP.md
+│   └── ADRs/
+├── examples/
+│   ├── policies/
+│   ├── provider-capabilities/
+│   └── scenarios/
+├── governance/
+├── src/
+└── tests/
+```
+
+## Desenvolvimento
+
+O repositório utiliza como baseline o [`brunovicco/codex-python-engineering-harness`](https://github.com/brunovicco/codex-python-engineering-harness).
+
+Requisitos:
+
+- Python 3.12+
+- [`uv`](https://docs.astral.sh/uv/)
+
+Instalação e quality gate:
+
+```bash
+uv lock --check
+uv sync --frozen --all-groups --extra observability
+uv run python scripts/quality_gate.py
+```
+
+O `AGENTS.md` gerado pelo harness é o contrato principal para workflow de desenvolvimento, arquitetura, testes e segurança.
+
+## Documentação
+
+Comece por:
+
+- [Contexto do projeto](docs/PROJECT_CONTEXT.md)
+- [Visão do produto](docs/PRODUCT_VISION.md)
+- [Arquitetura](docs/PRODUCT_ARCHITECTURE.md)
+- [Modelo de domínio](docs/DOMAIN_MODEL.md)
+- [Baseline regulatório brasileiro](docs/REGULATORY_BASELINE_BR.md)
+- [Provider Capability Registry](docs/PROVIDER_CAPABILITY_REGISTRY.md)
+- [Modelo de políticas](docs/POLICY_MODEL.md)
+- [Threat model](docs/THREAT_MODEL.md)
+- [Estratégia de evals](docs/EVAL_STRATEGY.md)
+- [Roadmap](docs/MVP_ROADMAP.md)
+- [Fontes primárias](SOURCES.md)
+
+## Segurança
+
+Não utilize dados reais de clientes, credenciais de produção ou secrets de produção em desenvolvimento, exemplos ou testes. Consulte [SECURITY.md](SECURITY.md).
+
+## Limite jurídico e regulatório
+
+Este projeto é uma implementação de engenharia e referência arquitetural. Ele **não** fornece aconselhamento jurídico, certificação regulatória nem garantia de conformidade com LGPD, regulamentações da ANPD, CMN/BCB, ISO/IEC 42001, NIST ou outros frameworks.
+
+Os mappings regulatórios e de frameworks representam como controles técnicos podem apoiar objetivos de controle aprovados pela organização. A aplicabilidade e a interpretação permanecem sob responsabilidade dos stakeholders qualificados da organização.
+
+## Licença
+
+Distribuído sob a [Licença MIT](LICENSE).
+
+## Autor
+
+**Bruno Vicco**
+Generative AI Engineering · AI Platforms · Agentic Security · Governance

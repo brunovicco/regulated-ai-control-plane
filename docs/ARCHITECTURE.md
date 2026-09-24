@@ -2,7 +2,10 @@
 
 ## Context
 
-Describe the business capability owned by this service and its upstream and downstream dependencies.
+RegulaAI owns deterministic evaluation at the AI execution boundary. It accepts normalized
+business context, combines caller labels with narrow deterministic classification, evaluates an
+immutable organization policy set, verifies curated provider capability facts and returns an
+execution plan plus metadata-only evidence. Phase 1 does not call an AI provider.
 
 ## Layers
 
@@ -51,6 +54,25 @@ domain      -> no outer layer
 - Money: `Decimal` wrapped in a domain Value Object.
 - Idempotency: required for externally visible side effects.
 - Packaging: containerized via the repo `Dockerfile` (multi-stage, uv-based); the runtime `CMD` is defined per project.
+
+## Phase 1 components
+
+- `domain/models.py`: immutable value objects and decision precedence; no outer-layer imports.
+- `application/evaluate_operation.py`: the `EvaluateAiOperation` orchestration use case.
+- `application/ports.py`: policy, capability, classifier, evidence, observability and future
+  approval/execution contracts.
+- `adapters/yaml_files.py`: strict versioned policy/provider registry boundary.
+- `adapters/classifier.py`: CPF/CNPJ checksum, labeled account-field and secret-field detection.
+- `adapters/evidence_sqlite.py`: metadata-only local evidence persistence.
+- `adapters/evaluation_observability.py`: stable, allowlisted structured lifecycle events.
+- `entrypoints/api.py`: HTTP validation, error mapping, composition root and Phase 1 endpoints.
+
+Transform obligations are returned before any future execution port can be called. Capability
+requirements selected for the primary target are also applied to every explicit fallback target.
+High-assurance freshness is policy data (`max_age_days`), not a global domain constant.
+
+See [ADR-0004](adr/0004-versioned-yaml-and-sqlite-phase-1-adapters.md) for the local adapter
+decision and [the demo](DEMO.md) for the end-to-end flow.
 
 ## Diagrams
 

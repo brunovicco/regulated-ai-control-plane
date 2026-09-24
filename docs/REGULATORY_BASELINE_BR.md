@@ -52,7 +52,7 @@ Engineering implications may include control objectives for:
 The runtime must **not** decide by itself that a transfer is legally valid. It can enforce an
 organization-provided assertion/approval and the associated technical controls.
 
-## Banco Central / CMN
+## Banco Central/CMN
 
 ### Resolução CMN nº 4.893/2021
 

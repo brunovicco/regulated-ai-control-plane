@@ -101,7 +101,7 @@ Mitigations:
 
 Not Phase 1, but architecture must not make tenant id optional once SaaS mode exists.
 
-### SSRF / arbitrary outbound access (future execution)
+### SSRF/arbitrary outbound access (future execution)
 
 Mitigations:
 - explicit provider adapters/endpoints;
