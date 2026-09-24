@@ -1,5 +1,31 @@
 # Implementation plan
 
+## Phase 5a — metadata-only operator timeline
+
+### Goal
+
+Provide one read-only operational view that correlates an exact enforcement, its decision evidence
+and tool actions without adding payload retention, global discovery or administrative mutations.
+
+### Work
+
+1. Add immutable operator-timeline and attention-code types plus a focused application query.
+2. Extend the tool-action repository with a deterministic, enforcement-scoped listing operation.
+3. Build ordered control stages from existing evaluation, enforcement and action records; do not
+   invent unavailable transition timestamps or claim append-only history.
+4. Derive stable attention codes for pending approval, execution failure, ambiguous reconciliation,
+   approval failure and rejected tool results.
+5. Expose `GET /v1/operator/enforcements/{enforcement_id}/timeline` using an exact identifier only.
+6. Keep the response metadata-only and add unit, SQLite contract and end-to-end privacy tests.
+
+### Decisions and assumptions
+
+- This is a current-state control timeline, not a complete historical event ledger.
+- The endpoint does not list or search tenants, correlations or recent activity.
+- Existing deployment access controls must protect the operator surface; product authentication and
+  a visual dashboard remain out of scope.
+- The phase does not reconcile, retry, approve or otherwise mutate enforcement/action state.
+
 ## Phase 4d — trusted tool-result handling
 
 ### Goal

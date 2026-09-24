@@ -114,11 +114,13 @@ Contexto
   -> Validação exata da proposta e aprovação específica da ação
   -> Mock de execução de ferramenta sem rede
   -> Validação fechada do output e resultado seguro efêmero
+  -> Timeline operacional apenas com metadados e códigos de atenção
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`,
 `POST /v1/enforcements/{enforcement_id}/tool-actions`, `GET /v1/tool-actions/{action_id}`,
+`GET /v1/operator/enforcements/{enforcement_id}/timeline`,
 `GET /v1/providers` e `GET /health`. O modo padrão continua sem rede. Quando configurado explicitamente, o modo gateway
 usa timeouts limitados, não realiza retry local, descarta a saída do modelo e aceita somente
 definições de ferramentas resolvidas pelo catálogo versionado da organização. Chamadas de

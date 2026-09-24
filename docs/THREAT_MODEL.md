@@ -127,6 +127,21 @@ Mitigations:
 - hashes over canonical normalized structures;
 - test that sentinel secrets/PII never appear in outputs/log fixtures.
 
+### Operator metadata enumeration
+
+Threat:
+an unauthenticated or cross-tenant caller lists operational activity or uses the operator view to
+recover content and sensitive workflow state.
+
+Mitigations:
+- Phase 5a supports exact, bounded enforcement-ID lookup only; there is no list, search or filter;
+- the response uses the same metadata allowlist as evidence/enforcement/action records and never
+  includes payloads, arguments, assertions or tool results;
+- action correlation is bounded and explicitly reports truncation;
+- the endpoint is read-only and cannot approve, retry or reconcile;
+- deployments must restrict the operator route at the existing access boundary until product
+  authentication and tenant isolation are implemented.
+
 ### Evidence tampering
 
 Mitigations:
@@ -223,3 +238,6 @@ future asymmetric or OIDC adapter should remove signing capability from the enfo
   classification/handling combination;
 - raw or masked tool-result values appear in SQLite, replay/GET responses, errors or logs;
 - tool-result text attempts prompt injection or result-driven authority escalation.
+- operator timeline is queried with a missing/invalid identifier, inconsistent linked metadata or
+  more actions than its bounded view;
+- sentinel payload, argument, assertion or result values appear in an operator response.

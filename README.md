@@ -111,11 +111,13 @@ Context
   -> Exact tool-proposal validation and action-specific approval
   -> Network-silent tool execution mock
   -> Closed output validation and ephemeral safe result
+  -> Metadata-only operator timeline and attention codes
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`,
 `POST /v1/enforcements/{enforcement_id}/tool-actions`, `GET /v1/tool-actions/{action_id}`,
+`GET /v1/operator/enforcements/{enforcement_id}/timeline`,
 `GET /v1/providers` and `GET /health`. It validates versioned YAML control-plane records at startup, applies transformations
 inside the local trust boundary and stores only metadata evidence in SQLite. It still stops before
 real provider inference unless gateway mode is explicitly configured. Gateway mode uses bounded
