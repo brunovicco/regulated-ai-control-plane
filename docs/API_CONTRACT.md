@@ -24,6 +24,10 @@ Use synthetic values only.
     "service": "responses_api",
     "region": "global"
   },
+  "organization_assertions": {
+    "eligible_organization_required": true,
+    "endpoint_or_feature_must_be_zdr_eligible": true
+  },
   "data": [
     {
       "field": "customer_document",
@@ -49,6 +53,15 @@ Use synthetic values only.
   "policy_set_version": "br-financial-demo@1.0.0"
 }
 ```
+
+`fallback_providers` is an optional list using the same provider shape. Every fallback is checked
+against the mandatory capability requirements selected for the primary operation; it is never
+selected implicitly. `organization_assertions` is an optional boolean map for organization-owned
+configuration facts required by conditional capabilities.
+
+Correlation IDs, logical field names, provider identifiers, policy versions and tool identifiers
+must use bounded machine-identifier syntax. Arbitrary content belongs only in ephemeral `value`
+fields and is never echoed in validation errors.
 
 The CPF above is a public algorithm test/example value only. Tests may prefer clearly synthetic,
 non-person values generated specifically for the suite.
@@ -117,6 +130,11 @@ Returns capability metadata suitable for debugging/demo:
 - registry version.
 
 No credentials/config secrets.
+
+## GET /health
+
+Returns `{"status": "ok"}` when the local HTTP process is available. Policy/registry validation
+occurs during startup, so invalid control-plane configuration prevents the service from serving.
 
 ## Errors
 

@@ -10,6 +10,11 @@
 
 Keep these facts and the commands below current as the project evolves.
 
+## Product context
+
+Read `docs/PROJECT_CONTEXT.md` before changing product behavior. Preserve its vocabulary, trust
+boundaries and core invariants alongside this engineering contract.
+
 ## Required commands
 
 ```bash

@@ -6,16 +6,18 @@ Complete this document before processing personal or regulated data.
 
 | Data category | Source | Purpose | Legal/contractual basis | Destination | Retention | Deletion method |
 |---|---|---|---|---|---|---|
-| None documented | | | | | | |
+| Evaluation evidence metadata | Evaluation API | Reproduce policy decisions without content retention | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate the configured database under an approved evidence-retention procedure |
 
 ## Controls
 
-- Data minimization:
+- Data minimization: evidence stores only identifiers, labels, versions, outcomes, reason codes and
+  cryptographic digests; raw field values are excluded.
 - Access control:
 - Encryption in transit:
 - Encryption at rest:
-- Masking/tokenization:
-- Non-production data strategy:
+- Masking/tokenization: Phase 1 returns transformation obligations but does not execute them.
+- Non-production data strategy: tests and examples use generated or explicitly synthetic values;
+  tests assert that sentinels do not appear in evidence or errors.
 - Logging and tracing restrictions: document any enabled backend, content-capture approval,
   redaction, retention, and access policy. Add and follow a backend-specific policy before enabling
   content-bearing tracing. Generic OpenTelemetry spans are metadata-only: custom attributes pass
@@ -23,8 +25,9 @@ Complete this document before processing personal or regulated data.
   authorization headers, personal data, arbitrary URLs, tool output, or production payloads.
   The public tracing wrappers enforce this policy for span and event attributes, operation names,
   status descriptions, and exception details. W3C baggage is not propagated by default.
-- Data-subject deletion/anonymization:
-- External processors:
+- Data-subject deletion/anonymization: define evidence retention and correlation-id deletion
+  handling before production use.
+- External processors: none in Phase 1; evaluation performs no provider or network call.
 - Incident-response owner:
 
 ## Prohibited logging

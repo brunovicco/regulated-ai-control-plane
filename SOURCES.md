@@ -62,7 +62,7 @@ Important:
 `store=false` is not by itself equivalent to organization-level Zero Data Retention. Model this
 difference explicitly.
 
-## AWS / Amazon Bedrock
+## AWS/Amazon Bedrock
 
 ### Data protection
 https://docs.aws.amazon.com/bedrock/latest/userguide/data-protection.html
@@ -73,7 +73,7 @@ Use for:
 - provider access model described by AWS;
 - data-protection references.
 
-### AWS PrivateLink / Bedrock VPC endpoints
+### AWS PrivateLink/Bedrock VPC endpoints
 https://docs.aws.amazon.com/bedrock/latest/userguide/vpc-interface-endpoints.html
 
 Use for:

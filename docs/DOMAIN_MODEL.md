@@ -50,8 +50,8 @@ Identifies the intended execution surface:
 - requested processing mode.
 
 Examples:
-- `openai / responses_api`
-- `aws / bedrock_runtime / sa-east-1`
+- `openai/responses_api`
+- `aws/bedrock_runtime/sa-east-1`
 
 ## ProviderCapability
 

@@ -15,7 +15,7 @@ Human-reviewed control objective
       ↓
 Executable enterprise policy
       ↓
-Technical obligation / decision
+Technical obligation/decision
 ```
 
 This separation prevents code from pretending to be legal interpretation.
