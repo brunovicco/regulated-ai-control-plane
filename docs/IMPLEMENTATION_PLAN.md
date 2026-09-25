@@ -1,5 +1,34 @@
 # Implementation plan
 
+## Phase 6b — verified control-pack impact analysis
+
+### Goal
+
+Compare two authenticated policy/provider releases offline and produce a deterministic,
+metadata-only report of potential decision, evidence and governance impact before promotion.
+
+### Work
+
+1. Load base and candidate manifests through the Phase 6a verifier using one explicit trust store.
+2. Compare policy sets/rules and provider targets/capabilities by stable identities.
+3. Classify changed fields conservatively as `DECISION`, `EVIDENCE` or `GOVERNANCE` impact.
+4. Correlate changed capabilities with policy rules that require the capability and can match the
+   affected provider target.
+5. Emit stable JSON with pack identities, summaries, version-reuse/key-change signals and bounded
+   metadata-only changes.
+6. Add an optional CI failure exit code for potential decision impact, tests and ADR-0017.
+
+### Decisions and assumptions
+
+- Both releases must share a pack id and pass the same trust policy before semantic parsing.
+- The report is conservative static analysis, not exhaustive evaluation-context simulation.
+- Added or removed policies, rules, provider targets and capabilities are decision-impacting.
+- Provider state, conditions and freshness can affect decisions; provenance/version changes affect
+  evidence; notes and regulatory-support mappings are governance metadata.
+- The workflow performs no network access, source ingestion, signing, promotion or runtime mutation.
+- Pack-version ordering is organization-defined; reuse of one version with a different payload is
+  signaled but not automatically interpreted as malicious.
+
 ## Phase 6a — signed policy and provider packs
 
 ### Goal

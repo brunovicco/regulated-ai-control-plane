@@ -294,13 +294,33 @@ The dashboard does not introduce listing, search or administrative mutations. Se
 
 ```text
 deployment trust store + signed manifest + local YAML files
-    -> path/digest verification -> Ed25519 verification -> parse exact authenticated bytes
+    -> manifest schema/key/Ed25519 verification -> bounded path/digest verification
+    -> parse exact authenticated bytes
     -> runtime composition
 ```
 
 The trust store is an external trust decision. Signatures establish release authenticity and
 integrity, not regulatory correctness or current provider behavior. See
 [ADR-0016](adr/0016-signed-policy-provider-packs.md).
+
+## Phase 6b components
+
+- `domain/models.py`: release, semantic change, impact and report value objects.
+- `application/analyze_control_pack_diff.py`: framework-free deterministic comparison and
+  capability-to-policy correlation.
+- `scripts/diff_control_packs.py`: offline composition of verification, strict YAML parsing and
+  metadata-only JSON output.
+
+```text
+base manifest ----\
+                   -> same trust store -> verified exact bytes -> strict domain records
+candidate manifest /                                         -> static semantic impact report
+```
+
+The application use case never reads files, verifies signatures or executes policies. The CLI
+performs those boundary translations and can fail CI when static analysis finds potential decision
+impact. Absence of reported decision impact is not proof of behavioral equivalence. See
+[ADR-0017](adr/0017-verified-control-pack-impact-analysis.md).
 
 ## Diagrams
 

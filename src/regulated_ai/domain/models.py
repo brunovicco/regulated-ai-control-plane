@@ -131,6 +131,31 @@ class OperatorAttentionCode(StrEnum):
     EVENT_LIST_TRUNCATED = "EVENT_LIST_TRUNCATED"
 
 
+class ControlPackChangeKind(StrEnum):
+    """Semantic configuration surface represented in a control-pack diff."""
+
+    POLICY_SET = "POLICY_SET"
+    POLICY_RULE = "POLICY_RULE"
+    PROVIDER_TARGET = "PROVIDER_TARGET"
+    PROVIDER_CAPABILITY = "PROVIDER_CAPABILITY"
+
+
+class ControlPackChangeType(StrEnum):
+    """Stable change operation between two verified releases."""
+
+    ADDED = "ADDED"
+    REMOVED = "REMOVED"
+    MODIFIED = "MODIFIED"
+
+
+class ControlPackImpact(StrEnum):
+    """Highest potential runtime surface affected by one semantic change."""
+
+    GOVERNANCE = "GOVERNANCE"
+    EVIDENCE = "EVIDENCE"
+    DECISION = "DECISION"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -395,6 +420,65 @@ class PolicySet:
     def identifier(self) -> str:
         """Return immutable policy-set identifier and version."""
         return f"{self.id}@{self.version}"
+
+
+@dataclass(frozen=True, slots=True)
+class ControlPackReleaseIdentity:
+    """Non-secret identity of a verified release entering semantic analysis."""
+
+    pack_id: str
+    pack_version: str
+    signing_key_id: str
+    payload_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class ControlPackRelease:
+    """Strict domain records loaded from one verified policy/provider pack."""
+
+    identity: ControlPackReleaseIdentity
+    policy_sets: tuple[PolicySet, ...]
+    provider_records: tuple[ProviderCapabilityRecord, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ControlPackChange:
+    """One deterministic, metadata-only semantic change."""
+
+    kind: ControlPackChangeKind
+    change_type: ControlPackChangeType
+    identifier: str
+    impact: ControlPackImpact
+    changed_fields: tuple[str, ...] = ()
+    dependent_policy_rule_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ControlPackDiffReport:
+    """Bounded static impact report for two releases of the same pack."""
+
+    base: ControlPackReleaseIdentity
+    candidate: ControlPackReleaseIdentity
+    changes: tuple[ControlPackChange, ...]
+    version_reused: bool
+    signing_key_changed: bool
+
+    @property
+    def highest_impact(self) -> ControlPackImpact | None:
+        """Return the most consequential potential impact in the report."""
+        for impact in (
+            ControlPackImpact.DECISION,
+            ControlPackImpact.EVIDENCE,
+            ControlPackImpact.GOVERNANCE,
+        ):
+            if any(change.impact is impact for change in self.changes):
+                return impact
+        return None
+
+    @property
+    def has_decision_impact(self) -> bool:
+        """Return whether conservative static analysis found decision impact."""
+        return any(change.impact is ControlPackImpact.DECISION for change in self.changes)
 
 
 @dataclass(frozen=True, slots=True)

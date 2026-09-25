@@ -198,6 +198,28 @@ Residual risks:
 - key custody, reviewer authorization, revocation and distribution remain external operational
   controls in Phase 6a.
 
+### Control-pack change bypasses review
+
+Threat:
+a signed candidate changes policy outcomes or provider assumptions without reviewers recognizing
+the affected runtime surface, or a comparison is performed against a separately trusted lineage.
+
+Mitigations:
+- base and candidate must both verify against one explicitly selected trust store and share a pack
+  identifier;
+- changes are compared by stable policy/provider identities with deterministic ordering;
+- state, conditions, freshness, rule match/decision/obligations and additions/removals are marked
+  as potential decision impact;
+- changed capabilities list policy rules that require the same key and can match the target;
+- same-version/different-payload releases and signing-key changes are explicit report signals;
+- CI can fail with exit code 2 when potential decision impact exists;
+- output is metadata-only and never includes signing secrets or arbitrary YAML values.
+
+Residual risks:
+- static correlation does not enumerate all possible evaluation contexts or prove equivalence;
+- compromised trusted keys or trust-store changes remain outside the comparison guarantee;
+- human review, approval quorum and release promotion are not automated in Phase 6b.
+
 ### Cross-tenant leakage (future SaaS)
 
 Not Phase 1, but architecture must not make tenant id optional once SaaS mode exists.

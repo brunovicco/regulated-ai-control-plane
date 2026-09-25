@@ -35,6 +35,23 @@ design; key custody, reviewer authorization and revocation belong to the deploym
 Set both `REGULAAI_CONTROL_PACK_MANIFEST` and `REGULAAI_CONTROL_PACK_TRUST_STORE` to deployment
 paths to load an organization-managed release without modifying the packaged defaults.
 
+Before promoting a candidate signed with a key in the same trust store, generate a deterministic
+static impact report:
+
+```bash
+uv run python scripts/diff_control_packs.py \
+  --base-manifest /approved/base/control-pack-manifest.yaml \
+  --candidate-manifest /review/candidate/control-pack-manifest.yaml \
+  --trust-store /approved/control-pack-signing-keys.yaml \
+  --fail-on-decision-impact
+```
+
+Successful analysis prints one compact JSON document. Exit code `0` means the comparison completed
+without a configured decision-impact failure; exit code `2` means decision impact was detected;
+exit code `1` means verification, parsing or comparison failed. The report classifies potential
+`DECISION`, `EVIDENCE` and `GOVERNANCE` impact and lists dependent policy rules for changed
+capabilities. It is static review support, not proof that two releases behave identically.
+
 The default tokenization key is generated per process. To keep demo tokens stable across restarts,
 set `REGULAAI_TOKENIZATION_KEY` to a local value of at least 32 bytes. Production key material must
 come from an approved secret-management boundary and must never be committed.

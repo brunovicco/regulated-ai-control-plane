@@ -1,5 +1,9 @@
 """Application use cases, ports, commands, and queries."""
 
+from regulated_ai.application.analyze_control_pack_diff import (
+    AnalyzeControlPackDiff,
+    ControlPackDiffError,
+)
 from regulated_ai.application.enforce_operation import (
     ApprovalFailedError,
     EnforceAiOperation,
@@ -36,7 +40,9 @@ from regulated_ai.application.get_operator_timeline import (
 
 __all__ = [
     "ActionApprovalFailedError",
+    "AnalyzeControlPackDiff",
     "ApprovalFailedError",
+    "ControlPackDiffError",
     "EnforceAiOperation",
     "EnforcementPersistenceError",
     "EvaluateAiOperation",

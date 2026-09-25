@@ -67,6 +67,9 @@ Complete this document before processing personal or regulated data.
   keys and exposes pack id/version, signing-key id and payload digest; private signing keys stay in
   the organization-owned offline release boundary and must never enter service configuration,
   logs or repository history.
+- Phase 6b reports only pack identities, configuration identifiers, changed field names, impact
+  classes and dependent policy-rule identifiers. It does not emit YAML values, provider notes,
+  source content, private keys, runtime requests, customer data or evidence records.
 - Incident-response owner:
 
 ## Prohibited logging

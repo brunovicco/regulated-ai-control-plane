@@ -117,6 +117,7 @@ Context
   -> Digest-bound provider source and freshness snapshots
   -> Exact-ID server-rendered operator dashboard
   -> Signed policy/provider pack verification before startup composition
+  -> Offline semantic impact analysis between verified pack releases
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -143,6 +144,12 @@ signature selected from a local public-key trust store. Any digest, signature, k
 path failure prevents startup. Only public verification material is packaged; release private keys
 must remain in an organization-owned offline boundary. Signature validity establishes release
 authenticity, not policy correctness, provider freshness or compliance.
+
+Phase 6b compares an approved base and candidate only after both pass the same trust store. Its
+offline JSON report classifies potential decision, evidence and governance impact, correlates
+changed provider capabilities with dependent policy rules and flags version reuse or signing-key
+changes. It is conservative review support, not exhaustive behavioral equivalence or release
+authority.
 
 Not implemented in the first slice:
 

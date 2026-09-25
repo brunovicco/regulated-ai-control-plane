@@ -161,14 +161,15 @@ Implemented in Phase 5e:
 ## Phase 6 — Maintained intelligence
 
 Status: Phase 6a implements signed local policy/provider releases with fail-closed digest,
-signature, trust-anchor and path verification. Automated source ingestion, review workflow, impact
-analysis, key lifecycle automation and enterprise distribution remain pending.
+signature, trust-anchor and path verification. Phase 6b adds offline semantic diff and conservative
+impact classification between verified releases. Automated source ingestion, full review workflow,
+key lifecycle automation and enterprise distribution remain pending.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
 - provider capability update workflow;
 - regulatory review workflow;
-- diff impact analysis;
+- diff impact analysis; **implemented in Phase 6b**
 - enterprise integrations;
 - additional sectors.
 
@@ -179,6 +180,14 @@ Implemented in Phase 6a:
 - fail-closed startup before runtime YAML parsing;
 - verified pack identity in provider metadata;
 - offline signer that accepts an external private key and verifies before manifest replacement.
+
+Implemented in Phase 6b:
+- same-trust verification of base and candidate packs before comparison;
+- stable policy/rule and provider/capability semantic changes;
+- decision, evidence and governance impact classification;
+- conservative capability-to-dependent-policy correlation;
+- version-reuse and signing-key-change signals;
+- deterministic metadata-only JSON and optional CI failure on decision impact.
 
 ## Defer
 
