@@ -171,3 +171,8 @@ Phase 5b also returns `lifecycle_events`. New state transitions are appended tra
 records that existed before tracking show `source: MIGRATION_BASELINE` and
 `history_complete: false`. This is a local append-only operational history, not a signed audit
 ledger.
+
+Phase 5c adds the matched policy/control/capability identifiers, decision and enforcement reasons,
+authorized tools, provider target, transformation receipts and previous evidence digest. Approval
+context excludes actor identity, assertions and authority-bearing content. Provider source and
+freshness history remains unavailable until decisions persist an immutable source snapshot.

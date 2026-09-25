@@ -1,5 +1,31 @@
 # Implementation plan
 
+## Phase 5c — operator control context
+
+### Goal
+
+Expose the allowlisted control metadata needed to explain one exact enforcement without adding
+global discovery, payload recovery or administrative mutations.
+
+### Work
+
+1. Extend the operator timeline with matched policies, control objectives, capability identifiers,
+   reason codes, authorized tools and provider target.
+2. Return metadata-only transformation receipts and the existing previous-event digest.
+3. Expose a sanitized enforcement approval summary without actor identity and only an
+   `approval_recorded` signal for each stage.
+4. Validate evidence/enforcement input binding and approval receipt bindings before composing the
+   response.
+5. Add unit and end-to-end privacy tests plus ADR-0013 and operator documentation.
+
+### Decisions and assumptions
+
+- Only metadata already persisted by earlier phases is exposed; there is no new storage schema.
+- Provider source/freshness history is not reconstructed from the current registry because the
+  evidence record does not contain an immutable source snapshot.
+- The endpoint remains exact-ID, bounded and read-only.
+- Approval actor identity, assertions, payloads, arguments and results remain excluded.
+
 ## Phase 5b — append-only lifecycle history
 
 ### Goal

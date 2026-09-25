@@ -257,6 +257,30 @@ does not provide global listing or search.
   "tool_catalog_version": "br-financial-tools@1.1.0",
   "classification_labels": ["BRAZIL_CPF"],
   "obligation_types": ["TOKENIZE", "REQUIRE_HUMAN_APPROVAL"],
+  "matched_policy_ids": ["br.financial.external_inference.minimize_identifier@1.0.0"],
+  "provider_capability_ids": ["openai.responses_api.zero_data_retention"],
+  "control_objective_ids": ["BR.PRIV.MINIMIZE_EXTERNAL_DATA"],
+  "decision_reason_codes": [],
+  "enforcement_reason_codes": [],
+  "authorized_tool_ids": ["cards.unblock@1.1.0"],
+  "provider_target": "openai.responses_api.global",
+  "transformation_receipts": [
+    {
+      "receipt_id": "tr_...",
+      "type": "TOKENIZE",
+      "target": "customer_document",
+      "input_digest": "sha256:...",
+      "output_digest": "sha256:...",
+      "reason_code": "MINIMIZE_EXTERNAL_IDENTIFIER"
+    }
+  ],
+  "approval": {
+    "approval_id": "approval-...",
+    "issued_at": "2026-09-24T11:55:00+00:00",
+    "expires_at": "2026-09-24T12:05:00+00:00",
+    "consumed_at": "2026-09-24T12:00:00+00:00"
+  },
+  "previous_event_digest": null,
   "attention_required": true,
   "attention_codes": ["TOOL_RESULT_REJECTED"],
   "history_complete": true,
@@ -271,7 +295,8 @@ does not provide global listing or search.
       "status": "REQUIRE_APPROVAL",
       "attention_codes": [],
       "tool_name": null,
-      "call_id": null
+      "call_id": null,
+      "approval_recorded": false
     }
   ],
   "lifecycle_events": [
@@ -301,6 +326,13 @@ inventing earlier transitions. At most 256 events are returned; a longer sequenc
 The completeness flag is also false when current actions are truncated or the transition events do
 not cover the current evaluation, enforcement and returned action states.
 Append-only enforcement is local to SQLite and is not a signed or externally anchored audit claim.
+
+The control context uses only metadata captured by the linked evidence and enforcement records.
+Approval summaries omit actor identity, and tool-action stages expose only whether an approval was
+recorded. Provider source URLs and freshness are not joined from the current registry because that
+would not prove which source snapshot supported a historical decision. `previous_event_digest` is
+returned when present but does not by itself claim a complete or externally anchored evidence
+chain.
 
 Status behavior:
 
