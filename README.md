@@ -115,13 +115,15 @@ Context
   -> Append-only local lifecycle history with explicit migration baselines
   -> Metadata-only operator control and sanitized approval context
   -> Digest-bound provider source and freshness snapshots
+  -> Exact-ID server-rendered operator dashboard
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`,
 `POST /v1/enforcements/{enforcement_id}/tool-actions`, `GET /v1/tool-actions/{action_id}`,
 `GET /v1/operator/enforcements/{enforcement_id}/timeline`,
-`GET /v1/providers` and `GET /health`. It validates versioned YAML control-plane records at startup, applies transformations
+`GET /operator?enforcement_id={enforcement_id}`, `GET /v1/providers` and `GET /health`. It
+validates versioned YAML control-plane records at startup, applies transformations
 inside the local trust boundary and stores only metadata evidence in SQLite. It still stops before
 real provider inference unless gateway mode is explicitly configured. Gateway mode uses bounded
 timeouts, performs no local retry, discards model output and accepts only tool definitions resolved
@@ -140,7 +142,7 @@ Not implemented in the first slice:
 - completion-returning API behavior;
 - live enterprise-system tool adapters and returning tool results to a model;
 - LLM-based policy judging;
-- frontend/dashboard;
+- global operator discovery and administrative dashboard actions;
 - SaaS multi-tenancy;
 - automated ingestion of regulatory text;
 - full DLP;

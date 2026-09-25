@@ -11,7 +11,7 @@ from typing import Annotated
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from regulated_ai.adapters import (
@@ -38,6 +38,8 @@ from regulated_ai.application import (
     EvaluationError,
     ExecuteToolAction,
     GetOperatorTimeline,
+    OperatorTimelineIntegrityError,
+    OperatorTimelineNotFoundError,
 )
 from regulated_ai.application.ports import (
     EnforcementRepository,
@@ -71,6 +73,11 @@ from regulated_ai.domain import (
     ToolProposal,
     ToolRequest,
     TransformationReceipt,
+)
+from regulated_ai.entrypoints.operator_dashboard import (
+    dashboard_headers,
+    operator_dashboard_css,
+    render_operator_dashboard,
 )
 
 
@@ -374,6 +381,42 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
     @application.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @application.get("/operator/assets/dashboard.css", response_class=Response)
+    def operator_stylesheet() -> Response:
+        return Response(
+            content=operator_dashboard_css(),
+            media_type="text/css",
+            headers={"Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff"},
+        )
+
+    @application.get("/operator", response_class=HTMLResponse)
+    def operator_dashboard(enforcement_id: str | None = None) -> HTMLResponse:
+        selected = "" if enforcement_id is None else enforcement_id.strip()
+        displayed = selected if len(selected) <= 128 else ""
+        if not selected:
+            return HTMLResponse(
+                render_operator_dashboard(enforcement_id=displayed),
+                headers=dashboard_headers(),
+            )
+        try:
+            timeline = _runtime(application).operator_timeline.execute(selected)
+        except OperatorTimelineNotFoundError:
+            return HTMLResponse(
+                render_operator_dashboard(enforcement_id=displayed, error="not_found"),
+                status_code=404,
+                headers=dashboard_headers(),
+            )
+        except OperatorTimelineIntegrityError:
+            return HTMLResponse(
+                render_operator_dashboard(enforcement_id=displayed, error="unavailable"),
+                status_code=503,
+                headers=dashboard_headers(),
+            )
+        return HTMLResponse(
+            render_operator_dashboard(timeline, enforcement_id=displayed),
+            headers=dashboard_headers(),
+        )
 
     @application.post("/v1/evaluations")
     def evaluate(request: EvaluationRequest) -> dict[str, object]:

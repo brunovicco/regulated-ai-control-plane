@@ -61,6 +61,8 @@ Complete this document before processing personal or regulated data.
 - Phase 5d persists only capability identifiers, target, state, conditions, version metadata,
   verification date and reviewed public HTTPS source URLs. It does not snapshot provider notes,
   credentials, customer configuration, request content or organization assertions.
+- Phase 5e renders only the existing timeline allowlist for one exact ID. HTML is escaped,
+  browser caching and referrers are disabled, and no new content or identity fields are persisted.
 - Incident-response owner:
 
 ## Prohibited logging

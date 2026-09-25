@@ -268,6 +268,21 @@ Historical snapshots are not refreshed from the current registry and do not asse
 provider behavior or compliance. See
 [ADR-0014](adr/0014-immutable-provider-provenance-snapshots.md).
 
+## Phase 5e components
+
+- `entrypoints/operator_dashboard.py`: escaped, no-script HTML rendering and local styling.
+- `entrypoints/api.py`: exact-ID dashboard route and defensive browser response headers.
+- `application/get_operator_timeline.py`: unchanged source of correlation, integrity and attention
+  semantics for both JSON and HTML presentations.
+
+```text
+known enforcement id -> bounded timeline use case -> escaped server-rendered HTML
+unknown or inconsistent metadata -> generic 404/503 HTML state
+```
+
+The dashboard does not introduce listing, search or administrative mutations. See
+[ADR-0015](adr/0015-exact-id-server-rendered-operator-dashboard.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.
