@@ -14,6 +14,8 @@ from regulated_ai.domain import (
     EnforcementStatus,
     EvidenceMetadata,
     OperatorAttentionCode,
+    OperatorLifecycleEvent,
+    OperatorLifecycleEventSource,
     OperatorTimelineStageKind,
     ToolActionRecord,
     ToolActionStatus,
@@ -44,6 +46,21 @@ class _MemoryActionRepository:
             key=lambda item: (item.created_at, item.action_id),
         )
         return tuple(matching[:limit])
+
+
+class _MemoryEventRepository:
+    def __init__(self, items: tuple[OperatorLifecycleEvent, ...] = ()) -> None:
+        self.items = items
+
+    def list_for_timeline(
+        self,
+        *,
+        enforcement_id: str,
+        evidence_id: str,
+        limit: int,
+    ) -> tuple[OperatorLifecycleEvent, ...]:
+        del enforcement_id, evidence_id
+        return self.items[:limit]
 
 
 def _evidence() -> EvidenceMetadata:
@@ -106,11 +123,44 @@ def _action(index: int, status: ToolActionStatus) -> ToolActionRecord:
     )
 
 
+def _event(
+    sequence: int,
+    *,
+    kind: OperatorTimelineStageKind = OperatorTimelineStageKind.TOOL_ACTION,
+    source: OperatorLifecycleEventSource = OperatorLifecycleEventSource.TRANSITION,
+) -> OperatorLifecycleEvent:
+    is_evaluation = kind is OperatorTimelineStageKind.EVALUATION
+    is_enforcement = kind is OperatorTimelineStageKind.ENFORCEMENT
+    return OperatorLifecycleEvent(
+        sequence=sequence,
+        event_id=f"ole_{sequence:020d}",
+        recorded_at=NOW + timedelta(seconds=sequence),
+        source=source,
+        kind=kind,
+        record_id=(
+            "ev_operator_test"
+            if is_evaluation
+            else "enf_operator_test"
+            if is_enforcement
+            else f"act_operator_{sequence:03d}"
+        ),
+        enforcement_id=None if is_evaluation else "enf_operator_test",
+        status=(
+            DecisionOutcome.REQUIRE_APPROVAL.value
+            if is_evaluation
+            else EnforcementStatus.EXECUTED.value
+            if is_enforcement
+            else ToolActionStatus.EXECUTED.value
+        ),
+    )
+
+
 def _service(
     *,
     enforcement: EnforcementRecord | None = None,
     evidence: EvidenceMetadata | None = None,
     actions: tuple[ToolActionRecord, ...] = (),
+    events: tuple[OperatorLifecycleEvent, ...] = (),
 ) -> GetOperatorTimeline:
     evidence_repository = MemoryEvidenceRepository()
     if evidence is not None:
@@ -122,6 +172,7 @@ def _service(
         evidence=evidence_repository,
         enforcement=enforcement_repository,
         actions=_MemoryActionRepository(actions),
+        events=_MemoryEventRepository(events),
     )
 
 
@@ -206,3 +257,54 @@ def test_operator_timeline_is_bounded_and_reports_truncation() -> None:
     assert len(timeline.stages) == 130
     assert timeline.actions_truncated
     assert timeline.attention_codes == (OperatorAttentionCode.ACTION_LIST_TRUNCATED,)
+
+
+def test_operator_timeline_reports_complete_transition_history() -> None:
+    events = (
+        _event(1, kind=OperatorTimelineStageKind.EVALUATION),
+        _event(2, kind=OperatorTimelineStageKind.ENFORCEMENT),
+    )
+
+    timeline = _service(enforcement=_enforcement(), evidence=_evidence(), events=events).execute(
+        "enf_operator_test"
+    )
+
+    assert timeline.lifecycle_events == events
+    assert timeline.history_complete
+    assert not timeline.events_truncated
+
+
+def test_operator_timeline_rejects_unordered_lifecycle_events() -> None:
+    events = (
+        _event(2, kind=OperatorTimelineStageKind.EVALUATION),
+        _event(1, kind=OperatorTimelineStageKind.ENFORCEMENT),
+    )
+
+    with pytest.raises(OperatorTimelineIntegrityError):
+        _service(enforcement=_enforcement(), evidence=_evidence(), events=events).execute(
+            "enf_operator_test"
+        )
+
+
+def test_operator_timeline_marks_event_truncation_incomplete() -> None:
+    events = tuple(_event(sequence) for sequence in range(1, 258))
+
+    timeline = _service(enforcement=_enforcement(), evidence=_evidence(), events=events).execute(
+        "enf_operator_test"
+    )
+
+    assert len(timeline.lifecycle_events) == 256
+    assert not timeline.history_complete
+    assert timeline.events_truncated
+    assert timeline.attention_codes == (OperatorAttentionCode.EVENT_LIST_TRUNCATED,)
+
+
+def test_operator_timeline_marks_migration_baseline_incomplete() -> None:
+    baseline = replace(_event(1), source=OperatorLifecycleEventSource.MIGRATION_BASELINE)
+
+    timeline = _service(
+        enforcement=_enforcement(), evidence=_evidence(), events=(baseline,)
+    ).execute("enf_operator_test")
+
+    assert not timeline.history_complete
+    assert not timeline.events_truncated

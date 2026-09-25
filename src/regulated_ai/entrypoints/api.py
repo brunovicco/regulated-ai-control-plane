@@ -28,6 +28,7 @@ from regulated_ai.adapters import (
     MockToolExecutionAdapter,
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
+    SqliteOperatorLifecycleEventRepository,
     SqliteToolActionRepository,
     StructuredEvaluationObserver,
 )
@@ -42,6 +43,7 @@ from regulated_ai.application.ports import (
     EnforcementRepository,
     EvidenceRepository,
     InferenceExecutionPort,
+    OperatorLifecycleEventRepository,
     ProviderCapabilityRepository,
     ToolActionRepository,
     ToolExecutionPort,
@@ -155,6 +157,7 @@ class Runtime:
     mock_execution: MockInferenceExecutionAdapter | None
     action_executor: ExecuteToolAction
     actions: ToolActionRepository
+    lifecycle_events: OperatorLifecycleEventRepository
     operator_timeline: GetOperatorTimeline
     tool_execution: ToolExecutionPort
     mock_tool_execution: MockToolExecutionAdapter
@@ -188,6 +191,7 @@ def build_runtime(
     repository = SqliteEvidenceRepository(database_path)
     enforcement = SqliteEnforcementRepository(database_path)
     actions = SqliteToolActionRepository(database_path)
+    lifecycle_events = SqliteOperatorLifecycleEventRepository(database_path)
     observer = StructuredEvaluationObserver()
     evaluator = EvaluateAiOperation(
         policies=policies,
@@ -253,6 +257,7 @@ def build_runtime(
         evidence=repository,
         enforcement=enforcement,
         actions=actions,
+        events=lifecycle_events,
     )
     return Runtime(
         evaluator=evaluator,
@@ -264,6 +269,7 @@ def build_runtime(
         mock_execution=mock_execution,
         action_executor=action_executor,
         actions=actions,
+        lifecycle_events=lifecycle_events,
         operator_timeline=operator_timeline,
         tool_execution=mock_tool_execution,
         mock_tool_execution=mock_tool_execution,
@@ -717,7 +723,9 @@ def _operator_timeline_payload(timeline: OperatorTimeline) -> dict[str, object]:
         "event_digest": timeline.event_digest,
         "attention_required": bool(timeline.attention_codes),
         "attention_codes": [item.value for item in timeline.attention_codes],
+        "history_complete": timeline.history_complete,
         "actions_truncated": timeline.actions_truncated,
+        "events_truncated": timeline.events_truncated,
         "stages": [
             {
                 "sequence": stage.sequence,
@@ -730,6 +738,19 @@ def _operator_timeline_payload(timeline: OperatorTimeline) -> dict[str, object]:
                 "call_id": stage.call_id,
             }
             for stage in timeline.stages
+        ],
+        "lifecycle_events": [
+            {
+                "sequence": event.sequence,
+                "event_id": event.event_id,
+                "recorded_at": event.recorded_at.isoformat(),
+                "source": event.source.value,
+                "kind": event.kind.value,
+                "record_id": event.record_id,
+                "enforcement_id": event.enforcement_id,
+                "status": event.status,
+            }
+            for event in timeline.lifecycle_events
         ],
     }
 

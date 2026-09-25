@@ -9,6 +9,7 @@ import pytest
 from regulated_ai.adapters.evidence_sqlite import (
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
+    SqliteOperatorLifecycleEventRepository,
     SqliteToolActionRepository,
 )
 from regulated_ai.domain import (
@@ -20,6 +21,8 @@ from regulated_ai.domain import (
     EnforcementStatus,
     EvidenceMetadata,
     ObligationType,
+    OperatorLifecycleEventSource,
+    OperatorTimelineStageKind,
     ProviderCallMetadata,
     ToolActionRecord,
     ToolActionStatus,
@@ -30,7 +33,8 @@ from regulated_ai.domain import (
 
 
 def test_sqlite_round_trip_contains_only_metadata(tmp_path: Path) -> None:
-    repository = SqliteEvidenceRepository(tmp_path / "evidence.sqlite3")
+    path = tmp_path / "evidence.sqlite3"
+    repository = SqliteEvidenceRepository(path)
     evidence = EvidenceMetadata(
         evidence_id="ev_test",
         created_at=datetime(2026, 9, 23, tzinfo=UTC),
@@ -57,9 +61,14 @@ def test_sqlite_round_trip_contains_only_metadata(tmp_path: Path) -> None:
     assert stored == evidence
     assert duplicate == evidence
     assert repository.get("missing") is None
-    assert "raw-sensitive-sentinel" not in (tmp_path / "evidence.sqlite3").read_bytes().decode(
-        errors="ignore"
+    events = SqliteOperatorLifecycleEventRepository(path).list_for_timeline(
+        enforcement_id="enf_test", evidence_id=evidence.evidence_id, limit=257
     )
+    assert tuple((event.kind, event.status) for event in events) == (
+        (OperatorTimelineStageKind.EVALUATION, DecisionOutcome.ALLOW_WITH_TRANSFORMATION.value),
+    )
+    assert events[0].source is OperatorLifecycleEventSource.TRANSITION
+    assert "raw-sensitive-sentinel" not in path.read_bytes().decode(errors="ignore")
 
 
 def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path) -> None:
@@ -148,7 +157,61 @@ def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path
     assert not replay_claimed
     assert repository.save(prepared).status is EnforcementStatus.EXECUTED
     assert repository.get("missing") is None
+    events = SqliteOperatorLifecycleEventRepository(path).list_for_timeline(
+        enforcement_id=prepared.enforcement_id,
+        evidence_id=prepared.evaluation_evidence_id,
+        limit=257,
+    )
+    assert tuple(event.status for event in events) == ("PREPARED", "DISPATCHED", "EXECUTED")
+    assert all(event.source is OperatorLifecycleEventSource.TRANSITION for event in events)
     assert "raw-sensitive-sentinel" not in path.read_bytes().decode(errors="ignore")
+
+
+def test_lifecycle_event_failure_rolls_back_state_transition(tmp_path: Path) -> None:
+    path = tmp_path / "atomic-lifecycle.sqlite3"
+    repository = SqliteEnforcementRepository(path)
+    prepared = EnforcementRecord(
+        enforcement_id="enf_atomic",
+        created_at=datetime(2026, 9, 23, tzinfo=UTC),
+        evaluation_id="eval_atomic",
+        evaluation_evidence_id="ev_atomic",
+        decision=DecisionOutcome.ALLOW,
+        status=EnforcementStatus.PREPARED,
+        policy_set_version="policy@1",
+        provider_registry_version="registry@1",
+        provider_target="provider.service.region",
+        transformation_receipts=(),
+        reason_codes=(),
+        input_digest="sha256:input",
+        output_digest="sha256:output",
+        provider_execution_id=None,
+    )
+    repository.save(prepared)
+    with closing(sqlite3.connect(path)) as connection:
+        connection.execute(
+            """
+            CREATE TRIGGER reject_dispatched_lifecycle
+            BEFORE INSERT ON operator_lifecycle_event
+            WHEN NEW.entity_kind = 'ENFORCEMENT' AND NEW.status = 'DISPATCHED'
+            BEGIN
+                SELECT RAISE(ABORT, 'simulated lifecycle write failure');
+            END
+            """
+        )
+        connection.commit()
+
+    with pytest.raises(sqlite3.IntegrityError, match="simulated lifecycle write failure"):
+        repository.claim_execution(replace(prepared, status=EnforcementStatus.DISPATCHED))
+
+    stored = repository.get(prepared.enforcement_id)
+    assert stored is not None
+    assert stored.status is EnforcementStatus.PREPARED
+    events = SqliteOperatorLifecycleEventRepository(path).list_for_timeline(
+        enforcement_id=prepared.enforcement_id,
+        evidence_id=prepared.evaluation_evidence_id,
+        limit=257,
+    )
+    assert tuple(event.status for event in events) == ("PREPARED",)
 
 
 def test_enforcement_repository_migrates_phase_three_schema(tmp_path: Path) -> None:
@@ -250,6 +313,24 @@ def test_tool_action_round_trip_claims_once_without_ephemeral_values(tmp_path: P
     )
     assert completed.exposed_result_fields == ("operation_reference", "operation_status")
     assert repository.save(waiting).status is ToolActionStatus.EXECUTED
+    events = SqliteOperatorLifecycleEventRepository(path).list_for_timeline(
+        enforcement_id=waiting.enforcement_id,
+        evidence_id="ev_missing",
+        limit=257,
+    )
+    assert tuple(event.status for event in events) == (
+        "WAITING_APPROVAL",
+        "PREPARED",
+        "DISPATCHED",
+        "EXECUTED",
+    )
+    with closing(sqlite3.connect(path)) as connection:
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "UPDATE operator_lifecycle_event SET status = 'ALTERED' WHERE event_sequence = 1"
+            )
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute("DELETE FROM operator_lifecycle_event WHERE event_sequence = 1")
     second = repository.save(
         replace(
             waiting,
@@ -308,6 +389,16 @@ def test_tool_action_repository_migrates_phase_four_c_schema(tmp_path: Path) -> 
             )
             """
         )
+        connection.execute(
+            """
+            INSERT INTO tool_action VALUES (
+                'act_legacy', '2026-09-23T12:00:00+00:00', 'enf_legacy', 'eval_legacy',
+                'call_legacy', 'cards.read', '1', 'sha256:schema', 'sha256:arguments',
+                'workload.legacy', 'sha256:idempotency', 'sha256:action', 'EXECUTED',
+                NULL, 'mocktool_legacy', 'sha256:output'
+            )
+            """
+        )
         connection.commit()
 
     SqliteToolActionRepository(path)
@@ -320,3 +411,9 @@ def test_tool_action_repository_migrates_phase_four_c_schema(tmp_path: Path) -> 
         "result_classifications",
         "exposed_result_fields",
     }.issubset(columns)
+    events = SqliteOperatorLifecycleEventRepository(path).list_for_timeline(
+        enforcement_id="enf_legacy", evidence_id="ev_legacy", limit=257
+    )
+    assert len(events) == 1
+    assert events[0].record_id == "act_legacy"
+    assert events[0].source is OperatorLifecycleEventSource.MIGRATION_BASELINE

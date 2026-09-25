@@ -108,6 +108,13 @@ class OperatorTimelineStageKind(StrEnum):
     TOOL_ACTION = "TOOL_ACTION"
 
 
+class OperatorLifecycleEventSource(StrEnum):
+    """Origin of one persisted lifecycle-history observation."""
+
+    TRANSITION = "TRANSITION"
+    MIGRATION_BASELINE = "MIGRATION_BASELINE"
+
+
 class OperatorAttentionCode(StrEnum):
     """Stable reason that an operator-facing control timeline needs attention."""
 
@@ -121,6 +128,7 @@ class OperatorAttentionCode(StrEnum):
     TOOL_ACTION_RECONCILIATION_REQUIRED = "TOOL_ACTION_RECONCILIATION_REQUIRED"
     TOOL_RESULT_REJECTED = "TOOL_RESULT_REJECTED"
     ACTION_LIST_TRUNCATED = "ACTION_LIST_TRUNCATED"
+    EVENT_LIST_TRUNCATED = "EVENT_LIST_TRUNCATED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -658,6 +666,20 @@ class OperatorTimelineStage:
 
 
 @dataclass(frozen=True, slots=True)
+class OperatorLifecycleEvent:
+    """One append-only metadata observation from the local lifecycle ledger."""
+
+    sequence: int
+    event_id: str
+    recorded_at: datetime
+    source: OperatorLifecycleEventSource
+    kind: OperatorTimelineStageKind
+    record_id: str
+    enforcement_id: str | None
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
 class OperatorTimeline:
     """Bounded current-state view for one exact enforcement."""
 
@@ -675,7 +697,10 @@ class OperatorTimeline:
     event_digest: str
     stages: tuple[OperatorTimelineStage, ...]
     attention_codes: tuple[OperatorAttentionCode, ...]
+    lifecycle_events: tuple[OperatorLifecycleEvent, ...] = ()
+    history_complete: bool = False
     actions_truncated: bool = False
+    events_truncated: bool = False
 
 
 _PRECEDENCE = {

@@ -15,6 +15,9 @@ from regulated_ai.domain import (
     EnforcementStatus,
     EvidenceMetadata,
     ObligationType,
+    OperatorLifecycleEvent,
+    OperatorLifecycleEventSource,
+    OperatorTimelineStageKind,
     ProviderCallMetadata,
     ToolActionRecord,
     ToolActionStatus,
@@ -183,6 +186,175 @@ UPDATE tool_action
 SET status = 'DISPATCHED'
 WHERE action_id = ? AND status = 'PREPARED'
 """
+_LIFECYCLE_EVENT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS operator_lifecycle_event (
+    event_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    recorded_at TEXT NOT NULL,
+    source TEXT NOT NULL CHECK(source IN ('TRANSITION','MIGRATION_BASELINE')),
+    entity_kind TEXT NOT NULL CHECK(entity_kind IN ('EVALUATION','ENFORCEMENT','TOOL_ACTION')),
+    entity_id TEXT NOT NULL,
+    enforcement_id TEXT,
+    status TEXT NOT NULL,
+    UNIQUE(entity_kind, entity_id, status)
+)
+"""
+_LIFECYCLE_EVENT_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_operator_lifecycle_enforcement
+ON operator_lifecycle_event(enforcement_id, event_sequence)
+"""
+_LIFECYCLE_EVENT_IMMUTABLE = (
+    """
+    CREATE TRIGGER IF NOT EXISTS operator_lifecycle_event_no_update
+    BEFORE UPDATE ON operator_lifecycle_event
+    BEGIN
+        SELECT RAISE(ABORT, 'operator lifecycle events are append-only');
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS operator_lifecycle_event_no_delete
+    BEFORE DELETE ON operator_lifecycle_event
+    BEGIN
+        SELECT RAISE(ABORT, 'operator lifecycle events are append-only');
+    END
+    """,
+)
+_EVIDENCE_EVENT_TRIGGER = """
+CREATE TRIGGER IF NOT EXISTS evidence_lifecycle_insert
+AFTER INSERT ON evidence
+BEGIN
+    INSERT INTO operator_lifecycle_event (
+        recorded_at, source, entity_kind, entity_id, enforcement_id, status
+    ) VALUES (
+        NEW.created_at, 'TRANSITION', 'EVALUATION', NEW.evidence_id, NULL, NEW.decision
+    ) ON CONFLICT(entity_kind, entity_id, status) DO NOTHING;
+END
+"""
+_ENFORCEMENT_EVENT_TRIGGERS = (
+    """
+    CREATE TRIGGER IF NOT EXISTS enforcement_lifecycle_insert
+    AFTER INSERT ON enforcement
+    BEGIN
+        INSERT INTO operator_lifecycle_event (
+            recorded_at, source, entity_kind, entity_id, enforcement_id, status
+        ) VALUES (
+            NEW.created_at, 'TRANSITION', 'ENFORCEMENT', NEW.enforcement_id,
+            NEW.enforcement_id, NEW.status
+        ) ON CONFLICT(entity_kind, entity_id, status) DO NOTHING;
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS enforcement_lifecycle_status_update
+    AFTER UPDATE OF status ON enforcement
+    WHEN OLD.status <> NEW.status
+    BEGIN
+        INSERT INTO operator_lifecycle_event (
+            recorded_at, source, entity_kind, entity_id, enforcement_id, status
+        ) VALUES (
+            strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'TRANSITION', 'ENFORCEMENT',
+            NEW.enforcement_id, NEW.enforcement_id, NEW.status
+        ) ON CONFLICT(entity_kind, entity_id, status) DO NOTHING;
+    END
+    """,
+)
+_TOOL_ACTION_EVENT_TRIGGERS = (
+    """
+    CREATE TRIGGER IF NOT EXISTS tool_action_lifecycle_insert
+    AFTER INSERT ON tool_action
+    BEGIN
+        INSERT INTO operator_lifecycle_event (
+            recorded_at, source, entity_kind, entity_id, enforcement_id, status
+        ) VALUES (
+            NEW.created_at, 'TRANSITION', 'TOOL_ACTION', NEW.action_id,
+            NEW.enforcement_id, NEW.status
+        ) ON CONFLICT(entity_kind, entity_id, status) DO NOTHING;
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS tool_action_lifecycle_status_update
+    AFTER UPDATE OF status ON tool_action
+    WHEN OLD.status <> NEW.status
+    BEGIN
+        INSERT INTO operator_lifecycle_event (
+            recorded_at, source, entity_kind, entity_id, enforcement_id, status
+        ) VALUES (
+            strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'TRANSITION', 'TOOL_ACTION',
+            NEW.action_id, NEW.enforcement_id, NEW.status
+        ) ON CONFLICT(entity_kind, entity_id, status) DO NOTHING;
+    END
+    """,
+)
+
+
+def _initialize_lifecycle_schema(connection: sqlite3.Connection) -> None:
+    """Create the shared append-only event table and immutability guards."""
+    connection.execute(_LIFECYCLE_EVENT_SCHEMA)
+    connection.execute(_LIFECYCLE_EVENT_INDEX)
+    for statement in _LIFECYCLE_EVENT_IMMUTABLE:
+        connection.execute(statement)
+
+
+def _initialize_evidence_events(connection: sqlite3.Connection) -> None:
+    """Baseline legacy evidence and track subsequent inserts."""
+    _initialize_lifecycle_schema(connection)
+    connection.execute(
+        """
+        INSERT INTO operator_lifecycle_event (
+            recorded_at, source, entity_kind, entity_id, enforcement_id, status
+        )
+        SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'MIGRATION_BASELINE',
+               'EVALUATION', evidence_id, NULL, decision
+        FROM evidence
+        WHERE NOT EXISTS (
+            SELECT 1 FROM operator_lifecycle_event event
+            WHERE event.entity_kind = 'EVALUATION' AND event.entity_id = evidence.evidence_id
+        )
+        """
+    )
+    connection.execute(_EVIDENCE_EVENT_TRIGGER)
+
+
+def _initialize_enforcement_events(connection: sqlite3.Connection) -> None:
+    """Baseline legacy enforcement state and track future transitions."""
+    _initialize_lifecycle_schema(connection)
+    connection.execute(
+        """
+        INSERT INTO operator_lifecycle_event (
+            recorded_at, source, entity_kind, entity_id, enforcement_id, status
+        )
+        SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'MIGRATION_BASELINE',
+               'ENFORCEMENT', enforcement_id, enforcement_id, status
+        FROM enforcement
+        WHERE NOT EXISTS (
+            SELECT 1 FROM operator_lifecycle_event event
+            WHERE event.entity_kind = 'ENFORCEMENT'
+              AND event.entity_id = enforcement.enforcement_id
+        )
+        """
+    )
+    for statement in _ENFORCEMENT_EVENT_TRIGGERS:
+        connection.execute(statement)
+
+
+def _initialize_tool_action_events(connection: sqlite3.Connection) -> None:
+    """Baseline legacy action state and track future transitions."""
+    _initialize_lifecycle_schema(connection)
+    connection.execute(
+        """
+        INSERT INTO operator_lifecycle_event (
+            recorded_at, source, entity_kind, entity_id, enforcement_id, status
+        )
+        SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'MIGRATION_BASELINE',
+               'TOOL_ACTION', action_id, enforcement_id, status
+        FROM tool_action
+        WHERE NOT EXISTS (
+            SELECT 1 FROM operator_lifecycle_event event
+            WHERE event.entity_kind = 'TOOL_ACTION'
+              AND event.entity_id = tool_action.action_id
+        )
+        """
+    )
+    for statement in _TOOL_ACTION_EVENT_TRIGGERS:
+        connection.execute(statement)
 
 
 class SqliteEvidenceRepository:
@@ -201,6 +373,7 @@ class SqliteEvidenceRepository:
                 connection.execute(
                     "ALTER TABLE evidence ADD COLUMN authorized_tool_ids TEXT NOT NULL DEFAULT '[]'"
                 )
+            _initialize_evidence_events(connection)
 
     def save(self, evidence: EvidenceMetadata) -> EvidenceMetadata:
         """Insert one immutable record, preserving an existing identical id."""
@@ -307,6 +480,7 @@ class SqliteEnforcementRepository:
                 connection.execute(
                     "ALTER TABLE enforcement ADD COLUMN tool_proposals TEXT NOT NULL DEFAULT '[]'"
                 )
+            _initialize_enforcement_events(connection)
 
     def save(self, record: EnforcementRecord) -> EnforcementRecord:
         """Insert or advance the state of one enforcement attempt."""
@@ -416,6 +590,7 @@ class SqliteToolActionRepository:
                     "ALTER TABLE tool_action ADD COLUMN "
                     "exposed_result_fields TEXT NOT NULL DEFAULT '[]'"
                 )
+            _initialize_tool_action_events(connection)
 
     def save(self, record: ToolActionRecord) -> ToolActionRecord:
         """Insert or safely advance one action state."""
@@ -500,6 +675,55 @@ class SqliteToolActionRepository:
             connection.close()
 
 
+class SqliteOperatorLifecycleEventRepository:
+    """Read bounded append-only lifecycle metadata from the shared SQLite database."""
+
+    def __init__(self, path: Path) -> None:
+        """Initialize the event table and local immutability guards."""
+        self._path = path
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as connection:
+            _initialize_lifecycle_schema(connection)
+
+    def list_for_timeline(
+        self,
+        *,
+        enforcement_id: str,
+        evidence_id: str,
+        limit: int,
+    ) -> tuple[OperatorLifecycleEvent, ...]:
+        """Return one bounded event sequence for exact linked identifiers."""
+        if limit < 1 or limit > 257:
+            raise ValueError("Lifecycle-event list limit is invalid")
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT event_sequence, recorded_at, source, entity_kind,
+                       entity_id, enforcement_id, status
+                FROM operator_lifecycle_event
+                WHERE enforcement_id = ?
+                   OR (entity_kind = 'EVALUATION' AND entity_id = ?)
+                ORDER BY event_sequence
+                LIMIT ?
+                """,
+                (enforcement_id, evidence_id, limit),
+            ).fetchall()
+        return tuple(_operator_lifecycle_event(row) for row in rows)
+
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(self._path, timeout=5.0)
+        connection.execute("PRAGMA busy_timeout = 5000")
+        try:
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+
 def _tool_action_record(row: tuple[object, ...]) -> ToolActionRecord:
     """Translate one allowlisted SQLite row into immutable metadata."""
     from datetime import datetime
@@ -527,6 +751,31 @@ def _tool_action_record(row: tuple[object, ...]) -> ToolActionRecord:
             ToolResultClassification(item) for item in _string_tuple(row[18])
         ),
         exposed_result_fields=_string_tuple(row[19]),
+    )
+
+
+def _operator_lifecycle_event(row: tuple[object, ...]) -> OperatorLifecycleEvent:
+    """Translate and validate one append-only event row."""
+    from datetime import datetime
+
+    sequence = int(str(row[0]))
+    kind = OperatorTimelineStageKind(str(row[3]))
+    status = str(row[6])
+    if kind is OperatorTimelineStageKind.EVALUATION:
+        DecisionOutcome(status)
+    elif kind is OperatorTimelineStageKind.ENFORCEMENT:
+        EnforcementStatus(status)
+    else:
+        ToolActionStatus(status)
+    return OperatorLifecycleEvent(
+        sequence=sequence,
+        event_id=f"ole_{sequence:020d}",
+        recorded_at=datetime.fromisoformat(str(row[1])),
+        source=OperatorLifecycleEventSource(str(row[2])),
+        kind=kind,
+        record_id=str(row[4]),
+        enforcement_id=None if row[5] is None else str(row[5]),
+        status=status,
     )
 
 

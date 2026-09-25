@@ -10,6 +10,7 @@ from regulated_ai.adapters.evaluation_observability import StructuredEvaluationO
 from regulated_ai.adapters.evidence_sqlite import (
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
+    SqliteOperatorLifecycleEventRepository,
     SqliteToolActionRepository,
 )
 from regulated_ai.adapters.gateway_execution import (
@@ -47,6 +48,7 @@ __all__ = [
     "MockToolExecutionAdapter",
     "SqliteEnforcementRepository",
     "SqliteEvidenceRepository",
+    "SqliteOperatorLifecycleEventRepository",
     "SqliteToolActionRepository",
     "StructuredEvaluationObserver",
     "UnsupportedSchemaVersionError",

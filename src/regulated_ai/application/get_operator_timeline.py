@@ -1,16 +1,20 @@
 """Read-only metadata composition for one exact enforcement timeline."""
 
 import re
+from itertools import pairwise
 
 from regulated_ai.application.evaluate_operation import EvaluationError
 from regulated_ai.application.ports import (
     EnforcementRepository,
     EvidenceRepository,
+    OperatorLifecycleEventRepository,
     ToolActionRepository,
 )
 from regulated_ai.domain import (
     EnforcementStatus,
     OperatorAttentionCode,
+    OperatorLifecycleEvent,
+    OperatorLifecycleEventSource,
     OperatorTimeline,
     OperatorTimelineStage,
     OperatorTimelineStageKind,
@@ -20,6 +24,7 @@ from regulated_ai.domain import (
 
 _SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}\Z")
 _MAX_ACTIONS = 128
+_MAX_EVENTS = 256
 
 
 class OperatorTimelineNotFoundError(EvaluationError):
@@ -43,11 +48,13 @@ class GetOperatorTimeline:
         evidence: EvidenceRepository,
         enforcement: EnforcementRepository,
         actions: ToolActionRepository,
+        events: OperatorLifecycleEventRepository,
     ) -> None:
         """Bind metadata repositories used by the read-only query."""
         self._evidence = evidence
         self._enforcement = enforcement
         self._actions = actions
+        self._events = events
 
     def execute(self, enforcement_id: str) -> OperatorTimeline:
         """Return ordered metadata stages for one exact enforcement identifier."""
@@ -59,6 +66,11 @@ class GetOperatorTimeline:
                 raise OperatorTimelineNotFoundError("Operator timeline was not found")
             evidence = self._evidence.get(enforcement.evaluation_evidence_id)
             actions = self._actions.list_for_enforcement(enforcement_id, limit=_MAX_ACTIONS + 1)
+            events = self._events.list_for_timeline(
+                enforcement_id=enforcement_id,
+                evidence_id=enforcement.evaluation_evidence_id,
+                limit=_MAX_EVENTS + 1,
+            )
         except EvaluationError:
             raise
         except Exception as exc:
@@ -80,6 +92,20 @@ class GetOperatorTimeline:
         ):
             raise OperatorTimelineIntegrityError("Operator timeline metadata is inconsistent")
         selected_actions = actions[:_MAX_ACTIONS]
+        events_truncated = len(events) > _MAX_EVENTS
+        if any(
+            (
+                event.kind is OperatorTimelineStageKind.EVALUATION
+                and (event.record_id != evidence.evidence_id or event.enforcement_id is not None)
+            )
+            or (
+                event.kind is not OperatorTimelineStageKind.EVALUATION
+                and event.enforcement_id != enforcement.enforcement_id
+            )
+            for event in events
+        ) or any(current.sequence >= following.sequence for current, following in pairwise(events)):
+            raise OperatorTimelineIntegrityError("Operator timeline metadata is inconsistent")
+        selected_events = events[:_MAX_EVENTS]
 
         enforcement_attention = _enforcement_attention(enforcement.status)
         stages: list[OperatorTimelineStage] = [
@@ -117,6 +143,8 @@ class GetOperatorTimeline:
             )
         if actions_truncated:
             attention.append(OperatorAttentionCode.ACTION_LIST_TRUNCATED)
+        if events_truncated:
+            attention.append(OperatorAttentionCode.EVENT_LIST_TRUNCATED)
 
         return OperatorTimeline(
             enforcement_id=enforcement.enforcement_id,
@@ -133,8 +161,50 @@ class GetOperatorTimeline:
             event_digest=evidence.event_digest,
             stages=tuple(stages),
             attention_codes=tuple(dict.fromkeys(attention)),
+            lifecycle_events=selected_events,
+            history_complete=_history_complete(
+                events=selected_events,
+                events_truncated=events_truncated,
+                actions_truncated=actions_truncated,
+                evidence_id=evidence.evidence_id,
+                evidence_status=evidence.decision.value,
+                enforcement_id=enforcement.enforcement_id,
+                enforcement_status=enforcement.status.value,
+                actions=selected_actions,
+            ),
             actions_truncated=actions_truncated,
+            events_truncated=events_truncated,
         )
+
+
+def _history_complete(
+    *,
+    events: tuple[OperatorLifecycleEvent, ...],
+    events_truncated: bool,
+    actions_truncated: bool,
+    evidence_id: str,
+    evidence_status: str,
+    enforcement_id: str,
+    enforcement_status: str,
+    actions: tuple[ToolActionRecord, ...],
+) -> bool:
+    if (
+        events_truncated
+        or actions_truncated
+        or not events
+        or any(event.source is not OperatorLifecycleEventSource.TRANSITION for event in events)
+    ):
+        return False
+    observed = {(event.kind, event.record_id, event.status) for event in events}
+    required = {
+        (OperatorTimelineStageKind.EVALUATION, evidence_id, evidence_status),
+        (OperatorTimelineStageKind.ENFORCEMENT, enforcement_id, enforcement_status),
+    }
+    required.update(
+        (OperatorTimelineStageKind.TOOL_ACTION, action.action_id, action.status.value)
+        for action in actions
+    )
+    return required <= observed
 
 
 def _enforcement_attention(
