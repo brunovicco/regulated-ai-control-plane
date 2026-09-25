@@ -14,6 +14,7 @@ from regulated_ai.domain import (
     EnforcementRecord,
     EvidenceMetadata,
     ExecutionPlan,
+    OperatorLifecycleEvent,
     PolicySet,
     ProviderCapabilityRecord,
     ProviderExecutionReceipt,
@@ -113,6 +114,20 @@ class ToolActionRepository(Protocol):
         self, enforcement_id: str, *, limit: int
     ) -> tuple[ToolActionRecord, ...]:
         """Return a bounded, stable action list for one exact enforcement."""
+        ...
+
+
+class OperatorLifecycleEventRepository(Protocol):
+    """Read bounded append-only lifecycle metadata for an operator timeline."""
+
+    def list_for_timeline(
+        self,
+        *,
+        enforcement_id: str,
+        evidence_id: str,
+        limit: int,
+    ) -> tuple[OperatorLifecycleEvent, ...]:
+        """Return stable event sequence for one exact evidence/enforcement pair."""
         ...
 
 

@@ -259,7 +259,9 @@ does not provide global listing or search.
   "obligation_types": ["TOKENIZE", "REQUIRE_HUMAN_APPROVAL"],
   "attention_required": true,
   "attention_codes": ["TOOL_RESULT_REJECTED"],
+  "history_complete": true,
   "actions_truncated": false,
+  "events_truncated": false,
   "stages": [
     {
       "sequence": 1,
@@ -271,6 +273,18 @@ does not provide global listing or search.
       "tool_name": null,
       "call_id": null
     }
+  ],
+  "lifecycle_events": [
+    {
+      "sequence": 1,
+      "event_id": "ole_00000000000000000001",
+      "recorded_at": "2026-09-24T12:00:00+00:00",
+      "source": "TRANSITION",
+      "kind": "EVALUATION",
+      "record_id": "ev_...",
+      "enforcement_id": null,
+      "status": "REQUIRE_APPROVAL"
+    }
   ]
 }
 ```
@@ -279,6 +293,14 @@ Stages reflect architectural order and current state, not complete transition hi
 tool-action stages are returned. When more exist, `actions_truncated` is true and
 `ACTION_LIST_TRUNCATED` appears in `attention_codes`. The endpoint never returns prompts, data
 values, tool arguments, approval assertions or raw/safe tool results, and it cannot mutate state.
+
+`lifecycle_events` contains transitions recorded atomically after Phase 5b tracking was enabled.
+Legacy records receive a `MIGRATION_BASELINE`, which makes `history_complete` false rather than
+inventing earlier transitions. At most 256 events are returned; a longer sequence sets
+`events_truncated=true`, adds `EVENT_LIST_TRUNCATED`, and also makes `history_complete=false`.
+The completeness flag is also false when current actions are truncated or the transition events do
+not cover the current evaluation, enforcement and returned action states.
+Append-only enforcement is local to SQLite and is not a signed or externally anchored audit claim.
 
 Status behavior:
 

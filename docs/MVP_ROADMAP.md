@@ -109,8 +109,9 @@ Deliver:
 
 ## Phase 5 — Operator dashboard
 
-Status: Phase 5a implements the bounded metadata-only operator timeline API. Global discovery,
-complete transition history, reconciliation mutations and a visual dashboard remain pending.
+Status: Phase 5a implements the bounded metadata-only operator timeline API. Phase 5b adds local
+append-only transition history with explicit legacy baselines. Global discovery, cryptographic
+anchoring, reconciliation mutations and a visual dashboard remain pending.
 
 Show:
 - decision timeline;
@@ -127,6 +128,12 @@ Implemented in Phase 5a:
 - stable attention codes for approval, failure, reconciliation and rejected results;
 - bounded action correlation with explicit truncation;
 - no payload recovery or administrative mutation.
+
+Implemented in Phase 5b:
+- transactionally recorded evidence/enforcement/action lifecycle events;
+- schema-level append-only guards and duplicate suppression;
+- explicit migration baselines instead of inferred legacy history;
+- bounded event history with completeness and truncation indicators.
 
 ## Phase 6 — Maintained intelligence
 

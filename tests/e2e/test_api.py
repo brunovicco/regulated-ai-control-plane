@@ -19,6 +19,7 @@ from regulated_ai.adapters import (
     MockToolExecutionAdapter,
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
+    SqliteOperatorLifecycleEventRepository,
     SqliteToolActionRepository,
 )
 from regulated_ai.application import (
@@ -63,6 +64,7 @@ def _runtime(
     evidence = SqliteEvidenceRepository(database_path)
     enforcement = SqliteEnforcementRepository(database_path)
     actions = SqliteToolActionRepository(database_path)
+    lifecycle_events = SqliteOperatorLifecycleEventRepository(database_path)
     evaluator = EvaluateAiOperation(
         policies=policies,
         capabilities=capabilities,
@@ -101,10 +103,12 @@ def _runtime(
         mock_execution=mock,
         action_executor=action_executor,
         actions=actions,
+        lifecycle_events=lifecycle_events,
         operator_timeline=GetOperatorTimeline(
             evidence=evidence,
             enforcement=enforcement,
             actions=actions,
+            events=lifecycle_events,
         ),
         tool_execution=mock_tool_execution,
         mock_tool_execution=mock_tool_execution,
@@ -394,12 +398,25 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
     assert stored_action.json()["safe_result"] is None
     assert operator_timeline.status_code == 200
     assert operator_timeline.json()["attention_required"] is False
+    assert operator_timeline.json()["history_complete"] is True
+    assert operator_timeline.json()["events_truncated"] is False
     assert [stage["kind"] for stage in operator_timeline.json()["stages"]] == [
         "EVALUATION",
         "ENFORCEMENT",
         "TOOL_ACTION",
     ]
     assert operator_timeline.json()["stages"][-1]["status"] == "EXECUTED"
+    assert [event["status"] for event in operator_timeline.json()["lifecycle_events"]] == [
+        "REQUIRE_APPROVAL",
+        "WAITING_APPROVAL",
+        "PREPARED",
+        "DISPATCHED",
+        "EXECUTED",
+        "WAITING_APPROVAL",
+        "PREPARED",
+        "DISPATCHED",
+        "EXECUTED",
+    ]
     assert runtime.mock_tool_execution.call_count == 1
     database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
     for raw_value in (*arguments.values(), idempotency_key, action_assertion):
@@ -471,6 +488,8 @@ def test_action_api_rejects_untrusted_result_without_persisting_it(tmp_path: Pat
     assert stored.json()["output_digest"] is None
     assert operator_timeline.json()["attention_codes"] == ["TOOL_RESULT_REJECTED"]
     assert operator_timeline.json()["stages"][-1]["status"] == "RESULT_REJECTED"
+    assert operator_timeline.json()["history_complete"] is True
+    assert operator_timeline.json()["lifecycle_events"][-1]["status"] == "RESULT_REJECTED"
     assert runtime.mock_tool_execution.call_count == 1
     database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
     for raw_result in rejected_output.values():

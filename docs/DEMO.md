@@ -166,3 +166,8 @@ The response orders evaluation, enforcement and tool-action current states and h
 attention codes such as `ENFORCEMENT_APPROVAL_REQUIRED`,
 `TOOL_ACTION_RECONCILIATION_REQUIRED` or `TOOL_RESULT_REJECTED`. It is bounded, read-only and
 metadata-only; it is not a complete transition history and cannot approve or retry work.
+
+Phase 5b also returns `lifecycle_events`. New state transitions are appended transactionally;
+records that existed before tracking show `source: MIGRATION_BASELINE` and
+`history_complete: false`. This is a local append-only operational history, not a signed audit
+ledger.

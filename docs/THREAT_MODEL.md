@@ -142,6 +142,21 @@ Mitigations:
 - deployments must restrict the operator route at the existing access boundary until product
   authentication and tenant isolation are implemented.
 
+### Lifecycle history is altered or overstated
+
+Threat:
+application code rewrites operational history, legacy current state is presented as reconstructed
+history, or a local ledger is incorrectly claimed to be cryptographically immutable.
+
+Mitigations:
+- SQLite triggers append events in the same transaction as state changes;
+- event-table update/delete triggers reject ordinary mutation;
+- repeated identical states do not create duplicate events;
+- legacy records receive explicit `MIGRATION_BASELINE` events and set `history_complete=false`;
+- bounded responses signal event truncation;
+- documentation explicitly limits the guarantee to local schema enforcement and makes no signed,
+  externally anchored or privileged-owner tamper-resistance claim.
+
 ### Evidence tampering
 
 Mitigations:
@@ -241,3 +256,6 @@ future asymmetric or OIDC adapter should remove signing capability from the enfo
 - operator timeline is queried with a missing/invalid identifier, inconsistent linked metadata or
   more actions than its bounded view;
 - sentinel payload, argument, assertion or result values appear in an operator response.
+- lifecycle event rows are updated/deleted, duplicate replay events appear, or a legacy baseline is
+  reported as complete transition history;
+- more lifecycle events than the response bound exist without truncation being signaled.

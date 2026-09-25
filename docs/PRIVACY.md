@@ -50,6 +50,10 @@ Complete this document before processing personal or regulated data.
   already allowlisted in evidence/enforcement/action records. It does not list activity globally or
   recover payloads. Deployments must protect this operator surface with their existing access and
   network controls until product authentication and tenant isolation are implemented.
+- Phase 5b lifecycle events retain only sequence, observation time, source, entity/enforcement IDs
+  and status. They exclude payloads, arguments, outputs, assertions, credentials, actor data and
+  error details. Append-only guards mean approved retention should rotate/remove the database as a
+  unit rather than deleting individual event rows.
 - Incident-response owner:
 
 ## Prohibited logging
