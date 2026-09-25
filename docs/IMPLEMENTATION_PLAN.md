@@ -1,5 +1,38 @@
 # Implementation plan
 
+## Phase 6c — verified control-pack scenario replay
+
+### Goal
+
+Replay a bounded, metadata-only scenario corpus against an approved base and a candidate control
+pack, then report observed decision and evidence changes alongside the Phase 6b static analysis.
+
+### Work
+
+1. Verify both releases through one Phase 6a trust store and require the same pack id.
+2. Load a strict scenario suite that contains only normalized metadata, classifications and a fixed
+   evaluation timestamp; reject raw values and tool requests.
+3. Resolve each scenario's logical policy-set id independently in both releases and run the existing
+   deterministic evaluator with ephemeral evidence storage and no external execution.
+4. Compare decisions and exact obligation digests as decision impact; compare matched controls,
+   capability ids, reason codes and release-version metadata as evidence impact.
+5. Emit stable JSON with the suite digest, release identities, bounded per-scenario outcomes and an
+   optional CI failure exit code for observed decision impact.
+6. Add unit/contract tests, a synthetic-safe example suite and ADR-0018.
+
+### Decisions and assumptions
+
+- Scenario replay complements conservative static analysis; a finite corpus cannot prove semantic
+  equivalence or regulatory correctness.
+- The suite is a separately governed local input, not part of either signed pack, so its exact
+  SHA-256 digest is included in the report.
+- The fixed timezone-aware evaluation timestamp makes freshness decisions reproducible.
+- Scenarios carry fields and classification labels but never raw values. The evaluator receives an
+  empty ephemeral value and a pass-through classifier so no content is persisted or reported.
+- Tool scenarios are rejected until trusted tool catalogs participate in the same release and
+  comparison boundary.
+- Replay performs no network access, enforcement, approval, provider execution or promotion.
+
 ## Phase 6b — verified control-pack impact analysis
 
 ### Goal

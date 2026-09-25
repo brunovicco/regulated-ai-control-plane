@@ -19,6 +19,7 @@ from regulated_ai.adapters.gateway_execution import (
 )
 from regulated_ai.adapters.mock_execution import MockInferenceExecutionAdapter
 from regulated_ai.adapters.mock_tool_execution import MockToolExecutionAdapter
+from regulated_ai.adapters.scenario_files import ScenarioSuiteError, load_scenario_suite_file
 from regulated_ai.adapters.signed_packs import (
     ControlPackIdentity,
     SignedPackError,
@@ -53,6 +54,7 @@ __all__ = [
     "MalformedYamlError",
     "MockInferenceExecutionAdapter",
     "MockToolExecutionAdapter",
+    "ScenarioSuiteError",
     "SignedPackError",
     "SqliteEnforcementRepository",
     "SqliteEvidenceRepository",
@@ -61,6 +63,7 @@ __all__ = [
     "StructuredEvaluationObserver",
     "UnsupportedSchemaVersionError",
     "VerifiedControlPack",
+    "load_scenario_suite_file",
     "load_tool_catalog_file",
     "verify_control_pack",
 ]

@@ -133,3 +133,8 @@ to state, conditions or freshness are classified as potential decision impact; s
 changes are evidence impact; notes are governance metadata. The report also lists policy rules that
 require an affected capability key and can match its provider target. This is a conservative review
 aid and does not replace scenario regression, source review or release approval.
+
+Phase 6c runs curated metadata-only scenarios at a fixed timestamp against both verified releases.
+This can show an observed decision regression caused by capability state, condition or freshness
+changes while preserving the exact suite digest. It covers only selected contexts and does not
+replace the broader conservative Phase 6b report or human provider-source review.

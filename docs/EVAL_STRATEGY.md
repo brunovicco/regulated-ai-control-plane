@@ -90,4 +90,4 @@ Later phases may add:
 - latency/throughput;
 - false-positive/false-negative privacy classifier analysis;
 - approval workflow replay;
-- policy drift impact analysis.
+- broader policy drift scenario corpora beyond the Phase 6c metadata-only replay workflow.

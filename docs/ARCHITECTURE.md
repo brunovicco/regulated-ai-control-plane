@@ -322,6 +322,27 @@ performs those boundary translations and can fail CI when static analysis finds 
 impact. Absence of reported decision impact is not proof of behavioral equivalence. See
 [ADR-0017](adr/0017-verified-control-pack-impact-analysis.md).
 
+## Phase 6c components
+
+- `adapters/scenario_files.py`: strict, bounded parsing of metadata-only replay suites with an exact
+  file digest and fixed timezone-aware evaluation timestamp.
+- `application/replay_control_pack_scenarios.py`: deterministic reuse of the existing evaluator
+  with release-local repositories, pass-through classifications and ephemeral evidence.
+- `scripts/replay_control_pack_scenarios.py`: same-trust release verification, replay orchestration,
+  stable JSON output and optional CI failure on observed decision impact.
+
+```text
+verified base release -----\
+                            -> fixed metadata scenarios -> existing deterministic evaluator
+verified candidate release /                              -> observed impact report
+```
+
+Scenario files contain field identifiers and classification labels but no values or tools. The
+suite is outside the signed pack and is therefore identified by its exact SHA-256 digest. Replay
+executes no transformation, provider, approval or tool boundary, and a finite unchanged corpus is
+not evidence of exhaustive equivalence. See
+[ADR-0018](adr/0018-verified-control-pack-scenario-replay.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.

@@ -121,6 +121,7 @@ Contexto
   -> Dashboard operacional server-rendered por ID exato
   -> Verificação do pack assinado de políticas/providers antes da composição do runtime
   -> Análise semântica offline de impacto entre releases verificadas do pack
+  -> Replay de cenários apenas com metadados e relógio fixo entre releases verificadas
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -153,6 +154,12 @@ trust store. O relatório JSON offline classifica impacto potencial em decisão,
 governança, correlaciona capabilities alteradas às regras dependentes e sinaliza reutilização de
 versão ou troca de chave. É apoio conservador à revisão, não equivalência comportamental exaustiva
 nem autoridade para promover o release.
+
+A Fase 6c executa uma suíte de cenários, governada separadamente e somente com metadados, contra os
+dois releases verificados em um horário fixo. O relatório registra mudanças observadas em decisão,
+obrigações e evidência, vincula os bytes exatos da suíte por digest e pode falhar o CI quando houver
+impacto em decisão. O corpus finito contém labels de classificação, nunca valores, e não comprova
+equivalência nem autoriza promoção.
 
 Fora do primeiro ciclo:
 

@@ -1,0 +1,42 @@
+schema_version: "1"
+suite:
+  id: "br-financial-control-pack-regression"
+  version: "1.0.0"
+  evaluated_at: "2026-09-25T12:00:00Z"
+
+scenarios:
+  - id: "openai-high-assurance-personal-identifier"
+    policy_set_id: "br-financial-demo"
+    jurisdiction: "BR"
+    sector: "financial_services"
+    purpose: "customer_support"
+    operation_kind: "external_inference"
+    assurance_level: "high"
+    provider:
+      provider: "openai"
+      service: "responses_api"
+      region: "global"
+    data:
+      - field: "customer_document"
+        labels:
+          - "BRAZIL_CPF"
+          - "PERSONAL_DIRECT_IDENTIFIER"
+    organization_assertions:
+      eligible_organization_required: true
+      endpoint_or_feature_must_be_zdr_eligible: true
+
+  - id: "aws-high-assurance-secret"
+    policy_set_id: "br-financial-demo"
+    jurisdiction: "BR"
+    sector: "financial_services"
+    purpose: "customer_support"
+    operation_kind: "external_inference"
+    assurance_level: "high"
+    provider:
+      provider: "aws"
+      service: "bedrock_runtime"
+      region: "sa-east-1"
+    data:
+      - field: "credential_marker"
+        labels:
+          - "AUTHENTICATION_SECRET"

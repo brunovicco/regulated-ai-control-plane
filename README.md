@@ -118,6 +118,7 @@ Context
   -> Exact-ID server-rendered operator dashboard
   -> Signed policy/provider pack verification before startup composition
   -> Offline semantic impact analysis between verified pack releases
+  -> Fixed-clock metadata-only scenario replay across verified releases
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -150,6 +151,11 @@ offline JSON report classifies potential decision, evidence and governance impac
 changed provider capabilities with dependent policy rules and flags version reuse or signing-key
 changes. It is conservative review support, not exhaustive behavioral equivalence or release
 authority.
+
+Phase 6c replays a separately governed, metadata-only scenario suite against both verified
+releases at one fixed timestamp. It reports observed decision, obligation and evidence changes,
+binds the exact suite bytes by digest and can fail CI on decision impact. The finite corpus contains
+classification labels but no values and does not prove equivalence or authorize promotion.
 
 Not implemented in the first slice:
 

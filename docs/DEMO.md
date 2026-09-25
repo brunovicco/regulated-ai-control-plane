@@ -226,3 +226,26 @@ http://127.0.0.1:8000/operator?enforcement_id=enf_REPLACE_WITH_RETURNED_ID
 The page shows current stages, append-only history, attention codes, control context,
 transformations, provider provenance and evidence digests. It cannot approve, retry or reconcile
 work and does not display approval actor identity or request/tool content.
+
+## Compare verified releases with curated scenario replay
+
+Run the packaged release against itself to exercise the Phase 6c replay contract without creating
+a candidate:
+
+```bash
+uv run python scripts/replay_control_pack_scenarios.py \
+  --base-manifest src/regulated_ai/resources/control-pack-manifest.yaml \
+  --candidate-manifest src/regulated_ai/resources/control-pack-manifest.yaml \
+  --trust-store src/regulated_ai/resources/trust/control-pack-signing-keys.yaml \
+  --scenario-suite examples/scenarios/control-pack-regression.yaml \
+  --fail-on-decision-impact
+```
+
+The expected status is `NO_OBSERVED_CHANGE`. A candidate that changes a replayed decision or exact
+obligation digest returns exit code `2` when the flag is present. Invalid signatures, configuration
+or scenario schema return `1`; a successful report without the CI flag returns `0`.
+
+The suite fixes the evaluation clock and contains only metadata, field names and classification
+labels. The report includes pack identities, the exact suite digest, allowlisted result metadata
+and digests, never scenario values. Tools are intentionally excluded until their catalog joins the
+same trusted release boundary.
