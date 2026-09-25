@@ -114,6 +114,7 @@ Context
   -> Metadata-only operator timeline and attention codes
   -> Append-only local lifecycle history with explicit migration baselines
   -> Metadata-only operator control and sanitized approval context
+  -> Digest-bound provider source and freshness snapshots
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,

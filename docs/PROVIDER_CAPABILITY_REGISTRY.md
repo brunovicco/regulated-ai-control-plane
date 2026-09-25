@@ -121,3 +121,8 @@ A capability change should:
 3. trigger regression evaluation of policies/scenarios;
 4. surface breaking/downgrade changes;
 5. never silently mutate historical evidence.
+
+Phase 5d copies the metadata of each resolved fact into decision evidence and binds the ordered
+snapshot into the output/event digests. The snapshot preserves historical attribution even after
+the active registry advances. It supports an audit statement about which source metadata informed
+the decision; it does not prove that the provider still behaves the same way.

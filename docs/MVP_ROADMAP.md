@@ -111,8 +111,9 @@ Deliver:
 
 Status: Phase 5a implements the bounded metadata-only operator timeline API. Phase 5b adds local
 append-only transition history with explicit legacy baselines. Phase 5c adds decision, control,
-transformation and sanitized approval context. Provider source snapshots, global discovery,
-cryptographic anchoring, reconciliation mutations and a visual dashboard remain pending.
+transformation and sanitized approval context. Phase 5d binds provider source/freshness snapshots
+to new decision evidence. Global discovery, cryptographic anchoring, reconciliation mutations and
+a visual dashboard remain pending.
 
 Show:
 - decision timeline;
@@ -142,6 +143,13 @@ Implemented in Phase 5c:
 - metadata-only transformation receipts and previous evidence digest;
 - sanitized approval context without actor identity;
 - stronger evidence/enforcement and approval-binding integrity checks.
+
+Implemented in Phase 5d:
+- immutable capability snapshots with provider target, state and conditions;
+- captured provider record/registry versions, verification date and source URLs;
+- snapshot-bound output and event digests for new evaluations;
+- explicit incomplete context for migrated legacy evidence;
+- strict persistence-boundary validation without current-registry reconstruction.
 
 ## Phase 6 — Maintained intelligence
 

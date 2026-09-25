@@ -1,7 +1,7 @@
 import sqlite3
 from contextlib import closing
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -15,6 +15,7 @@ from regulated_ai.adapters.evidence_sqlite import (
 from regulated_ai.domain import (
     ActionApprovalReceipt,
     ApprovalReceipt,
+    CapabilityState,
     DataClassification,
     DecisionOutcome,
     EnforcementRecord,
@@ -24,6 +25,7 @@ from regulated_ai.domain import (
     OperatorLifecycleEventSource,
     OperatorTimelineStageKind,
     ProviderCallMetadata,
+    ProviderCapabilitySnapshot,
     ToolActionRecord,
     ToolActionStatus,
     ToolProposal,
@@ -53,6 +55,19 @@ def test_sqlite_round_trip_contains_only_metadata(tmp_path: Path) -> None:
         event_digest="sha256:event",
         tool_catalog_version="tools@1",
         authorized_tool_ids=("cards.read@1",),
+        provider_capability_snapshots=(
+            ProviderCapabilitySnapshot(
+                capability_id="provider.service.control",
+                provider_target="provider.service.region",
+                key="control",
+                state=CapabilityState.SUPPORTED,
+                conditions=(),
+                verified_at=date(2026, 9, 22),
+                record_version="1",
+                registry_version="registry@1",
+                source_urls=("https://provider.invalid/documentation",),
+            ),
+        ),
     )
 
     stored = repository.save(evidence)
@@ -69,6 +84,64 @@ def test_sqlite_round_trip_contains_only_metadata(tmp_path: Path) -> None:
     )
     assert events[0].source is OperatorLifecycleEventSource.TRANSITION
     assert "raw-sensitive-sentinel" not in path.read_bytes().decode(errors="ignore")
+
+    with closing(sqlite3.connect(path)) as connection:
+        connection.execute(
+            "UPDATE evidence SET provider_capability_snapshots = '[{}]' WHERE evidence_id = ?",
+            (evidence.evidence_id,),
+        )
+        connection.commit()
+    with pytest.raises(ValueError, match="capability snapshot"):
+        repository.get(evidence.evidence_id)
+
+
+def test_evidence_repository_migrates_provider_snapshot_column(tmp_path: Path) -> None:
+    path = tmp_path / "legacy-evidence.sqlite3"
+    with closing(sqlite3.connect(path)) as connection:
+        connection.execute(
+            """
+            CREATE TABLE evidence (
+                evidence_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                correlation_id TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                policy_set_version TEXT NOT NULL,
+                provider_registry_version TEXT NOT NULL,
+                matched_policy_ids TEXT NOT NULL,
+                provider_capability_ids TEXT NOT NULL,
+                control_objective_ids TEXT NOT NULL,
+                obligation_types TEXT NOT NULL,
+                classification_labels TEXT NOT NULL,
+                reason_codes TEXT NOT NULL,
+                input_digest TEXT NOT NULL,
+                output_digest TEXT NOT NULL,
+                event_digest TEXT NOT NULL,
+                previous_event_digest TEXT,
+                tool_catalog_version TEXT,
+                authorized_tool_ids TEXT NOT NULL DEFAULT '[]'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO evidence VALUES (
+                'ev_legacy', '2026-09-23T12:00:00+00:00', 'correlation-legacy', 'ALLOW',
+                'policy@1', 'registry@1', '[]', '["provider.service.control"]', '[]',
+                '["REQUIRE_EVIDENCE"]', '[]', '[]', 'sha256:input', 'sha256:output',
+                'sha256:event', NULL, NULL, '[]'
+            )
+            """
+        )
+        connection.commit()
+
+    repository = SqliteEvidenceRepository(path)
+    stored = repository.get("ev_legacy")
+
+    assert stored is not None
+    assert stored.provider_capability_snapshots == ()
+    with closing(sqlite3.connect(path)) as connection:
+        columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(evidence)")}
+    assert "provider_capability_snapshots" in columns
 
 
 def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path) -> None:

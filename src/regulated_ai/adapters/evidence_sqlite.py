@@ -4,11 +4,13 @@ import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import date
 from pathlib import Path
 
 from regulated_ai.domain import (
     ActionApprovalReceipt,
     ApprovalReceipt,
+    CapabilityState,
     DataClassification,
     DecisionOutcome,
     EnforcementRecord,
@@ -19,6 +21,7 @@ from regulated_ai.domain import (
     OperatorLifecycleEventSource,
     OperatorTimelineStageKind,
     ProviderCallMetadata,
+    ProviderCapabilitySnapshot,
     ToolActionRecord,
     ToolActionStatus,
     ToolProposal,
@@ -45,7 +48,8 @@ CREATE TABLE IF NOT EXISTS evidence (
     event_digest TEXT NOT NULL,
     previous_event_digest TEXT,
     tool_catalog_version TEXT,
-    authorized_tool_ids TEXT NOT NULL DEFAULT '[]'
+    authorized_tool_ids TEXT NOT NULL DEFAULT '[]',
+    provider_capability_snapshots TEXT NOT NULL DEFAULT '[]'
 )
 """
 _INSERT = """
@@ -54,8 +58,8 @@ INSERT OR IGNORE INTO evidence (
     provider_registry_version, matched_policy_ids, provider_capability_ids,
     control_objective_ids, obligation_types, classification_labels, reason_codes,
     input_digest, output_digest, event_digest, previous_event_digest,
-    tool_catalog_version, authorized_tool_ids
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    tool_catalog_version, authorized_tool_ids, provider_capability_snapshots
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 """
 _ENFORCEMENT_SCHEMA = """
 CREATE TABLE IF NOT EXISTS enforcement (
@@ -373,6 +377,11 @@ class SqliteEvidenceRepository:
                 connection.execute(
                     "ALTER TABLE evidence ADD COLUMN authorized_tool_ids TEXT NOT NULL DEFAULT '[]'"
                 )
+            if "provider_capability_snapshots" not in columns:
+                connection.execute(
+                    "ALTER TABLE evidence ADD COLUMN "
+                    "provider_capability_snapshots TEXT NOT NULL DEFAULT '[]'"
+                )
             _initialize_evidence_events(connection)
 
     def save(self, evidence: EvidenceMetadata) -> EvidenceMetadata:
@@ -396,6 +405,7 @@ class SqliteEvidenceRepository:
             evidence.previous_event_digest,
             evidence.tool_catalog_version,
             _json(evidence.authorized_tool_ids),
+            _provider_capability_snapshots_json(evidence.provider_capability_snapshots),
         )
         with self._connect() as connection:
             connection.execute(_INSERT, values)
@@ -414,7 +424,8 @@ class SqliteEvidenceRepository:
             return None
         from datetime import datetime
 
-        return EvidenceMetadata(
+        snapshots = _provider_capability_snapshots(row[18])
+        evidence = EvidenceMetadata(
             evidence_id=str(row[0]),
             created_at=datetime.fromisoformat(str(row[1])),
             correlation_id=str(row[2]),
@@ -435,7 +446,14 @@ class SqliteEvidenceRepository:
             previous_event_digest=None if row[15] is None else str(row[15]),
             tool_catalog_version=None if row[16] is None else str(row[16]),
             authorized_tool_ids=_string_tuple(row[17]),
+            provider_capability_snapshots=snapshots,
         )
+        if any(
+            snapshot.registry_version != evidence.provider_registry_version
+            for snapshot in snapshots
+        ):
+            raise ValueError("Stored provider capability snapshot is inconsistent")
+        return evidence
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -460,6 +478,93 @@ def _string_tuple(value: object) -> tuple[str, ...]:
     if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
         raise ValueError("Stored evidence metadata is invalid")
     return tuple(parsed)
+
+
+def _provider_capability_snapshots_json(
+    snapshots: tuple[ProviderCapabilitySnapshot, ...],
+) -> str:
+    return json.dumps(
+        [
+            {
+                "capability_id": item.capability_id,
+                "conditions": item.conditions,
+                "key": item.key,
+                "provider_target": item.provider_target,
+                "record_version": item.record_version,
+                "registry_version": item.registry_version,
+                "source_urls": item.source_urls,
+                "state": item.state.value,
+                "verified_at": item.verified_at.isoformat(),
+            }
+            for item in snapshots
+        ],
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+_CAPABILITY_SNAPSHOT_KEYS = {
+    "capability_id",
+    "conditions",
+    "key",
+    "provider_target",
+    "record_version",
+    "registry_version",
+    "source_urls",
+    "state",
+    "verified_at",
+}
+
+
+def _provider_capability_snapshots(value: object) -> tuple[ProviderCapabilitySnapshot, ...]:
+    parsed = json.loads(str(value))
+    if not isinstance(parsed, list):
+        raise ValueError("Stored provider capability snapshots are invalid")
+    snapshots = tuple(_provider_capability_snapshot(item) for item in parsed)
+    identities = {(item.capability_id, item.provider_target) for item in snapshots}
+    if len(snapshots) != len(identities):
+        raise ValueError("Stored provider capability snapshots are invalid")
+    return snapshots
+
+
+def _provider_capability_snapshot(value: object) -> ProviderCapabilitySnapshot:
+    if not isinstance(value, dict) or set(value) != _CAPABILITY_SNAPSHOT_KEYS:
+        raise ValueError("Stored provider capability snapshot is invalid")
+    strings = {
+        key: value[key]
+        for key in (
+            "capability_id",
+            "key",
+            "provider_target",
+            "record_version",
+            "registry_version",
+            "state",
+            "verified_at",
+        )
+    }
+    if any(not isinstance(item, str) or not item for item in strings.values()):
+        raise ValueError("Stored provider capability snapshot is invalid")
+    conditions = value["conditions"]
+    source_urls = value["source_urls"]
+    if (
+        not isinstance(conditions, list)
+        or not all(isinstance(item, str) for item in conditions)
+        or not isinstance(source_urls, list)
+        or not source_urls
+        or not all(isinstance(item, str) and item.startswith("https://") for item in source_urls)
+    ):
+        raise ValueError("Stored provider capability snapshot is invalid")
+    return ProviderCapabilitySnapshot(
+        capability_id=strings["capability_id"],
+        provider_target=strings["provider_target"],
+        key=strings["key"],
+        state=CapabilityState(strings["state"]),
+        conditions=tuple(conditions),
+        verified_at=date.fromisoformat(strings["verified_at"]),
+        record_version=strings["record_version"],
+        registry_version=strings["registry_version"],
+        source_urls=tuple(source_urls),
+    )
 
 
 class SqliteEnforcementRepository:

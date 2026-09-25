@@ -1,5 +1,31 @@
 # Implementation plan
 
+## Phase 5d — immutable provider provenance snapshots
+
+### Goal
+
+Bind source and freshness metadata for each resolved provider capability to the decision evidence so
+historical operator views never depend on mutable current registry configuration.
+
+### Work
+
+1. Add a metadata-only provider capability snapshot containing target, fact identity/state,
+   conditions, record/registry versions, verification date and official source URLs.
+2. Include ordered snapshots in canonical decision output and event digests.
+3. Persist snapshots in SQLite with strict JSON parsing and migrate legacy rows to an empty list.
+4. Expose snapshots through evidence and operator APIs with an explicit completeness flag.
+5. Add evaluation, persistence, migration, boundary and end-to-end privacy tests plus ADR-0014.
+
+### Decisions and assumptions
+
+- Snapshot metadata is part of new decision identity, so output/evaluation/evidence IDs change when
+  the captured provider facts or sources change.
+- Legacy evidence remains valid but reports incomplete provider context; provenance is not
+  reconstructed.
+- Sources are reviewed public HTTPS documentation URLs from the versioned provider registry.
+- A historical snapshot proves what metadata informed a decision, not current provider behavior or
+  regulatory compliance.
+
 ## Phase 5c — operator control context
 
 ### Goal

@@ -58,6 +58,9 @@ Complete this document before processing personal or regulated data.
   transformation receipts, authorized tool identifiers and a sanitized approval summary already
   present in local metadata. It excludes approval actor identity and does not resolve historical
   source URLs from mutable current configuration.
+- Phase 5d persists only capability identifiers, target, state, conditions, version metadata,
+  verification date and reviewed public HTTPS source URLs. It does not snapshot provider notes,
+  credentials, customer configuration, request content or organization assertions.
 - Incident-response owner:
 
 ## Prohibited logging

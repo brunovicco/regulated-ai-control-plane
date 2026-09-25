@@ -408,6 +408,28 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
     assert operator_timeline.json()["provider_capability_ids"] == [
         "openai.responses_api.zero_data_retention"
     ]
+    assert operator_timeline.json()["provider_context_complete"] is True
+    assert operator_timeline.json()["provider_capability_snapshots"] == [
+        {
+            "capability_id": "openai.responses_api.zero_data_retention",
+            "provider_target": "openai.responses_api.global",
+            "key": "zero_data_retention",
+            "state": "conditional",
+            "conditions": [
+                "eligible_organization_required",
+                "endpoint_or_feature_must_be_zdr_eligible",
+            ],
+            "verified_at": "2026-09-22",
+            "record_version": "1",
+            "registry_version": "2026-09-22.1",
+            "source_urls": ["https://developers.openai.com/pt-BR/api/docs/guides/your-data"],
+        }
+    ]
+    assert evidence["provider_context_complete"] is True
+    assert (
+        evidence["provider_capability_snapshots"]
+        == operator_timeline.json()["provider_capability_snapshots"]
+    )
     assert operator_timeline.json()["control_objective_ids"] == [
         "BR.PRIV.DEMONSTRABLE_CONTROLS",
         "BR.PRIV.MINIMIZE_EXTERNAL_DATA",

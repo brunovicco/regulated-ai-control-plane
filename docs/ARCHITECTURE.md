@@ -252,6 +252,22 @@ The operator response deliberately omits actor identity and does not reconstruct
 or freshness history from the current registry. See
 [ADR-0013](adr/0013-operator-control-context.md).
 
+## Phase 5d components
+
+- `application/evaluate_operation.py`: captures ordered capability snapshots and binds them to
+  decision/event digests.
+- `adapters/evidence_sqlite.py`: persists and strictly parses snapshot JSON with legacy migration.
+- `entrypoints/api.py`: exposes historical source/freshness context and completeness.
+
+```text
+resolved capability -> immutable metadata snapshot -> canonical decision digest -> evidence
+legacy evidence without snapshot -> provider_context_complete=false
+```
+
+Historical snapshots are not refreshed from the current registry and do not assert current
+provider behavior or compliance. See
+[ADR-0014](adr/0014-immutable-provider-provenance-snapshots.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.
