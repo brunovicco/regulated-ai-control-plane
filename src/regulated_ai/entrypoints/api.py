@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from regulated_ai.adapters import (
+    ControlPackIdentity,
     DeterministicDataClassifier,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
@@ -31,6 +32,7 @@ from regulated_ai.adapters import (
     SqliteOperatorLifecycleEventRepository,
     SqliteToolActionRepository,
     StructuredEvaluationObserver,
+    verify_control_pack,
 )
 from regulated_ai.application import (
     EnforceAiOperation,
@@ -156,6 +158,7 @@ class ToolActionRequest(_TransportModel):
 class Runtime:
     """Initialized application services exposed to transport handlers."""
 
+    control_pack: ControlPackIdentity
     evaluator: EvaluateAiOperation
     evidence: EvidenceRepository
     capabilities: ProviderCapabilityRepository
@@ -173,23 +176,31 @@ class Runtime:
 
 def build_runtime(
     *,
-    policy_paths: tuple[Path, ...] | None = None,
-    capability_paths: tuple[Path, ...] | None = None,
+    control_pack_manifest_path: Path | None = None,
+    control_pack_trust_store_path: Path | None = None,
     tool_catalog_path: Path | None = None,
     evidence_path: Path | None = None,
 ) -> Runtime:
     """Validate local control-plane files and compose the enforcement use case."""
     resource_root = resources.files("regulated_ai.resources")
-    policies = FilePolicyRepository(
-        policy_paths
-        or (Path(str(resource_root.joinpath("policies/br-financial-external-inference.yaml"))),)
+    configured_manifest = control_pack_manifest_path or _optional_environment_path(
+        "REGULAAI_CONTROL_PACK_MANIFEST"
     )
-    capabilities = FileProviderCapabilityRepository(
-        capability_paths
-        or (
-            Path(str(resource_root.joinpath("provider-capabilities/openai-responses.yaml"))),
-            Path(str(resource_root.joinpath("provider-capabilities/aws-bedrock.yaml"))),
-        )
+    configured_trust_store = control_pack_trust_store_path or _optional_environment_path(
+        "REGULAAI_CONTROL_PACK_TRUST_STORE"
+    )
+    if (configured_manifest is None) != (configured_trust_store is None):
+        raise ValueError("Control pack manifest and trust store must be configured together")
+    control_pack = verify_control_pack(
+        configured_manifest or Path(str(resource_root.joinpath("control-pack-manifest.yaml"))),
+        configured_trust_store
+        or Path(str(resource_root.joinpath("trust/control-pack-signing-keys.yaml"))),
+    )
+    policies = FilePolicyRepository.from_bytes(
+        tuple((item.path, item.content) for item in control_pack.policy_files)
+    )
+    capabilities = FileProviderCapabilityRepository.from_bytes(
+        tuple((item.path, item.content) for item in control_pack.capability_files)
     )
     tools = FileToolCatalogRepository(
         tool_catalog_path or Path(str(resource_root.joinpath("tools/br-financial-tools.yaml")))
@@ -268,6 +279,7 @@ def build_runtime(
         events=lifecycle_events,
     )
     return Runtime(
+        control_pack=control_pack.identity,
         evaluator=evaluator,
         evidence=repository,
         capabilities=capabilities,
@@ -318,6 +330,15 @@ def _required_environment(name: str) -> str:
     if value is None or not value.strip():
         raise ValueError(f"{name} is required in gateway execution mode")
     return value
+
+
+def _optional_environment_path(name: str) -> Path | None:
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    if not value.strip():
+        raise ValueError(f"{name} must not be empty")
+    return Path(value)
 
 
 def _float_environment(name: str, default: float) -> float:
@@ -481,8 +502,15 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
 
     @application.get("/v1/providers")
     def get_providers() -> dict[str, object]:
-        registry = _runtime(application).capabilities
+        runtime = _runtime(application)
+        registry = runtime.capabilities
         return {
+            "control_pack": {
+                "id": runtime.control_pack.pack_id,
+                "version": runtime.control_pack.pack_version,
+                "signing_key_id": runtime.control_pack.signing_key_id,
+                "payload_digest": runtime.control_pack.payload_digest,
+            },
             "provider_registry_version": registry.registry_version,
             "providers": [
                 {

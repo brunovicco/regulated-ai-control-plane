@@ -274,19 +274,27 @@ _TOOL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]*\Z")
 
 def _read_yaml(path: Path) -> dict[str, Any]:
     try:
-        content = path.read_text(encoding="utf-8")
-        syntax_tree = yaml.compose(content, Loader=yaml.SafeLoader)
+        content = path.read_bytes()
+    except OSError as exc:
+        raise MalformedYamlError(f"Invalid configuration file: {path.name}") from exc
+    return _read_yaml_bytes(content, path.name)
+
+
+def _read_yaml_bytes(content: bytes, filename: str) -> dict[str, Any]:
+    try:
+        text = content.decode("utf-8")
+        syntax_tree = yaml.compose(text, Loader=yaml.SafeLoader)
         if syntax_tree is not None:
             _reject_duplicate_mapping_keys(syntax_tree)
-        raw = yaml.safe_load(content)
-    except (OSError, yaml.YAMLError) as exc:
-        raise MalformedYamlError(f"Invalid configuration file: {path.name}") from exc
+        raw = yaml.safe_load(text)
+    except (UnicodeDecodeError, yaml.YAMLError) as exc:
+        raise MalformedYamlError(f"Invalid configuration file: {filename}") from exc
     if not isinstance(raw, dict):
-        raise MalformedYamlError(f"Configuration must be a mapping: {path.name}")
+        raise MalformedYamlError(f"Configuration must be a mapping: {filename}")
     schema_version = raw.get("schema_version")
     if schema_version != "1":
         raise UnsupportedSchemaVersionError(
-            f"Unsupported schema version in configuration file: {path.name}"
+            f"Unsupported schema version in configuration file: {filename}"
         )
     return raw
 
@@ -310,12 +318,21 @@ def _reject_duplicate_mapping_keys(node: Node) -> None:
 
 def load_policy_file(path: Path) -> PolicySet:
     """Translate one strict policy YAML document into domain types."""
+    return _load_policy_document(_read_yaml(path), path.name)
+
+
+def load_policy_bytes(content: bytes, filename: str) -> PolicySet:
+    """Translate authenticated policy bytes into domain types without reopening a path."""
+    return _load_policy_document(_read_yaml_bytes(content, filename), filename)
+
+
+def _load_policy_document(raw: dict[str, Any], filename: str) -> PolicySet:
     try:
-        document = _PolicyFileModel.model_validate(_read_yaml(path))
+        document = _PolicyFileModel.model_validate(raw)
     except UnsupportedSchemaVersionError:
         raise
     except (ValidationError, ValueError) as exc:
-        raise MalformedYamlError(f"Policy file failed schema validation: {path.name}") from exc
+        raise MalformedYamlError(f"Policy file failed schema validation: {filename}") from exc
     metadata = document.policy_set
     return PolicySet(
         id=metadata.id,
@@ -329,14 +346,23 @@ def load_policy_file(path: Path) -> PolicySet:
 
 def load_capability_file(path: Path) -> ProviderCapabilityRecord:
     """Translate one strict capability YAML document into domain types."""
+    return _load_capability_document(_read_yaml(path), path.name)
+
+
+def load_capability_bytes(content: bytes, filename: str) -> ProviderCapabilityRecord:
+    """Translate authenticated capability bytes without reopening a path."""
+    return _load_capability_document(_read_yaml_bytes(content, filename), filename)
+
+
+def _load_capability_document(raw: dict[str, Any], filename: str) -> ProviderCapabilityRecord:
     from datetime import date
 
     try:
-        document = _CapabilityFileModel.model_validate(_read_yaml(path))
+        document = _CapabilityFileModel.model_validate(raw)
     except UnsupportedSchemaVersionError:
         raise
     except (ValidationError, ValueError) as exc:
-        raise MalformedYamlError(f"Capability file failed schema validation: {path.name}") from exc
+        raise MalformedYamlError(f"Capability file failed schema validation: {filename}") from exc
     record_version = str(document.record_version)
     verified_at = date.fromisoformat(document.verified_at)
     capabilities = tuple(
@@ -476,7 +502,18 @@ class FilePolicyRepository:
 
     def __init__(self, paths: tuple[Path, ...]) -> None:
         """Load every configured policy file and reject duplicate identifiers."""
-        loaded = tuple(load_policy_file(path) for path in paths)
+        self._initialize(tuple(load_policy_file(path) for path in paths))
+
+    @classmethod
+    def from_bytes(cls, documents: tuple[tuple[str, bytes], ...]) -> "FilePolicyRepository":
+        """Build from exact authenticated bytes to avoid a verify/parse path race."""
+        instance = cls.__new__(cls)
+        instance._initialize(
+            tuple(load_policy_bytes(content, filename) for filename, content in documents)
+        )
+        return instance
+
+    def _initialize(self, loaded: tuple[PolicySet, ...]) -> None:
         self._items = {item.identifier: item for item in loaded}
         if len(self._items) != len(loaded):
             raise ConfigurationBoundaryError("Duplicate policy-set identifier")
@@ -491,7 +528,20 @@ class FileProviderCapabilityRepository:
 
     def __init__(self, paths: tuple[Path, ...]) -> None:
         """Load records and require one registry release version."""
-        loaded = tuple(load_capability_file(path) for path in paths)
+        self._initialize(tuple(load_capability_file(path) for path in paths))
+
+    @classmethod
+    def from_bytes(
+        cls, documents: tuple[tuple[str, bytes], ...]
+    ) -> "FileProviderCapabilityRepository":
+        """Build from exact authenticated bytes to avoid a verify/parse path race."""
+        instance = cls.__new__(cls)
+        instance._initialize(
+            tuple(load_capability_bytes(content, filename) for filename, content in documents)
+        )
+        return instance
+
+    def _initialize(self, loaded: tuple[ProviderCapabilityRecord, ...]) -> None:
         versions = {item.registry_version for item in loaded}
         if not loaded or len(versions) != 1:
             raise ConfigurationBoundaryError("Provider records must share one registry version")

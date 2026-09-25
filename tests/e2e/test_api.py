@@ -1,5 +1,6 @@
 import hashlib
 import json
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from regulated_ai.adapters import (
+    ControlPackIdentity,
     DeterministicDataClassifier,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
@@ -17,6 +19,7 @@ from regulated_ai.adapters import (
     HmacTokenizationAdapter,
     MockInferenceExecutionAdapter,
     MockToolExecutionAdapter,
+    SignedPackError,
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
     SqliteOperatorLifecycleEventRepository,
@@ -94,6 +97,12 @@ def _runtime(
         clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
     )
     return Runtime(
+        control_pack=ControlPackIdentity(
+            pack_id="synthetic-test-pack",
+            pack_version="1.0.0",
+            signing_key_id="synthetic-test-key",
+            payload_digest=f"sha256:{'0' * 64}",
+        ),
         evaluator=evaluator,
         evidence=evidence,
         capabilities=capabilities,
@@ -204,6 +213,12 @@ def test_end_to_end_card_unblock_evaluation_and_evidence_privacy(tmp_path: Path)
     assert evidence.json()["policy_set_version"] == "br-financial-demo@1.0.0"
     assert evidence.json()["provider_registry_version"] == "2026-09-22.1"
     assert providers.status_code == 200
+    assert providers.json()["control_pack"] == {
+        "id": "synthetic-test-pack",
+        "version": "1.0.0",
+        "signing_key_id": "synthetic-test-key",
+        "payload_digest": f"sha256:{'0' * 64}",
+    }
     assert len(providers.json()["providers"]) == 2
     assert health.json() == {"status": "ok"}
 
@@ -224,8 +239,39 @@ def test_api_rejects_forged_tool_risk_claim(tmp_path: Path) -> None:
 def test_packaged_runtime_records_are_loadable(tmp_path: Path) -> None:
     runtime = build_runtime(evidence_path=tmp_path / "packaged-evidence.sqlite3")
 
+    assert runtime.control_pack.pack_id == "br-financial-runtime"
+    assert runtime.control_pack.pack_version == "2026-09-25.1"
+    assert runtime.control_pack.signing_key_id == "regulaai-demo-2026-09"
     assert runtime.capabilities.registry_version == "2026-09-22.1"
     assert {item.target.provider for item in runtime.capabilities.list()} == {"aws", "openai"}
+
+
+def test_runtime_rejects_tampered_configured_control_pack(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = Path(__file__).resolve().parents[2]
+    resources = root / "src" / "regulated_ai" / "resources"
+    pack = tmp_path / "pack"
+    shutil.copytree(resources, pack)
+    policy_path = pack / "policies" / "br-financial-external-inference.yaml"
+    policy_path.write_text(policy_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    monkeypatch.setenv("REGULAAI_CONTROL_PACK_MANIFEST", str(pack / "control-pack-manifest.yaml"))
+    monkeypatch.setenv(
+        "REGULAAI_CONTROL_PACK_TRUST_STORE",
+        str(pack / "trust" / "control-pack-signing-keys.yaml"),
+    )
+
+    with pytest.raises(SignedPackError, match="digest does not match"):
+        build_runtime(evidence_path=tmp_path / "tampered-evidence.sqlite3")
+
+
+def test_runtime_requires_control_pack_paths_together(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_CONTROL_PACK_MANIFEST", str(tmp_path / "manifest.yaml"))
+
+    with pytest.raises(ValueError, match="must be configured together"):
+        build_runtime(evidence_path=tmp_path / "unpaired-evidence.sqlite3")
 
 
 def test_runtime_gateway_mode_requires_complete_explicit_configuration(

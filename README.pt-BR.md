@@ -119,6 +119,7 @@ Contexto
   -> Contexto operacional de controles e aprovação sanitizada, apenas com metadados
   -> Snapshots de fontes e frescor do provedor vinculados ao digest
   -> Dashboard operacional server-rendered por ID exato
+  -> Verificação do pack assinado de políticas/providers antes da composição do runtime
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -126,7 +127,8 @@ O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements/{enforcement_id}/tool-actions`, `GET /v1/tool-actions/{action_id}`,
 `GET /v1/operator/enforcements/{enforcement_id}/timeline`,
 `GET /operator?enforcement_id={enforcement_id}`, `GET /v1/providers` e `GET /health`. O modo
-padrão continua sem rede. Quando configurado explicitamente, o modo gateway
+padrão verifica o pack local assinado de políticas/providers e continua sem rede. Quando
+configurado explicitamente, o modo gateway
 usa timeouts limitados, não realiza retry local, descarta a saída do modelo e aceita somente
 definições de ferramentas resolvidas pelo catálogo versionado da organização. Chamadas de
 ferramentas retornadas pelo modelo continuam sem autoridade até que os argumentos exatos sejam
@@ -137,6 +139,13 @@ resposta imediata de sucesso. Outputs brutos e seguros não são persistidos nem
 replays.
 As asserções de aprovação são emitidas fora do serviço, vinculadas ao digest determinístico da
 decisão, recebidas apenas de forma efêmera e consumidas uma única vez antes da execução.
+
+A Fase 6a vincula o release empacotado de políticas/providers a digests SHA-256 e a uma assinatura
+Ed25519 selecionada em um trust store local de chaves públicas. Falhas de digest, assinatura,
+chave, composição ou caminho impedem o startup. Somente material público de verificação é
+empacotado; chaves privadas de release devem permanecer em uma fronteira offline controlada pela
+organização. A assinatura comprova autenticidade do release, não correção da política, atualidade
+do provider ou compliance.
 
 Fora do primeiro ciclo:
 
