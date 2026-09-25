@@ -54,6 +54,10 @@ Complete this document before processing personal or regulated data.
   and status. They exclude payloads, arguments, outputs, assertions, credentials, actor data and
   error details. Append-only guards mean approved retention should rotate/remove the database as a
   unit rather than deleting individual event rows.
+- Phase 5c exposes policy/control/capability identifiers, reason codes, provider target,
+  transformation receipts, authorized tool identifiers and a sanitized approval summary already
+  present in local metadata. It excludes approval actor identity and does not resolve historical
+  source URLs from mutable current configuration.
 - Incident-response owner:
 
 ## Prohibited logging

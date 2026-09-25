@@ -237,6 +237,21 @@ The local ledger prevents ordinary row updates/deletes but is not cryptographica
 against a database owner. See
 [ADR-0012](adr/0012-append-only-local-lifecycle-history.md).
 
+## Phase 5c components
+
+- `domain/models.py`: sanitized approval summary and expanded operator control context.
+- `application/get_operator_timeline.py`: evidence/enforcement and approval-binding validation.
+- `entrypoints/api.py`: allowlisted decision, transformation and approval metadata.
+
+```text
+exact enforcement id -> validate linked metadata and approval bindings
+    -> current state + lifecycle history + control context
+```
+
+The operator response deliberately omits actor identity and does not reconstruct provider source
+or freshness history from the current registry. See
+[ADR-0013](adr/0013-operator-control-context.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.

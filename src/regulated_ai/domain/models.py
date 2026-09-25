@@ -663,6 +663,7 @@ class OperatorTimelineStage:
     attention_codes: tuple[OperatorAttentionCode, ...] = ()
     tool_name: str | None = None
     call_id: str | None = None
+    approval_recorded: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -680,6 +681,16 @@ class OperatorLifecycleEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class OperatorApprovalSummary:
+    """Approval metadata safe for the operator view without actor identity."""
+
+    approval_id: str
+    issued_at: datetime
+    expires_at: datetime
+    consumed_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class OperatorTimeline:
     """Bounded current-state view for one exact enforcement."""
 
@@ -692,9 +703,19 @@ class OperatorTimeline:
     tool_catalog_version: str | None
     classification_labels: tuple[DataClassification, ...]
     obligation_types: tuple[ObligationType, ...]
+    matched_policy_ids: tuple[str, ...]
+    provider_capability_ids: tuple[str, ...]
+    control_objective_ids: tuple[str, ...]
+    decision_reason_codes: tuple[str, ...]
+    enforcement_reason_codes: tuple[str, ...]
+    authorized_tool_ids: tuple[str, ...]
+    provider_target: str
+    transformation_receipts: tuple[TransformationReceipt, ...]
+    approval: OperatorApprovalSummary | None
     input_digest: str
     output_digest: str
     event_digest: str
+    previous_event_digest: str | None
     stages: tuple[OperatorTimelineStage, ...]
     attention_codes: tuple[OperatorAttentionCode, ...]
     lifecycle_events: tuple[OperatorLifecycleEvent, ...] = ()

@@ -137,6 +137,8 @@ Mitigations:
 - Phase 5a supports exact, bounded enforcement-ID lookup only; there is no list, search or filter;
 - the response uses the same metadata allowlist as evidence/enforcement/action records and never
   includes payloads, arguments, assertions or tool results;
+- approval context omits actor identity and action stages expose only whether approval was recorded;
+- evidence/enforcement input digests and approval receipt bindings are validated before response;
 - action correlation is bounded and explicitly reports truncation;
 - the endpoint is read-only and cannot approve, retry or reconcile;
 - deployments must restrict the operator route at the existing access boundary until product

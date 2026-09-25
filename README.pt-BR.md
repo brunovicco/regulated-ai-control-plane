@@ -116,6 +116,7 @@ Contexto
   -> Validação fechada do output e resultado seguro efêmero
   -> Timeline operacional apenas com metadados e códigos de atenção
   -> Histórico local append-only com baselines explícitas de migração
+  -> Contexto operacional de controles e aprovação sanitizada, apenas com metadados
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,

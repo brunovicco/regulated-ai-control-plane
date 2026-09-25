@@ -11,7 +11,11 @@ from regulated_ai.application.ports import (
     ToolActionRepository,
 )
 from regulated_ai.domain import (
+    ApprovalReceipt,
+    EnforcementRecord,
     EnforcementStatus,
+    EvidenceMetadata,
+    OperatorApprovalSummary,
     OperatorAttentionCode,
     OperatorLifecycleEvent,
     OperatorLifecycleEventSource,
@@ -81,6 +85,7 @@ class GetOperatorTimeline:
             evidence.decision is not enforcement.decision
             or evidence.policy_set_version != enforcement.policy_set_version
             or evidence.provider_registry_version != enforcement.provider_registry_version
+            or evidence.input_digest != enforcement.input_digest
         ):
             raise OperatorTimelineIntegrityError("Operator timeline metadata is inconsistent")
 
@@ -88,8 +93,9 @@ class GetOperatorTimeline:
         if any(
             action.enforcement_id != enforcement.enforcement_id
             or action.evaluation_id != enforcement.evaluation_id
+            or not _action_approval_is_consistent(action)
             for action in actions
-        ):
+        ) or not _approval_is_consistent(enforcement.approval_receipt, enforcement, evidence):
             raise OperatorTimelineIntegrityError("Operator timeline metadata is inconsistent")
         selected_actions = actions[:_MAX_ACTIONS]
         events_truncated = len(events) > _MAX_EVENTS
@@ -123,6 +129,7 @@ class GetOperatorTimeline:
                 created_at=enforcement.created_at,
                 status=enforcement.status.value,
                 attention_codes=enforcement_attention,
+                approval_recorded=enforcement.approval_receipt is not None,
             ),
         ]
         attention = list(enforcement_attention)
@@ -139,6 +146,7 @@ class GetOperatorTimeline:
                     attention_codes=action_attention,
                     tool_name=action.tool_name,
                     call_id=action.call_id,
+                    approval_recorded=action.approval_receipt is not None,
                 )
             )
         if actions_truncated:
@@ -156,9 +164,19 @@ class GetOperatorTimeline:
             tool_catalog_version=evidence.tool_catalog_version,
             classification_labels=evidence.classification_labels,
             obligation_types=evidence.obligation_types,
+            matched_policy_ids=evidence.matched_policy_ids,
+            provider_capability_ids=evidence.provider_capability_ids,
+            control_objective_ids=evidence.control_objective_ids,
+            decision_reason_codes=evidence.reason_codes,
+            enforcement_reason_codes=enforcement.reason_codes,
+            authorized_tool_ids=evidence.authorized_tool_ids,
+            provider_target=enforcement.provider_target,
+            transformation_receipts=enforcement.transformation_receipts,
+            approval=_approval_summary(enforcement.approval_receipt),
             input_digest=evidence.input_digest,
             output_digest=evidence.output_digest,
             event_digest=evidence.event_digest,
+            previous_event_digest=evidence.previous_event_digest,
             stages=tuple(stages),
             attention_codes=tuple(dict.fromkeys(attention)),
             lifecycle_events=selected_events,
@@ -175,6 +193,42 @@ class GetOperatorTimeline:
             actions_truncated=actions_truncated,
             events_truncated=events_truncated,
         )
+
+
+def _approval_is_consistent(
+    receipt: ApprovalReceipt | None,
+    enforcement: EnforcementRecord,
+    evidence: EvidenceMetadata,
+) -> bool:
+    if receipt is None:
+        return True
+    return (
+        receipt.enforcement_id == enforcement.enforcement_id
+        and receipt.decision_digest == evidence.output_digest
+        and receipt.issued_at <= receipt.consumed_at <= receipt.expires_at
+    )
+
+
+def _action_approval_is_consistent(action: ToolActionRecord) -> bool:
+    receipt = action.approval_receipt
+    if receipt is None:
+        return True
+    return (
+        receipt.action_id == action.action_id
+        and receipt.action_digest == action.action_digest
+        and receipt.issued_at <= receipt.consumed_at <= receipt.expires_at
+    )
+
+
+def _approval_summary(receipt: ApprovalReceipt | None) -> OperatorApprovalSummary | None:
+    if receipt is None:
+        return None
+    return OperatorApprovalSummary(
+        approval_id=receipt.approval_id,
+        issued_at=receipt.issued_at,
+        expires_at=receipt.expires_at,
+        consumed_at=receipt.consumed_at,
+    )
 
 
 def _history_complete(
