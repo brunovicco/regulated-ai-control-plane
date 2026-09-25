@@ -363,6 +363,17 @@ used capability IDs but no snapshot reports `provider_context_complete=false`; t
 invent provenance. `previous_event_digest` is returned when present but does not by itself claim a
 complete or externally anchored evidence chain.
 
+## GET /operator?enforcement_id={enforcement_id}
+
+Returns a server-rendered HTML presentation of the same exact-ID operator timeline. Omitting the
+query parameter returns an empty lookup form; an unknown or syntactically invalid exact identifier
+returns a generic HTML 404 state. Integrity failures return a generic HTML 503 state.
+
+The page is read-only and performs no list, search or discovery. It contains no JavaScript or
+external assets, escapes all metadata and sends `Cache-Control: no-store`, a restrictive Content
+Security Policy, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and a restrictive
+Permissions Policy. `/operator/assets/dashboard.css` serves the same-origin stylesheet.
+
 Status behavior:
 
 - `DENY` -> `BLOCKED_DENY`, with no transformation or execution;

@@ -142,8 +142,10 @@ Mitigations:
 - historical provider provenance comes from digest-bound evidence snapshots, never a join against
   mutable current registry configuration;
 - action correlation is bounded and explicitly reports truncation;
+- the HTML dashboard escapes every dynamic value, executes no JavaScript, loads only same-origin
+  CSS and applies no-store, CSP, frame-denial, referrer and permissions-policy headers;
 - the endpoint is read-only and cannot approve, retry or reconcile;
-- deployments must restrict the operator route at the existing access boundary until product
+- deployments must restrict the JSON and HTML operator routes at the existing access boundary until product
   authentication and tenant isolation are implemented.
 
 ### Lifecycle history is altered or overstated

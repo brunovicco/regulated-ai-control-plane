@@ -118,13 +118,15 @@ Contexto
   -> Histórico local append-only com baselines explícitas de migração
   -> Contexto operacional de controles e aprovação sanitizada, apenas com metadados
   -> Snapshots de fontes e frescor do provedor vinculados ao digest
+  -> Dashboard operacional server-rendered por ID exato
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements`, `GET /v1/enforcements/{enforcement_id}`,
 `POST /v1/enforcements/{enforcement_id}/tool-actions`, `GET /v1/tool-actions/{action_id}`,
 `GET /v1/operator/enforcements/{enforcement_id}/timeline`,
-`GET /v1/providers` e `GET /health`. O modo padrão continua sem rede. Quando configurado explicitamente, o modo gateway
+`GET /operator?enforcement_id={enforcement_id}`, `GET /v1/providers` e `GET /health`. O modo
+padrão continua sem rede. Quando configurado explicitamente, o modo gateway
 usa timeouts limitados, não realiza retry local, descarta a saída do modelo e aceita somente
 definições de ferramentas resolvidas pelo catálogo versionado da organização. Chamadas de
 ferramentas retornadas pelo modelo continuam sem autoridade até que os argumentos exatos sejam
@@ -142,7 +144,7 @@ Fora do primeiro ciclo:
 - retorno de completion pela API;
 - adapters reais para sistemas corporativos e retorno do resultado da ferramenta ao modelo;
 - LLM decidindo política;
-- frontend/dashboard;
+- descoberta global e ações administrativas no dashboard operacional;
 - SaaS multi-tenant;
 - ingestão automática de legislação;
 - DLP completo;

@@ -180,3 +180,13 @@ Phase 5d adds `provider_capability_snapshots` to evidence and the operator timel
 decision captures the provider target, capability state/conditions, registry/record versions,
 verification date and reviewed source URLs. `provider_context_complete` is false for legacy
 evidence whose source metadata was never captured.
+
+Phase 5e renders the same timeline in a browser without JavaScript or global discovery:
+
+```text
+http://127.0.0.1:8000/operator?enforcement_id=enf_REPLACE_WITH_RETURNED_ID
+```
+
+The page shows current stages, append-only history, attention codes, control context,
+transformations, provider provenance and evidence digests. It cannot approve, retry or reconcile
+work and does not display approval actor identity or request/tool content.

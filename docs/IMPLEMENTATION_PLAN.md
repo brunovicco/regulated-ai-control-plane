@@ -1,5 +1,28 @@
 # Implementation plan
 
+## Phase 5e — exact-ID operator dashboard
+
+### Goal
+
+Provide a visual, read-only view of the stable operator timeline without introducing global
+metadata discovery or a client-side execution surface.
+
+### Work
+
+1. Add a server-rendered dashboard that accepts one exact enforcement identifier.
+2. Reuse `GetOperatorTimeline` for all correlation, integrity and attention semantics.
+3. Escape every dynamic value, avoid JavaScript and serve only same-origin styling.
+4. Apply no-store caching, restrictive CSP, frame denial, referrer suppression and permissions
+   policy headers.
+5. Add renderer and end-to-end privacy/security tests plus ADR-0015.
+
+### Decisions and assumptions
+
+- The dashboard is presentation over the existing timeline contract, not a second read model.
+- It does not list, search or discover records; the operator must already know the exact ID.
+- Existing deployment access controls remain responsible for protecting the operator surface.
+- The page is read-only and cannot approve, retry or reconcile work.
+
 ## Phase 5d — immutable provider provenance snapshots
 
 ### Goal

@@ -379,6 +379,11 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
         operator_timeline = client.get(
             f"/v1/operator/enforcements/{completed_enforcement['enforcement_id']}/timeline"
         )
+        operator_dashboard = client.get(
+            "/operator",
+            params={"enforcement_id": completed_enforcement["enforcement_id"]},
+        )
+        operator_stylesheet = client.get("/operator/assets/dashboard.css")
 
     assert waiting_action.status_code == 200
     assert waiting_action.json()["status"] == "WAITING_APPROVAL"
@@ -464,9 +469,24 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
         "DISPATCHED",
         "EXECUTED",
     ]
+    assert operator_dashboard.status_code == 200
+    assert operator_dashboard.headers["cache-control"] == "no-store"
+    assert "default-src 'none'" in operator_dashboard.headers["content-security-policy"]
+    assert completed_enforcement["enforcement_id"] in operator_dashboard.text
+    assert "openai.responses_api.global" in operator_dashboard.text
+    assert "br.financial.external_inference.minimize_identifier@1.0.0" in (operator_dashboard.text)
+    assert "https://developers.openai.com/pt-BR/api/docs/guides/your-data" in (
+        operator_dashboard.text
+    )
+    assert "approver-test-1" not in operator_dashboard.text
+    assert decision_assertion not in operator_dashboard.text
+    assert action_assertion not in operator_dashboard.text
+    assert operator_stylesheet.status_code == 200
+    assert operator_stylesheet.headers["x-content-type-options"] == "nosniff"
     assert runtime.mock_tool_execution.call_count == 1
     database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
     for raw_value in (*arguments.values(), idempotency_key, action_assertion):
+        assert raw_value not in operator_dashboard.text
         assert raw_value not in database
         assert raw_value not in completed_action.text
         assert raw_value not in operator_timeline.text
@@ -476,6 +496,24 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
     ):
         assert raw_result not in database
         assert raw_result not in completed_action.text
+
+
+def test_operator_dashboard_handles_initial_and_missing_exact_id_states(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    app = create_app(lambda: runtime)
+
+    with TestClient(app) as client:
+        initial = client.get("/operator")
+        missing = client.get("/operator", params={"enforcement_id": "enf_missing"})
+        oversized = client.get("/operator", params={"enforcement_id": "x" * 129})
+
+    assert initial.status_code == 200
+    assert "não lista nem pesquisa registros" in initial.text
+    assert missing.status_code == 404
+    assert "Timeline não encontrada" in missing.text
+    assert missing.headers["cache-control"] == "no-store"
+    assert oversized.status_code == 404
+    assert "x" * 129 not in oversized.text
 
 
 def test_action_api_rejects_untrusted_result_without_persisting_it(tmp_path: Path) -> None:
