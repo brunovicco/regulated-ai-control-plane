@@ -1,5 +1,32 @@
 # Implementation plan
 
+## Phase 5b — append-only lifecycle history
+
+### Goal
+
+Record bounded, metadata-only lifecycle transitions atomically with SQLite state changes so the
+operator timeline can distinguish real history from its current-state snapshot.
+
+### Work
+
+1. Add immutable lifecycle-event/source types and a read-only event repository port.
+2. Create an append-only SQLite event table with triggers for evidence insertion and
+   enforcement/tool-action status transitions.
+3. Protect event rows from update/delete and insert explicit migration baselines for legacy records
+   that predate event tracking.
+4. Extend the operator query with at most 256 ordered events, explicit truncation and a
+   `history_complete` indicator.
+5. Persist only sequence, UTC timestamp, source, entity kind/id, enforcement id and status.
+6. Add contract, application and end-to-end tests plus ADR-0012 and operator documentation.
+
+### Decisions and assumptions
+
+- Trigger writes share the same SQLite transaction as the state change they describe.
+- `MIGRATION_BASELINE` is an observation at upgrade time, not reconstructed history.
+- Append-only is enforced by the local schema; it is not a signed or externally anchored ledger.
+- The phase remains read-only at the API and does not add global discovery, approval, retry or
+  reconciliation mutations.
+
 ## Phase 5a — metadata-only operator timeline
 
 ### Goal

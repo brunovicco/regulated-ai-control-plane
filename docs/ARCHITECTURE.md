@@ -221,6 +221,22 @@ This is a current-state control timeline, not an append-only transition ledger. 
 activity globally nor mutates approval, execution or reconciliation state. See
 [ADR-0011](adr/0011-metadata-only-operator-timeline.md).
 
+## Phase 5b components
+
+- `adapters/evidence_sqlite.py`: shared lifecycle-event table, transactional triggers, migration
+  baselines, append-only guards and bounded event query.
+- `application/get_operator_timeline.py`: event integrity validation, completeness and truncation.
+- `entrypoints/api.py`: metadata-only lifecycle history within the exact-ID operator response.
+
+```text
+state INSERT/UPDATE -> SQLite trigger in the same transaction -> append lifecycle event
+legacy record at upgrade -> MIGRATION_BASELINE -> history_complete=false
+```
+
+The local ledger prevents ordinary row updates/deletes but is not cryptographically tamper-evident
+against a database owner. See
+[ADR-0012](adr/0012-append-only-local-lifecycle-history.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.

@@ -112,6 +112,7 @@ Context
   -> Network-silent tool execution mock
   -> Closed output validation and ephemeral safe result
   -> Metadata-only operator timeline and attention codes
+  -> Append-only local lifecycle history with explicit migration baselines
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
