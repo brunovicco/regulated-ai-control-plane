@@ -162,14 +162,16 @@ Implemented in Phase 5e:
 
 Status: Phase 6a implements signed local policy/provider releases with fail-closed digest,
 signature, trust-anchor and path verification. Phase 6b adds offline semantic diff and conservative
-impact classification between verified releases. Automated source ingestion, full review workflow,
-key lifecycle automation and enterprise distribution remain pending.
+impact classification between verified releases. Phase 6c adds fixed-clock, metadata-only scenario
+replay for observed decision and evidence changes. Automated source ingestion, full review
+workflow, key lifecycle automation and enterprise distribution remain pending.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
 - provider capability update workflow;
 - regulatory review workflow;
 - diff impact analysis; **implemented in Phase 6b**
+- curated scenario replay; **implemented in Phase 6c**
 - enterprise integrations;
 - additional sectors.
 
@@ -188,6 +190,14 @@ Implemented in Phase 6b:
 - conservative capability-to-dependent-policy correlation;
 - version-reuse and signing-key-change signals;
 - deterministic metadata-only JSON and optional CI failure on decision impact.
+
+Implemented in Phase 6c:
+- strict bounded scenario suites with no raw values or tools;
+- exact suite digest and fixed timezone-aware freshness clock;
+- same-context evaluation of an approved base and verified candidate;
+- observed decision/obligation and evidence-impact classification;
+- per-scenario fail-closed outcomes and deterministic metadata-only JSON;
+- optional CI failure when curated replay observes decision impact.
 
 ## Defer
 

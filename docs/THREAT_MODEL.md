@@ -220,6 +220,30 @@ Residual risks:
 - compromised trusted keys or trust-store changes remain outside the comparison guarantee;
 - human review, approval quorum and release promotion are not automated in Phase 6b.
 
+### Scenario replay leaks data or overstates release safety
+
+Threat:
+a regression corpus includes raw customer content, evaluates freshness at an implicit moving time,
+or an unchanged finite replay is presented as proof that a candidate is safe or compliant.
+
+Mitigations:
+- the strict suite schema has no value, prompt, tool or free-form content field;
+- only bounded field identifiers, classification labels, normalized context and boolean
+  organization assertions are accepted;
+- a mandatory timezone-aware timestamp fixes freshness evaluation across both releases;
+- both packs pass the same trust store and share one pack id before replay;
+- the exact suite bytes are bound to the report with SHA-256;
+- results expose only allowlisted metadata and digests, and evidence storage is ephemeral;
+- output and documentation state that replay is finite review evidence, not equivalence,
+  certification or promotion authority.
+
+Residual risks:
+- an incomplete or biased corpus can miss material behavior changes;
+- field names, labels and control identifiers remain organization metadata requiring retention and
+  access controls;
+- the suite itself is separately governed and is not authenticated by the control-pack signature;
+- tool behavior is not covered until trusted tool catalogs join the release boundary.
+
 ### Cross-tenant leakage (future SaaS)
 
 Not Phase 1, but architecture must not make tenant id optional once SaaS mode exists.

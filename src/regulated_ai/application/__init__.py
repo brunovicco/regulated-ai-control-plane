@@ -37,12 +37,17 @@ from regulated_ai.application.get_operator_timeline import (
     OperatorTimelineIntegrityError,
     OperatorTimelineNotFoundError,
 )
+from regulated_ai.application.replay_control_pack_scenarios import (
+    ControlPackScenarioReplayError,
+    ReplayControlPackScenarios,
+)
 
 __all__ = [
     "ActionApprovalFailedError",
     "AnalyzeControlPackDiff",
     "ApprovalFailedError",
     "ControlPackDiffError",
+    "ControlPackScenarioReplayError",
     "EnforceAiOperation",
     "EnforcementPersistenceError",
     "EvaluateAiOperation",
@@ -58,6 +63,7 @@ __all__ = [
     "OperatorTimelineNotFoundError",
     "PolicySetNotFoundError",
     "ProviderRegistryError",
+    "ReplayControlPackScenarios",
     "ToolActionConflictError",
     "ToolActionExecutionFailedError",
     "ToolActionNotFoundError",

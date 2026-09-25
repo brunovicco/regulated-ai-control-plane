@@ -156,6 +156,13 @@ class ControlPackImpact(StrEnum):
     DECISION = "DECISION"
 
 
+class ScenarioReplayStatus(StrEnum):
+    """Outcome state for one deterministic control-pack scenario evaluation."""
+
+    EVALUATED = "EVALUATED"
+    FAILED_CLOSED = "FAILED_CLOSED"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -479,6 +486,80 @@ class ControlPackDiffReport:
     def has_decision_impact(self) -> bool:
         """Return whether conservative static analysis found decision impact."""
         return any(change.impact is ControlPackImpact.DECISION for change in self.changes)
+
+
+@dataclass(frozen=True, slots=True)
+class ControlPackScenario:
+    """Metadata-only evaluation context reused across two verified releases."""
+
+    id: str
+    policy_set_id: str
+    jurisdiction: Jurisdiction
+    sector: Sector
+    purpose: Purpose
+    operation_kind: str
+    assurance_level: AssuranceLevel
+    provider: ProviderTarget
+    data_items: tuple[DataItem, ...]
+    organization_assertions: tuple[tuple[str, bool], ...] = ()
+    fallback_providers: tuple[ProviderTarget, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ControlPackScenarioSuite:
+    """Bounded curated scenario corpus with a reproducible evaluation clock."""
+
+    id: str
+    version: str
+    suite_digest: str
+    evaluated_at: datetime
+    scenarios: tuple[ControlPackScenario, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioReplayOutcome:
+    """Allowlisted result metadata from one pack and one scenario."""
+
+    status: ScenarioReplayStatus
+    decision: DecisionOutcome | None
+    obligation_types: tuple[ObligationType, ...]
+    obligations_digest: str | None
+    matched_policy_ids: tuple[str, ...]
+    provider_capability_ids: tuple[str, ...]
+    reason_codes: tuple[str, ...]
+    policy_set_version: str | None
+    provider_registry_version: str | None
+    output_digest: str | None
+    error_code: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioReplayResult:
+    """Comparison of one scenario across approved base and candidate releases."""
+
+    scenario_id: str
+    base: ScenarioReplayOutcome
+    candidate: ScenarioReplayOutcome
+    changed_fields: tuple[str, ...]
+    impact: ControlPackImpact | None
+
+
+@dataclass(frozen=True, slots=True)
+class ControlPackScenarioReplayReport:
+    """Deterministic replay evidence for two releases and one scenario suite."""
+
+    base: ControlPackReleaseIdentity
+    candidate: ControlPackReleaseIdentity
+    suite_id: str
+    suite_version: str
+    suite_digest: str
+    evaluated_at: datetime
+    results: tuple[ScenarioReplayResult, ...]
+
+    @property
+    def has_decision_impact(self) -> bool:
+        """Return whether any curated scenario observed decision behavior change."""
+        return any(item.impact is ControlPackImpact.DECISION for item in self.results)
 
 
 @dataclass(frozen=True, slots=True)

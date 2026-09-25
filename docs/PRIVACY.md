@@ -70,6 +70,10 @@ Complete this document before processing personal or regulated data.
 - Phase 6b reports only pack identities, configuration identifiers, changed field names, impact
   classes and dependent policy-rule identifiers. It does not emit YAML values, provider notes,
   source content, private keys, runtime requests, customer data or evidence records.
+- Phase 6c scenario suites contain field identifiers and classification labels but no field values,
+  prompts, tool arguments or customer data. Replay evidence reports only suite/release identities,
+  decisions, obligation types/digests, control/capability identifiers, reason codes and output
+  digests; its ephemeral evaluator does not retain an evidence database.
 - Incident-response owner:
 
 ## Prohibited logging
