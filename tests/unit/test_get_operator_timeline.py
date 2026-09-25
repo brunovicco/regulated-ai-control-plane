@@ -9,16 +9,20 @@ from regulated_ai.application import (
     OperatorTimelineNotFoundError,
 )
 from regulated_ai.domain import (
+    ActionApprovalReceipt,
+    ApprovalReceipt,
     DecisionOutcome,
     EnforcementRecord,
     EnforcementStatus,
     EvidenceMetadata,
+    ObligationType,
     OperatorAttentionCode,
     OperatorLifecycleEvent,
     OperatorLifecycleEventSource,
     OperatorTimelineStageKind,
     ToolActionRecord,
     ToolActionStatus,
+    TransformationReceipt,
 )
 
 from ..helpers import NOW, MemoryEnforcementRepository, MemoryEvidenceRepository
@@ -205,6 +209,91 @@ def test_operator_timeline_orders_stages_and_aggregates_attention() -> None:
         OperatorAttentionCode.TOOL_RESULT_REJECTED,
     )
     assert not timeline.actions_truncated
+
+
+def test_operator_timeline_exposes_control_context_without_actor_identity() -> None:
+    evidence = replace(
+        _evidence(),
+        previous_event_digest=f"sha256:{'9' * 64}",
+    )
+    approval = ApprovalReceipt(
+        approval_id="approval-operator-test",
+        actor_id="actor-must-not-be-copied",
+        decision_digest=evidence.output_digest,
+        enforcement_id="enf_operator_test",
+        issued_at=NOW - timedelta(minutes=5),
+        expires_at=NOW + timedelta(minutes=5),
+        consumed_at=NOW,
+    )
+    transformation = TransformationReceipt(
+        receipt_id="tr_operator_test",
+        type=ObligationType.TOKENIZE,
+        target="customer_document",
+        input_digest=f"sha256:{'a' * 64}",
+        output_digest=f"sha256:{'b' * 64}",
+        reason_code="MINIMIZE_EXTERNAL_IDENTIFIER",
+    )
+    enforcement = replace(
+        _enforcement(),
+        approval_receipt=approval,
+        transformation_receipts=(transformation,),
+        reason_codes=("ENFORCEMENT_COMPLETE",),
+    )
+
+    timeline = _service(enforcement=enforcement, evidence=evidence).execute("enf_operator_test")
+
+    assert timeline.matched_policy_ids == ("rule@test",)
+    assert timeline.provider_capability_ids == ("provider.control",)
+    assert timeline.control_objective_ids == ("CONTROL.TEST",)
+    assert timeline.decision_reason_codes == ("TEST",)
+    assert timeline.enforcement_reason_codes == ("ENFORCEMENT_COMPLETE",)
+    assert timeline.authorized_tool_ids == ("cards.unblock@1.1.0",)
+    assert timeline.provider_target == "provider.service.region"
+    assert timeline.transformation_receipts == (transformation,)
+    assert timeline.approval is not None
+    assert timeline.approval.approval_id == "approval-operator-test"
+    assert not hasattr(timeline.approval, "actor_id")
+    assert timeline.previous_event_digest == f"sha256:{'9' * 64}"
+    assert timeline.stages[1].approval_recorded
+
+
+def test_operator_timeline_rejects_inconsistent_approval_metadata() -> None:
+    evidence = _evidence()
+    approval = ApprovalReceipt(
+        approval_id="approval-operator-test",
+        actor_id="actor-test",
+        decision_digest=f"sha256:{'0' * 64}",
+        enforcement_id="enf_operator_test",
+        issued_at=NOW - timedelta(minutes=5),
+        expires_at=NOW + timedelta(minutes=5),
+        consumed_at=NOW,
+    )
+
+    with pytest.raises(OperatorTimelineIntegrityError):
+        _service(
+            enforcement=replace(_enforcement(), approval_receipt=approval),
+            evidence=evidence,
+        ).execute("enf_operator_test")
+
+
+def test_operator_timeline_rejects_inconsistent_action_approval_metadata() -> None:
+    action = _action(1, ToolActionStatus.EXECUTED)
+    approval = ActionApprovalReceipt(
+        approval_id="action-approval-operator-test",
+        actor_id="actor-test",
+        action_digest=f"sha256:{'0' * 64}",
+        action_id=action.action_id,
+        issued_at=NOW - timedelta(minutes=5),
+        expires_at=NOW + timedelta(minutes=5),
+        consumed_at=NOW,
+    )
+
+    with pytest.raises(OperatorTimelineIntegrityError):
+        _service(
+            enforcement=_enforcement(),
+            evidence=_evidence(),
+            actions=(replace(action, approval_receipt=approval),),
+        ).execute("enf_operator_test")
 
 
 @pytest.mark.parametrize(

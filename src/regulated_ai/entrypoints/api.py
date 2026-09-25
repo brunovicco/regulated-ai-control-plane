@@ -718,9 +718,30 @@ def _operator_timeline_payload(timeline: OperatorTimeline) -> dict[str, object]:
         "tool_catalog_version": timeline.tool_catalog_version,
         "classification_labels": [item.value for item in timeline.classification_labels],
         "obligation_types": [item.value for item in timeline.obligation_types],
+        "matched_policy_ids": list(timeline.matched_policy_ids),
+        "provider_capability_ids": list(timeline.provider_capability_ids),
+        "control_objective_ids": list(timeline.control_objective_ids),
+        "decision_reason_codes": list(timeline.decision_reason_codes),
+        "enforcement_reason_codes": list(timeline.enforcement_reason_codes),
+        "authorized_tool_ids": list(timeline.authorized_tool_ids),
+        "provider_target": timeline.provider_target,
+        "transformation_receipts": [
+            _receipt_payload(item) for item in timeline.transformation_receipts
+        ],
+        "approval": (
+            None
+            if timeline.approval is None
+            else {
+                "approval_id": timeline.approval.approval_id,
+                "issued_at": timeline.approval.issued_at.isoformat(),
+                "expires_at": timeline.approval.expires_at.isoformat(),
+                "consumed_at": timeline.approval.consumed_at.isoformat(),
+            }
+        ),
         "input_digest": timeline.input_digest,
         "output_digest": timeline.output_digest,
         "event_digest": timeline.event_digest,
+        "previous_event_digest": timeline.previous_event_digest,
         "attention_required": bool(timeline.attention_codes),
         "attention_codes": [item.value for item in timeline.attention_codes],
         "history_complete": timeline.history_complete,
@@ -736,6 +757,7 @@ def _operator_timeline_payload(timeline: OperatorTimeline) -> dict[str, object]:
                 "attention_codes": [item.value for item in stage.attention_codes],
                 "tool_name": stage.tool_name,
                 "call_id": stage.call_id,
+                "approval_recorded": stage.approval_recorded,
             }
             for stage in timeline.stages
         ],

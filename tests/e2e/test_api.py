@@ -400,12 +400,37 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
     assert operator_timeline.json()["attention_required"] is False
     assert operator_timeline.json()["history_complete"] is True
     assert operator_timeline.json()["events_truncated"] is False
+    assert operator_timeline.json()["matched_policy_ids"] == [
+        "br.financial.external_inference.minimize_identifier@1.0.0",
+        "org.agent.high_impact_approval@1.0.0",
+        "org.provider.require_reviewed_retention@1.0.0",
+    ]
+    assert operator_timeline.json()["provider_capability_ids"] == [
+        "openai.responses_api.zero_data_retention"
+    ]
+    assert operator_timeline.json()["control_objective_ids"] == [
+        "BR.PRIV.DEMONSTRABLE_CONTROLS",
+        "BR.PRIV.MINIMIZE_EXTERNAL_DATA",
+        "ORG.AGENT.HIGH_IMPACT_APPROVAL",
+    ]
+    assert operator_timeline.json()["authorized_tool_ids"] == [
+        "cards.read@1.1.0",
+        "cards.unblock@1.1.0",
+    ]
+    assert operator_timeline.json()["provider_target"] == "openai.responses_api.global"
+    assert operator_timeline.json()["transformation_receipts"][0]["target"] == ("customer_document")
+    assert operator_timeline.json()["approval"]["approval_id"].startswith("approval-")
+    assert "actor_id" not in operator_timeline.json()["approval"]
+    assert "approver-test-1" not in operator_timeline.text
+    assert operator_timeline.json()["previous_event_digest"] is None
     assert [stage["kind"] for stage in operator_timeline.json()["stages"]] == [
         "EVALUATION",
         "ENFORCEMENT",
         "TOOL_ACTION",
     ]
     assert operator_timeline.json()["stages"][-1]["status"] == "EXECUTED"
+    assert operator_timeline.json()["stages"][1]["approval_recorded"] is True
+    assert operator_timeline.json()["stages"][-1]["approval_recorded"] is True
     assert [event["status"] for event in operator_timeline.json()["lifecycle_events"]] == [
         "REQUIRE_APPROVAL",
         "WAITING_APPROVAL",
