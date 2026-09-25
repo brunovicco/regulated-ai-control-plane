@@ -120,6 +120,7 @@ Contexto
   -> Snapshots de fontes e frescor do provedor vinculados ao digest
   -> Dashboard operacional server-rendered por ID exato
   -> Verificação do pack assinado de políticas/providers antes da composição do runtime
+  -> Análise semântica offline de impacto entre releases verificadas do pack
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -146,6 +147,12 @@ chave, composição ou caminho impedem o startup. Somente material público de v
 empacotado; chaves privadas de release devem permanecer em uma fronteira offline controlada pela
 organização. A assinatura comprova autenticidade do release, não correção da política, atualidade
 do provider ou compliance.
+
+A Fase 6b compara uma base aprovada e uma candidata somente depois que ambas passam pelo mesmo
+trust store. O relatório JSON offline classifica impacto potencial em decisão, evidência e
+governança, correlaciona capabilities alteradas às regras dependentes e sinaliza reutilização de
+versão ou troca de chave. É apoio conservador à revisão, não equivalência comportamental exaustiva
+nem autoridade para promover o release.
 
 Fora do primeiro ciclo:
 

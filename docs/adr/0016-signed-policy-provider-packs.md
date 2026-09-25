@@ -30,10 +30,11 @@ algorithm and signing-key identifier.
 At startup, before the existing YAML adapters parse records, RegulaAI:
 
 1. strictly parses the manifest and deployment-controlled trust store;
-2. rejects duplicate, absolute, traversing, symlinked, missing or oversized file paths;
-3. verifies every content digest;
-4. selects an explicitly trusted public key by id and verifies the signature;
-5. passes the exact authenticated bytes to the existing strict policy/provider parsers, avoiding a
+2. selects an explicitly trusted public key by id and verifies the manifest signature before
+   following any manifest-declared file path;
+3. rejects duplicate, absolute, traversing, symlinked, missing or oversized file paths and verifies
+   every content digest;
+4. passes the exact authenticated bytes to the existing strict policy/provider parsers, avoiding a
    verify-then-reopen filesystem race.
 
 Package a demo public trust anchor and signature, never a private key. Provide an offline helper

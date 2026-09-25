@@ -126,3 +126,10 @@ Phase 5d copies the metadata of each resolved fact into decision evidence and bi
 snapshot into the output/event digests. The snapshot preserves historical attribution even after
 the active registry advances. It supports an audit statement about which source metadata informed
 the decision; it does not prove that the provider still behaves the same way.
+
+Phase 6a requires the release manifest and exact registry bytes to pass signed-pack verification.
+Phase 6b compares a verified candidate against a verified base under the same trust store. Changes
+to state, conditions or freshness are classified as potential decision impact; source and version
+changes are evidence impact; notes are governance metadata. The report also lists policy rules that
+require an affected capability key and can match its provider target. This is a conservative review
+aid and does not replace scenario regression, source review or release approval.
