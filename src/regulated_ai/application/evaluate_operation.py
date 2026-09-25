@@ -31,6 +31,7 @@ from regulated_ai.domain import (
     PolicyObligation,
     PolicyRule,
     ProviderCapability,
+    ProviderCapabilitySnapshot,
     ProviderTarget,
     ToolRequest,
     strongest_outcome,
@@ -127,6 +128,7 @@ class EvaluateAiOperation:
             outcomes = tuple(rule.decision for rule in matched if rule.decision is not None)
             reasons = {rule.reason_code for rule in matched if rule.reason_code is not None}
             capability_ids: set[str] = set()
+            capability_snapshots: set[ProviderCapabilitySnapshot] = set()
             capability_outcomes: list[DecisionOutcome] = []
 
             registry_version = self._capabilities.registry_version
@@ -144,6 +146,7 @@ class EvaluateAiOperation:
                         fact = self._resolve_capability(target, requirement)
                         if fact is not None:
                             capability_ids.add(fact.identifier)
+                            capability_snapshots.add(_capability_snapshot(fact, target))
                         failure = _capability_failure(
                             fact,
                             requirement,
@@ -175,6 +178,16 @@ class EvaluateAiOperation:
                 sorted({item for rule in matched for item in rule.control_objective_ids})
             )
             capability_id_tuple = tuple(sorted(capability_ids))
+            capability_snapshot_tuple = tuple(
+                sorted(
+                    capability_snapshots,
+                    key=lambda item: (
+                        item.provider_target,
+                        item.capability_id,
+                        item.record_version,
+                    ),
+                )
+            )
             labels = tuple(sorted({label for item in classified for label in item.labels}, key=str))
             tool_ids = tuple(tool.identifier for tool in authorized_tools)
             tool_catalog_version = self._tools.catalog_version if self._tools is not None else None
@@ -186,6 +199,9 @@ class EvaluateAiOperation:
                 "obligations": [_canonical_obligation(item) for item in ordered_obligations],
                 "policy_set_version": policy_set.identifier,
                 "provider_capability_ids": capability_id_tuple,
+                "provider_capability_snapshots": [
+                    _canonical_capability_snapshot(item) for item in capability_snapshot_tuple
+                ],
                 "provider_registry_version": registry_version,
                 "reason_codes": reason_codes,
                 "tool_catalog_version": tool_catalog_version,
@@ -215,6 +231,9 @@ class EvaluateAiOperation:
                 "output_digest": output_digest,
                 "policy_set_version": policy_set.identifier,
                 "provider_capability_ids": capability_id_tuple,
+                "provider_capability_snapshots": [
+                    _canonical_capability_snapshot(item) for item in capability_snapshot_tuple
+                ],
                 "provider_registry_version": registry_version,
                 "reason_codes": reason_codes,
                 "tool_catalog_version": tool_catalog_version,
@@ -240,6 +259,7 @@ class EvaluateAiOperation:
                 event_digest=_digest(event_payload),
                 tool_catalog_version=tool_catalog_version,
                 authorized_tool_ids=tool_ids,
+                provider_capability_snapshots=capability_snapshot_tuple,
             )
             try:
                 stored = self._evidence.save(evidence)
@@ -273,7 +293,27 @@ class EvaluateAiOperation:
         self, target: ProviderTarget, requirement: CapabilityRequirement
     ) -> ProviderCapability | None:
         record = self._capabilities.get(target)
-        return None if record is None else record.capability(requirement.key)
+        if record is None:
+            return None
+        if (
+            record.registry_version != self._capabilities.registry_version
+            or record.target.provider != target.provider
+            or record.target.service != target.service
+            or record.target.region != target.region
+        ):
+            raise ProviderRegistryError("Provider capability record is inconsistent")
+        fact = record.capability(requirement.key)
+        if fact is not None and (
+            fact.provider != target.provider
+            or fact.service != target.service
+            or fact.region != target.region
+            or fact.registry_version != record.registry_version
+            or fact.record_version != record.record_version
+            or fact.verified_at != record.verified_at
+            or fact.source_urls != record.source_urls
+        ):
+            raise ProviderRegistryError("Provider capability fact is inconsistent")
+        return fact
 
     def _authorize_tools(self, requests: tuple[ToolRequest, ...]) -> tuple[AuthorizedTool, ...]:
         if not requests:
@@ -438,6 +478,36 @@ def _canonical_obligation(obligation: Obligation) -> dict[str, object]:
         "reason_code": obligation.reason_code,
         "target": obligation.target,
         "type": obligation.type.value,
+    }
+
+
+def _capability_snapshot(
+    fact: ProviderCapability, target: ProviderTarget
+) -> ProviderCapabilitySnapshot:
+    return ProviderCapabilitySnapshot(
+        capability_id=fact.identifier,
+        provider_target=target.identifier,
+        key=fact.key,
+        state=fact.state,
+        conditions=tuple(sorted(fact.conditions)),
+        verified_at=fact.verified_at,
+        record_version=fact.record_version,
+        registry_version=fact.registry_version,
+        source_urls=tuple(sorted(fact.source_urls)),
+    )
+
+
+def _canonical_capability_snapshot(snapshot: ProviderCapabilitySnapshot) -> dict[str, object]:
+    return {
+        "capability_id": snapshot.capability_id,
+        "conditions": snapshot.conditions,
+        "key": snapshot.key,
+        "provider_target": snapshot.provider_target,
+        "record_version": snapshot.record_version,
+        "registry_version": snapshot.registry_version,
+        "source_urls": snapshot.source_urls,
+        "state": snapshot.state.value,
+        "verified_at": snapshot.verified_at.isoformat(),
     }
 
 

@@ -271,6 +271,21 @@ class ProviderCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderCapabilitySnapshot:
+    """Immutable source metadata captured for one capability used by a decision."""
+
+    capability_id: str
+    provider_target: str
+    key: str
+    state: CapabilityState
+    conditions: tuple[str, ...]
+    verified_at: date
+    record_version: str
+    registry_version: str
+    source_urls: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderCapabilityRecord:
     """Versioned capability facts for one provider target."""
 
@@ -404,6 +419,7 @@ class EvidenceMetadata:
     previous_event_digest: str | None = None
     tool_catalog_version: str | None = None
     authorized_tool_ids: tuple[str, ...] = ()
+    provider_capability_snapshots: tuple[ProviderCapabilitySnapshot, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -705,6 +721,8 @@ class OperatorTimeline:
     obligation_types: tuple[ObligationType, ...]
     matched_policy_ids: tuple[str, ...]
     provider_capability_ids: tuple[str, ...]
+    provider_capability_snapshots: tuple[ProviderCapabilitySnapshot, ...]
+    provider_context_complete: bool
     control_objective_ids: tuple[str, ...]
     decision_reason_codes: tuple[str, ...]
     enforcement_reason_codes: tuple[str, ...]

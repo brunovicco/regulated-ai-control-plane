@@ -81,7 +81,7 @@ def configured_checks(root: Path) -> list[Check]:
             ("bandit", "-c", "pyproject.toml", "-r", *source_roots) if source_roots else (),
         )
     )
-    checks.append(Check("dependencies", ("pip-audit",)))
+    checks.append(Check("dependencies", ("pip-audit", "--vulnerability-service", "osv")))
     return checks
 
 

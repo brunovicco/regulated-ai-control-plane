@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pytest
 
@@ -11,6 +11,7 @@ from regulated_ai.application import (
 from regulated_ai.domain import (
     ActionApprovalReceipt,
     ApprovalReceipt,
+    CapabilityState,
     DecisionOutcome,
     EnforcementRecord,
     EnforcementStatus,
@@ -20,6 +21,7 @@ from regulated_ai.domain import (
     OperatorLifecycleEvent,
     OperatorLifecycleEventSource,
     OperatorTimelineStageKind,
+    ProviderCapabilitySnapshot,
     ToolActionRecord,
     ToolActionStatus,
     TransformationReceipt,
@@ -209,12 +211,26 @@ def test_operator_timeline_orders_stages_and_aggregates_attention() -> None:
         OperatorAttentionCode.TOOL_RESULT_REJECTED,
     )
     assert not timeline.actions_truncated
+    assert not timeline.provider_context_complete
 
 
 def test_operator_timeline_exposes_control_context_without_actor_identity() -> None:
     evidence = replace(
         _evidence(),
         previous_event_digest=f"sha256:{'9' * 64}",
+        provider_capability_snapshots=(
+            ProviderCapabilitySnapshot(
+                capability_id="provider.control",
+                provider_target="provider.service.region",
+                key="control",
+                state=CapabilityState.SUPPORTED,
+                conditions=(),
+                verified_at=date(2026, 9, 22),
+                record_version="1",
+                registry_version="registry@test",
+                source_urls=("https://provider.invalid/documentation",),
+            ),
+        ),
     )
     approval = ApprovalReceipt(
         approval_id="approval-operator-test",
@@ -244,6 +260,8 @@ def test_operator_timeline_exposes_control_context_without_actor_identity() -> N
 
     assert timeline.matched_policy_ids == ("rule@test",)
     assert timeline.provider_capability_ids == ("provider.control",)
+    assert timeline.provider_context_complete
+    assert timeline.provider_capability_snapshots[0].verified_at == date(2026, 9, 22)
     assert timeline.control_objective_ids == ("CONTROL.TEST",)
     assert timeline.decision_reason_codes == ("TEST",)
     assert timeline.enforcement_reason_codes == ("ENFORCEMENT_COMPLETE",)
@@ -274,6 +292,33 @@ def test_operator_timeline_rejects_inconsistent_approval_metadata() -> None:
             enforcement=replace(_enforcement(), approval_receipt=approval),
             evidence=evidence,
         ).execute("enf_operator_test")
+
+
+def test_operator_timeline_rejects_duplicate_provider_snapshot_identity() -> None:
+    first = ProviderCapabilitySnapshot(
+        capability_id="provider.control",
+        provider_target="provider.service.region",
+        key="control",
+        state=CapabilityState.SUPPORTED,
+        conditions=(),
+        verified_at=date(2026, 9, 22),
+        record_version="1",
+        registry_version="registry@test",
+        source_urls=("https://provider.invalid/documentation",),
+    )
+    evidence = replace(
+        _evidence(),
+        provider_capability_snapshots=(
+            first,
+            replace(
+                first,
+                source_urls=("https://provider.invalid/conflicting-documentation",),
+            ),
+        ),
+    )
+
+    with pytest.raises(OperatorTimelineIntegrityError):
+        _service(enforcement=_enforcement(), evidence=evidence).execute("enf_operator_test")
 
 
 def test_operator_timeline_rejects_inconsistent_action_approval_metadata() -> None:

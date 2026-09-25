@@ -174,5 +174,9 @@ ledger.
 
 Phase 5c adds the matched policy/control/capability identifiers, decision and enforcement reasons,
 authorized tools, provider target, transformation receipts and previous evidence digest. Approval
-context excludes actor identity, assertions and authority-bearing content. Provider source and
-freshness history remains unavailable until decisions persist an immutable source snapshot.
+context excludes actor identity, assertions and authority-bearing content.
+
+Phase 5d adds `provider_capability_snapshots` to evidence and the operator timeline. Each new
+decision captures the provider target, capability state/conditions, registry/record versions,
+verification date and reviewed source URLs. `provider_context_complete` is false for legacy
+evidence whose source metadata was never captured.

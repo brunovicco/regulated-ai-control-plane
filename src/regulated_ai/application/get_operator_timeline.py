@@ -88,6 +88,23 @@ class GetOperatorTimeline:
             or evidence.input_digest != enforcement.input_digest
         ):
             raise OperatorTimelineIntegrityError("Operator timeline metadata is inconsistent")
+        snapshot_ids = {
+            snapshot.capability_id for snapshot in evidence.provider_capability_snapshots
+        }
+        snapshot_identities = {
+            (snapshot.capability_id, snapshot.provider_target)
+            for snapshot in evidence.provider_capability_snapshots
+        }
+        capability_ids = set(evidence.provider_capability_ids)
+        if (
+            any(
+                snapshot.registry_version != evidence.provider_registry_version
+                for snapshot in evidence.provider_capability_snapshots
+            )
+            or not snapshot_ids <= capability_ids
+            or len(snapshot_identities) != len(evidence.provider_capability_snapshots)
+        ):
+            raise OperatorTimelineIntegrityError("Operator timeline metadata is inconsistent")
 
         actions_truncated = len(actions) > _MAX_ACTIONS
         if any(
@@ -166,6 +183,8 @@ class GetOperatorTimeline:
             obligation_types=evidence.obligation_types,
             matched_policy_ids=evidence.matched_policy_ids,
             provider_capability_ids=evidence.provider_capability_ids,
+            provider_capability_snapshots=evidence.provider_capability_snapshots,
+            provider_context_complete=snapshot_ids == capability_ids,
             control_objective_ids=evidence.control_objective_ids,
             decision_reason_codes=evidence.reason_codes,
             enforcement_reason_codes=enforcement.reason_codes,

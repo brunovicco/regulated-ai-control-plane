@@ -67,6 +67,18 @@ Required semantic fields:
 
 `conditional` must include machine-readable or reviewable conditions.
 
+## ProviderCapabilitySnapshot
+
+Metadata-only historical copy of a capability fact actually resolved during evaluation:
+- capability id and exact provider target;
+- key, state and conditions;
+- record and registry versions;
+- verification date;
+- reviewed public source URLs.
+
+The ordered snapshot is bound into new decision/evidence digests. Missing snapshots on legacy
+evidence are reported as incomplete rather than reconstructed from the current registry.
+
 ## RegulatorySourceRef
 
 Reference only; not executable:

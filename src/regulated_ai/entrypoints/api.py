@@ -62,6 +62,7 @@ from regulated_ai.domain import (
     Jurisdiction,
     OperatorTimeline,
     ProviderCallMetadata,
+    ProviderCapabilitySnapshot,
     ProviderTarget,
     Purpose,
     Sector,
@@ -547,6 +548,14 @@ def _evidence_payload(evidence: EvidenceMetadata) -> dict[str, object]:
         "obligation_types": [item.value for item in evidence.obligation_types],
         "matched_policies": list(evidence.matched_policy_ids),
         "provider_capabilities_used": list(evidence.provider_capability_ids),
+        "provider_capability_snapshots": [
+            _provider_capability_snapshot_payload(item)
+            for item in evidence.provider_capability_snapshots
+        ],
+        "provider_context_complete": {
+            item.capability_id for item in evidence.provider_capability_snapshots
+        }
+        == set(evidence.provider_capability_ids),
         "control_objective_ids": list(evidence.control_objective_ids),
         "reason_codes": list(evidence.reason_codes),
         "policy_set_version": evidence.policy_set_version,
@@ -720,6 +729,11 @@ def _operator_timeline_payload(timeline: OperatorTimeline) -> dict[str, object]:
         "obligation_types": [item.value for item in timeline.obligation_types],
         "matched_policy_ids": list(timeline.matched_policy_ids),
         "provider_capability_ids": list(timeline.provider_capability_ids),
+        "provider_capability_snapshots": [
+            _provider_capability_snapshot_payload(item)
+            for item in timeline.provider_capability_snapshots
+        ],
+        "provider_context_complete": timeline.provider_context_complete,
         "control_objective_ids": list(timeline.control_objective_ids),
         "decision_reason_codes": list(timeline.decision_reason_codes),
         "enforcement_reason_codes": list(timeline.enforcement_reason_codes),
@@ -774,6 +788,22 @@ def _operator_timeline_payload(timeline: OperatorTimeline) -> dict[str, object]:
             }
             for event in timeline.lifecycle_events
         ],
+    }
+
+
+def _provider_capability_snapshot_payload(
+    snapshot: ProviderCapabilitySnapshot,
+) -> dict[str, object]:
+    return {
+        "capability_id": snapshot.capability_id,
+        "provider_target": snapshot.provider_target,
+        "key": snapshot.key,
+        "state": snapshot.state.value,
+        "conditions": list(snapshot.conditions),
+        "verified_at": snapshot.verified_at.isoformat(),
+        "record_version": snapshot.record_version,
+        "registry_version": snapshot.registry_version,
+        "source_urls": list(snapshot.source_urls),
     }
 
 

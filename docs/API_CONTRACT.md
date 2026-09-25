@@ -118,6 +118,20 @@ Example:
   "decision": "REQUIRE_APPROVAL",
   "classification_labels": ["BRAZIL_CPF"],
   "obligation_types": ["TOKENIZE", "REQUIRE_HUMAN_APPROVAL"],
+  "provider_capability_snapshots": [
+    {
+      "capability_id": "openai.responses_api.zero_data_retention",
+      "provider_target": "openai.responses_api.global",
+      "key": "zero_data_retention",
+      "state": "conditional",
+      "conditions": ["eligible_organization_required"],
+      "verified_at": "2026-09-22",
+      "record_version": "1",
+      "registry_version": "2026-09-22.1",
+      "source_urls": ["https://developers.openai.com/pt-BR/api/docs/guides/your-data"]
+    }
+  ],
+  "provider_context_complete": true,
   "policy_set_version": "br-financial-demo@1.0.0",
   "provider_registry_version": "2026-09-22.1",
   "input_digest": "sha256:...",
@@ -259,6 +273,20 @@ does not provide global listing or search.
   "obligation_types": ["TOKENIZE", "REQUIRE_HUMAN_APPROVAL"],
   "matched_policy_ids": ["br.financial.external_inference.minimize_identifier@1.0.0"],
   "provider_capability_ids": ["openai.responses_api.zero_data_retention"],
+  "provider_capability_snapshots": [
+    {
+      "capability_id": "openai.responses_api.zero_data_retention",
+      "provider_target": "openai.responses_api.global",
+      "key": "zero_data_retention",
+      "state": "conditional",
+      "conditions": ["eligible_organization_required"],
+      "verified_at": "2026-09-22",
+      "record_version": "1",
+      "registry_version": "2026-09-22.1",
+      "source_urls": ["https://developers.openai.com/pt-BR/api/docs/guides/your-data"]
+    }
+  ],
+  "provider_context_complete": true,
   "control_objective_ids": ["BR.PRIV.MINIMIZE_EXTERNAL_DATA"],
   "decision_reason_codes": [],
   "enforcement_reason_codes": [],
@@ -329,10 +357,11 @@ Append-only enforcement is local to SQLite and is not a signed or externally anc
 
 The control context uses only metadata captured by the linked evidence and enforcement records.
 Approval summaries omit actor identity, and tool-action stages expose only whether an approval was
-recorded. Provider source URLs and freshness are not joined from the current registry because that
-would not prove which source snapshot supported a historical decision. `previous_event_digest` is
-returned when present but does not by itself claim a complete or externally anchored evidence
-chain.
+recorded. For new evaluations, provider source URLs, fact state and verification dates come from
+digest-bound historical snapshots, not a join against the current registry. Legacy evidence with
+used capability IDs but no snapshot reports `provider_context_complete=false`; the API does not
+invent provenance. `previous_event_digest` is returned when present but does not by itself claim a
+complete or externally anchored evidence chain.
 
 Status behavior:
 

@@ -117,6 +117,7 @@ Contexto
   -> Timeline operacional apenas com metadados e códigos de atenção
   -> Histórico local append-only com baselines explícitas de migração
   -> Contexto operacional de controles e aprovação sanitizada, apenas com metadados
+  -> Snapshots de fontes e frescor do provedor vinculados ao digest
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,

@@ -139,6 +139,8 @@ Mitigations:
   includes payloads, arguments, assertions or tool results;
 - approval context omits actor identity and action stages expose only whether approval was recorded;
 - evidence/enforcement input digests and approval receipt bindings are validated before response;
+- historical provider provenance comes from digest-bound evidence snapshots, never a join against
+  mutable current registry configuration;
 - action correlation is bounded and explicitly reports truncation;
 - the endpoint is read-only and cannot approve, retry or reconcile;
 - deployments must restrict the operator route at the existing access boundary until product
@@ -167,6 +169,8 @@ Mitigations:
 - optional previous-digest chain in MVP;
 - later signed/append-only storage;
 - policy/provider versions captured.
+- provider source/freshness snapshots are bound into new decision and event digests;
+- malformed, duplicate or registry-mismatched persisted snapshots fail closed.
 
 ### Malicious policy/provider YAML
 

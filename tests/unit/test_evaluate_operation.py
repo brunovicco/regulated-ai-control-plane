@@ -9,6 +9,7 @@ from regulated_ai.application import (
     EvidencePersistenceError,
     InvalidEvaluationContextError,
     PolicySetNotFoundError,
+    ProviderRegistryError,
     ToolAuthorizationError,
 )
 from regulated_ai.application.ports import EvaluationObserver, EvidenceRepository
@@ -265,6 +266,49 @@ def test_conditional_capability_requires_explicit_matching_assertion() -> None:
 
     assert denied.decision is DecisionOutcome.DENY
     assert allowed.decision is DecisionOutcome.ALLOW
+
+
+def test_capability_source_snapshot_is_persisted_and_digest_bound() -> None:
+    original = capability_record()
+    evidence = MemoryEvidenceRepository()
+    result = _evaluator(
+        _policy(_capability_rule()), records=(original,), evidence=evidence
+    ).execute(context())
+
+    stored = evidence.get(result.evidence_id)
+    assert stored is not None
+    assert len(stored.provider_capability_snapshots) == 1
+    snapshot = stored.provider_capability_snapshots[0]
+    assert snapshot.capability_id == "test-provider.test-service.required_control"
+    assert snapshot.provider_target == "test-provider.test-service.test-region"
+    assert snapshot.state is CapabilityState.SUPPORTED
+    assert snapshot.verified_at == date(2026, 9, 22)
+    assert snapshot.source_urls == ("https://provider.invalid/documentation",)
+
+    changed_urls = ("https://provider.invalid/reviewed-documentation",)
+    changed_fact = replace(original.capabilities[0], source_urls=changed_urls)
+    changed_record = replace(
+        original,
+        source_urls=changed_urls,
+        capabilities=(changed_fact,),
+    )
+    changed = _evaluator(_policy(_capability_rule()), records=(changed_record,)).execute(context())
+
+    assert changed.output_digest != result.output_digest
+    assert changed.evidence_id != result.evidence_id
+
+
+def test_capability_fact_must_match_its_registry_record() -> None:
+    original = capability_record()
+    inconsistent_fact = replace(
+        original.capabilities[0],
+        source_urls=("https://provider.invalid/unreviewed-documentation",),
+    )
+    inconsistent_record = replace(original, capabilities=(inconsistent_fact,))
+    evaluator = _evaluator(_policy(_capability_rule()), records=(inconsistent_record,))
+
+    with pytest.raises(ProviderRegistryError, match="fact is inconsistent"):
+        evaluator.execute(context())
 
 
 def test_every_documented_capability_condition_must_be_asserted() -> None:
