@@ -142,13 +142,15 @@ Example:
 ## GET /v1/providers
 
 Returns capability metadata suitable for debugging/demo:
+- verified control-pack id, version, signing-key id and canonical payload digest;
 - provider/service/region identifiers;
 - capability states;
 - verified date;
 - source URLs;
 - registry version.
 
-No credentials/config secrets.
+No credentials, private signing keys or configuration secrets. The pack metadata states which
+local release passed startup verification; it is not a compliance or provider-freshness claim.
 
 ## POST /v1/enforcements
 
@@ -401,14 +403,16 @@ receipt digests and execution status. It never returns the execution payload.
 
 ## GET /health
 
-Returns `{"status": "ok"}` when the local HTTP process is available. Policy/registry validation
-occurs during startup, so invalid control-plane configuration prevents the service from serving.
+Returns `{"status": "ok"}` when the local HTTP process is available. Control-pack signature and
+digest verification occurs before policy/registry validation during startup, so invalid or
+untrusted control-plane configuration prevents the service from serving.
 
 ## Errors
 
 Use stable machine-readable codes, for example:
 - `POLICY_SET_NOT_FOUND`
 - `POLICY_SCHEMA_UNSUPPORTED`
+- `SIGNED_CONTROL_PACK_INVALID`
 - `PROVIDER_CAPABILITY_UNKNOWN`
 - `PROVIDER_CAPABILITY_STALE`
 - `INVALID_EVALUATION_CONTEXT`

@@ -1,0 +1,5 @@
+schema_version: "1"
+keys:
+  regulaai-demo-2026-09:
+    algorithm: "ed25519"
+    public_key: "BAAHIRE2xel49a53/rpTElweY+Yf3i0g9plTVBLorWw="

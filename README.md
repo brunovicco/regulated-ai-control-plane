@@ -116,6 +116,7 @@ Context
   -> Metadata-only operator control and sanitized approval context
   -> Digest-bound provider source and freshness snapshots
   -> Exact-ID server-rendered operator dashboard
+  -> Signed policy/provider pack verification before startup composition
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -123,7 +124,8 @@ The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements/{enforcement_id}/tool-actions`, `GET /v1/tool-actions/{action_id}`,
 `GET /v1/operator/enforcements/{enforcement_id}/timeline`,
 `GET /operator?enforcement_id={enforcement_id}`, `GET /v1/providers` and `GET /health`. It
-validates versioned YAML control-plane records at startup, applies transformations
+verifies a signed policy/provider pack and validates its versioned YAML records at startup,
+applies transformations
 inside the local trust boundary and stores only metadata evidence in SQLite. It still stops before
 real provider inference unless gateway mode is explicitly configured. Gateway mode uses bounded
 timeouts, performs no local retry, discards model output and accepts only tool definitions resolved
@@ -135,6 +137,12 @@ result content are not persisted or recoverable on replay. Tool execution remain
 Approval assertions are issued
 outside the service, bound to the decision digest, accepted only ephemerally and consumed once
 before execution.
+
+Phase 6a binds the packaged policy/provider release to SHA-256 file digests and an Ed25519
+signature selected from a local public-key trust store. Any digest, signature, key, composition or
+path failure prevents startup. Only public verification material is packaged; release private keys
+must remain in an organization-owned offline boundary. Signature validity establishes release
+authenticity, not policy correctness, provider freshness or compliance.
 
 Not implemented in the first slice:
 

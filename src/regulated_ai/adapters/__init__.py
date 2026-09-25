@@ -19,6 +19,12 @@ from regulated_ai.adapters.gateway_execution import (
 )
 from regulated_ai.adapters.mock_execution import MockInferenceExecutionAdapter
 from regulated_ai.adapters.mock_tool_execution import MockToolExecutionAdapter
+from regulated_ai.adapters.signed_packs import (
+    ControlPackIdentity,
+    SignedPackError,
+    VerifiedControlPack,
+    verify_control_pack,
+)
 from regulated_ai.adapters.tokenization import HmacTokenizationAdapter
 from regulated_ai.adapters.yaml_files import (
     ConfigurationBoundaryError,
@@ -34,6 +40,7 @@ __all__ = [
     "ActionApprovalAssertionError",
     "ApprovalAssertionError",
     "ConfigurationBoundaryError",
+    "ControlPackIdentity",
     "DeterministicDataClassifier",
     "FilePolicyRepository",
     "FileProviderCapabilityRepository",
@@ -46,11 +53,14 @@ __all__ = [
     "MalformedYamlError",
     "MockInferenceExecutionAdapter",
     "MockToolExecutionAdapter",
+    "SignedPackError",
     "SqliteEnforcementRepository",
     "SqliteEvidenceRepository",
     "SqliteOperatorLifecycleEventRepository",
     "SqliteToolActionRepository",
     "StructuredEvaluationObserver",
     "UnsupportedSchemaVersionError",
+    "VerifiedControlPack",
     "load_tool_catalog_file",
+    "verify_control_pack",
 ]

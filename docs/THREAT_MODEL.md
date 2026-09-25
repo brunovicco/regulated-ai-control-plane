@@ -180,11 +180,23 @@ Threat:
 untrusted content causes arbitrary code execution or schema confusion.
 
 Mitigations:
+- policy/provider files must be declared by a trusted signed manifest and match their SHA-256
+  digests before YAML parsing;
+- Ed25519 signatures are checked against an explicit local public-key trust store;
+- absolute, traversing, missing, symlinked and oversized pack paths fail closed;
 - safe parser;
 - strict schema;
 - no dynamic expression evaluation;
 - unknown fields/version handling;
 - no YAML object construction features.
+
+Residual risks:
+- a compromised authorized signing key or malicious trust-store change can authorize a harmful
+  release;
+- signature validity does not establish legal correctness, source freshness, provider behavior or
+  regulatory compliance;
+- key custody, reviewer authorization, revocation and distribution remain external operational
+  controls in Phase 6a.
 
 ### Cross-tenant leakage (future SaaS)
 

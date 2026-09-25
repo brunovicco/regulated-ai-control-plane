@@ -1,0 +1,17 @@
+schema_version: "1"
+pack_id: "br-financial-runtime"
+pack_version: "2026-09-25.1"
+files:
+  - kind: "policy"
+    path: "policies/br-financial-external-inference.yaml"
+    sha256: "sha256:cd90751b550389baeaab30d83c19f73c6975a27c5771edfc0be8e080608fc02e"
+  - kind: "provider_capability"
+    path: "provider-capabilities/aws-bedrock.yaml"
+    sha256: "sha256:2d07667e54062741f4ace2dee6f820b2c0df64cf34be748101c39995bf7bb085"
+  - kind: "provider_capability"
+    path: "provider-capabilities/openai-responses.yaml"
+    sha256: "sha256:0986fc86f84381100d671210c93eb0036bc5c09358de68cdfe3f026f5f1adff8"
+signing:
+  algorithm: "ed25519"
+  key_id: "regulaai-demo-2026-09"
+  signature: "qr1Pvw+eNKr0txn5gMu1YhrcxzeWVzHASHNcw1JTgIj0yXrV+7CeKP/ChmvI7EGKVmUlVfu27ncFZecInwaNCA=="

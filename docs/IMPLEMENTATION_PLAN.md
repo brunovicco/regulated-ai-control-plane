@@ -1,5 +1,35 @@
 # Implementation plan
 
+## Phase 6a — signed policy and provider packs
+
+### Goal
+
+Fail closed unless the local policy/provider release matches an organization-trusted Ed25519
+signature and every declared file digest.
+
+### Work
+
+1. Define a strict manifest containing a stable pack identity, version, policy/provider file list,
+   SHA-256 digests and one signing-key identifier.
+2. Verify normalized local paths, bounded file sizes, content digests and the Ed25519
+   signature before parsing any runtime policy or provider record.
+3. Keep the trust store deployment-controlled and package only public keys; never place a private
+   signing key in the repository or service runtime.
+4. Expose verified pack identity through the provider metadata endpoint and add an offline signing
+   helper that validates the result before replacing a manifest.
+5. Add tamper, unknown-key, traversal and packaged-runtime tests plus ADR-0016.
+
+### Decisions and assumptions
+
+- The signature authenticates an approved release; it does not prove source freshness, provider
+  behavior, legal correctness or compliance.
+- Ed25519 uses the maintained `cryptography` dependency; signatures cover deterministic canonical
+  JSON derived from the strict YAML manifest.
+- Pack files remain YAML and retain their existing schema validation after signature verification.
+- Key generation, custody, authorization and revocation belong to an external organization-owned
+  release process. The repository contains a demo public trust anchor only.
+- Tool catalogs remain outside this phase and retain their existing strict local validation.
+
 ## Phase 5e — exact-ID operator dashboard
 
 ### Goal

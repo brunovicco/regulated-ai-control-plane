@@ -160,13 +160,25 @@ Implemented in Phase 5e:
 
 ## Phase 6 — Maintained intelligence
 
+Status: Phase 6a implements signed local policy/provider releases with fail-closed digest,
+signature, trust-anchor and path verification. Automated source ingestion, review workflow, impact
+analysis, key lifecycle automation and enterprise distribution remain pending.
+
 Explore:
-- signed policy/provider packs;
+- signed policy/provider packs; **implemented in Phase 6a**
 - provider capability update workflow;
 - regulatory review workflow;
 - diff impact analysis;
 - enterprise integrations;
 - additional sectors.
+
+Implemented in Phase 6a:
+- strict versioned policy/provider manifest with bounded normalized paths;
+- SHA-256 binding for every declared file;
+- Ed25519 signature verification against a deployment-controlled public-key trust store;
+- fail-closed startup before runtime YAML parsing;
+- verified pack identity in provider metadata;
+- offline signer that accepts an external private key and verifies before manifest replacement.
 
 ## Defer
 

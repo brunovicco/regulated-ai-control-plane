@@ -283,6 +283,25 @@ unknown or inconsistent metadata -> generic 404/503 HTML state
 The dashboard does not introduce listing, search or administrative mutations. See
 [ADR-0015](adr/0015-exact-id-server-rendered-operator-dashboard.md).
 
+## Phase 6a components
+
+- `adapters/signed_packs.py`: strict manifest/trust-store parsing, path and digest validation, and
+  Ed25519 verification.
+- `entrypoints/api.py`: verifies the packaged release before constructing policy/provider
+  repositories and exposes its metadata through `/v1/providers`.
+- `scripts/sign_control_pack.py`: offline release helper that refreshes digests, signs with an
+  external private key and verifies the result before atomic replacement.
+
+```text
+deployment trust store + signed manifest + local YAML files
+    -> path/digest verification -> Ed25519 verification -> parse exact authenticated bytes
+    -> runtime composition
+```
+
+The trust store is an external trust decision. Signatures establish release authenticity and
+integrity, not regulatory correctness or current provider behavior. See
+[ADR-0016](adr/0016-signed-policy-provider-packs.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.

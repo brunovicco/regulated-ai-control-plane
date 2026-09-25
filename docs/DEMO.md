@@ -12,9 +12,28 @@ uv sync --frozen --all-groups --extra observability
 uv run uvicorn regulated_ai.entrypoints.api:app --host 127.0.0.1 --port 8000
 ```
 
-The service validates its packaged policy, provider registry and trusted tool catalog before
-accepting traffic. Evidence is written to `var/regulaai-evidence.sqlite3` by default. Set
+The service verifies its signed policy/provider control pack, then validates the packaged records
+and trusted tool catalog before accepting traffic. `/v1/providers` reports the verified pack id,
+version, signing-key id and canonical payload digest. Evidence is written to
+`var/regulaai-evidence.sqlite3` by default. Set
 `REGULAAI_EVIDENCE_DB` to another local path when needed.
+
+The repository includes only a demo public verification key. To publish a changed pack, configure
+the intended public key in the trust store and keep the matching Ed25519 private PEM outside the
+repository, then run:
+
+```bash
+uv run python scripts/sign_control_pack.py \
+  --manifest src/regulated_ai/resources/control-pack-manifest.yaml \
+  --trust-store src/regulated_ai/resources/trust/control-pack-signing-keys.yaml \
+  --private-key /approved/secret/location/control-pack-ed25519.pem
+```
+
+The helper refreshes file digests, signs the canonical manifest and verifies it against the trust
+store before replacement. Do not use the packaged demo trust anchor as a production key-management
+design; key custody, reviewer authorization and revocation belong to the deployment release process.
+Set both `REGULAAI_CONTROL_PACK_MANIFEST` and `REGULAAI_CONTROL_PACK_TRUST_STORE` to deployment
+paths to load an organization-managed release without modifying the packaged defaults.
 
 The default tokenization key is generated per process. To keep demo tokens stable across restarts,
 set `REGULAAI_TOKENIZATION_KEY` to a local value of at least 32 bytes. Production key material must

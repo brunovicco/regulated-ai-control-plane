@@ -63,6 +63,10 @@ Complete this document before processing personal or regulated data.
   credentials, customer configuration, request content or organization assertions.
 - Phase 5e renders only the existing timeline allowlist for one exact ID. HTML is escaped,
   browser caching and referrers are disabled, and no new content or identity fields are persisted.
+- Phase 6a signs only control metadata and file digests. The runtime retains public verification
+  keys and exposes pack id/version, signing-key id and payload digest; private signing keys stay in
+  the organization-owned offline release boundary and must never enter service configuration,
+  logs or repository history.
 - Incident-response owner:
 
 ## Prohibited logging
