@@ -165,8 +165,9 @@ signature, trust-anchor and path verification. Phase 6b adds offline semantic di
 impact classification between verified releases. Phase 6c adds fixed-clock, metadata-only scenario
 replay for observed decision and evidence changes. Phase 6d adds a digest-bound offline review gate
 for updates to existing provider capability targets. Phase 6e adds a digest-bound regulatory review
-gate for updates to existing policy sets. Automated source ingestion, reviewer authentication, key
-lifecycle automation and enterprise distribution remain pending.
+gate for updates to existing policy sets. Phase 6f composes verified static, replay and exact-byte
+review evidence into one deterministic release bundle. Automated source ingestion, reviewer
+authentication, key lifecycle automation and enterprise distribution remain pending.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -217,6 +218,15 @@ Implemented in Phase 6e:
 - explicit separation of regulatory mappings from non-regulatory enterprise authority policy;
 - deterministic metadata-only pass/block report before separate signing;
 - no source retrieval, legal interpretation, reviewer authentication, signing or promotion.
+
+Implemented in Phase 6f:
+- same-trust verification of the base and signed candidate before evidence composition;
+- recomputed static diff and fixed-clock scenario replay for one exact release pair;
+- review records re-evaluated against exact authenticated candidate file bytes;
+- required passing review coverage for every modified existing policy/provider entity;
+- explicit incomplete findings for missing/blocked reviews and unsupported additions/removals;
+- deterministic metadata-only JSON with a canonical bundle digest;
+- no automatic impact acceptance, signing, promotion, deployment or external calls.
 
 ## Defer
 

@@ -81,6 +81,9 @@ Complete this document before processing personal or regulated data.
   identifiers, conclusions, dates and digests. They exclude reviewer names, regulatory text,
   quotes, free-form notes, customer data, credentials and private keys. Reports emit only bounded
   identifiers and stable findings.
+- Phase 6f bundles only the allowlisted metadata already produced by static analysis, scenario
+  replay and human-review gates, plus release/file/review and bundle digests. It does not copy raw
+  YAML, scenario values, source content, reviewer identity, credentials or signing material.
 - Incident-response owner:
 
 ## Prohibited logging

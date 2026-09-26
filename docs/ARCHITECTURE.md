@@ -388,6 +388,27 @@ presented as a regulatory mandate. It never retrieves or interprets source text,
 reviewer, signs a pack or authorizes promotion. See
 [ADR-0020](adr/0020-digest-bound-policy-regulatory-review-gate.md).
 
+## Phase 6f components
+
+- `application/assemble_release_evidence.py`: framework-free release-pair, candidate-file and review
+  binding plus completeness findings.
+- `scripts/assemble_release_evidence.py`: same-trust verification, exact-byte composition of the
+  existing diff/replay/review use cases, canonical JSON and bundle digest.
+
+```text
+verified base + verified candidate + exact scenario suite + human review records
+    -> recompute static diff and replay
+    -> re-run reviews against authenticated candidate file bytes
+    -> EVIDENCE_COMPLETE | EVIDENCE_INCOMPLETE
+    -> separate organization-owned impact acceptance and promotion decision
+```
+
+The composer does not trust previously exported reports and does not treat potential or observed
+change as an automatic rejection. Completeness means all supported modified entities have passing,
+exact-byte review evidence. Whole policy/provider additions and removals remain incomplete because
+their onboarding/removal governance is not yet defined. See
+[ADR-0021](adr/0021-verified-release-evidence-bundle.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.

@@ -210,6 +210,26 @@ class RegulatoryReviewFindingCode(StrEnum):
     ENTERPRISE_RULE_CONCLUSION_INVALID = "ENTERPRISE_RULE_CONCLUSION_INVALID"
 
 
+class ReleaseReviewArtifactKind(StrEnum):
+    """Reviewable signed-pack entity kind in a release evidence bundle."""
+
+    POLICY_SET = "POLICY_SET"
+    PROVIDER_TARGET = "PROVIDER_TARGET"
+
+
+class ReleaseEvidenceFindingCode(StrEnum):
+    """Stable reason that release review evidence is incomplete."""
+
+    POLICY_REVIEW_MISSING = "POLICY_REVIEW_MISSING"
+    POLICY_REVIEW_BLOCKED = "POLICY_REVIEW_BLOCKED"
+    PROVIDER_REVIEW_MISSING = "PROVIDER_REVIEW_MISSING"
+    PROVIDER_REVIEW_BLOCKED = "PROVIDER_REVIEW_BLOCKED"
+    POLICY_SET_ADDITION_UNSUPPORTED = "POLICY_SET_ADDITION_UNSUPPORTED"
+    POLICY_SET_REMOVAL_UNSUPPORTED = "POLICY_SET_REMOVAL_UNSUPPORTED"
+    PROVIDER_TARGET_ADDITION_UNSUPPORTED = "PROVIDER_TARGET_ADDITION_UNSUPPORTED"
+    PROVIDER_TARGET_REMOVAL_UNSUPPORTED = "PROVIDER_TARGET_REMOVAL_UNSUPPORTED"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -734,6 +754,51 @@ class PolicyUpdateRegulatoryReviewReport:
     @property
     def approved(self) -> bool:
         """Return whether every bounded regulatory-review condition passed."""
+        return not self.findings
+
+
+@dataclass(frozen=True, slots=True)
+class ReleaseCandidateArtifact:
+    """Exact signed candidate file digest for one reviewable domain entity."""
+
+    kind: ReleaseReviewArtifactKind
+    subject_id: str
+    content_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class ReleaseReviewEvidence:
+    """Result of one review gate bound to base and candidate content."""
+
+    kind: ReleaseReviewArtifactKind
+    subject_id: str
+    base_pack_payload_digest: str
+    candidate_content_digest: str
+    review_id: str
+    review_digest: str
+    approved: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ReleaseEvidenceFinding:
+    """Metadata-only missing or blocked condition in release evidence."""
+
+    code: ReleaseEvidenceFindingCode
+    subject_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class ControlPackReleaseEvidenceReport:
+    """Composed evidence for one verified base/candidate release pair."""
+
+    static_analysis: ControlPackDiffReport
+    scenario_replay: ControlPackScenarioReplayReport
+    review_evidence: tuple[ReleaseReviewEvidence, ...]
+    findings: tuple[ReleaseEvidenceFinding, ...]
+
+    @property
+    def complete(self) -> bool:
+        """Return whether all changed supported entities have passing review evidence."""
         return not self.findings
 
 
