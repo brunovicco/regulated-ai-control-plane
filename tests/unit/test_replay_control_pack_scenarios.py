@@ -9,6 +9,7 @@ from regulated_ai.application import (
 )
 from regulated_ai.domain import (
     AssuranceLevel,
+    AuthorizedTool,
     CapabilityRequirement,
     CapabilityState,
     ControlPackImpact,
@@ -28,7 +29,23 @@ from regulated_ai.domain import (
     Purpose,
     ScenarioReplayStatus,
     Sector,
+    ToolRequest,
 )
+
+
+def _tool(*, risk_class: str = "read_only") -> AuthorizedTool:
+    return AuthorizedTool(
+        name="cards.read",
+        description="Read synthetic status.",
+        risk_class=risk_class,
+        schema_version="1",
+        input_schema_json="{}",
+        input_schema_digest="sha256:input",
+        output_schema_json="{}",
+        output_schema_digest="sha256:output",
+        definition_digest=f"sha256:{risk_class}",
+        catalog_version="tools@1",
+    )
 
 
 def _rule(*, version: str = "1.0.0") -> PolicyRule:
@@ -93,11 +110,14 @@ def _release(
     digest: str = "sha256:base",
     policy: PolicySet | None = None,
     record: ProviderCapabilityRecord | None = None,
+    tool: AuthorizedTool | None = None,
 ) -> ControlPackRelease:
     return ControlPackRelease(
         identity=ControlPackReleaseIdentity(pack_id, "1.0.0", "test-key", digest),
         policy_sets=(policy or _policy(),),
         provider_records=(record or _record(),),
+        tool_catalog_version="tools@1" if tool is not None else None,
+        tools=() if tool is None else (tool,),
     )
 
 
@@ -168,6 +188,21 @@ def test_version_only_result_change_is_evidence_impact() -> None:
     assert result.base.decision is result.candidate.decision
     assert result.base.obligations_digest == result.candidate.obligations_digest
     assert "policy_set_version" in result.changed_fields
+    assert "output_digest" in result.changed_fields
+
+
+def test_tool_risk_change_is_observed_by_metadata_only_replay() -> None:
+    scenario = replace(_suite().scenarios[0], tools=(ToolRequest("cards.read"),))
+
+    report = ReplayControlPackScenarios().execute(
+        _release(tool=_tool()),
+        _release(digest="sha256:candidate", tool=_tool(risk_class="high_impact_state_change")),
+        _suite(scenario=scenario),
+    )
+
+    result = report.results[0]
+    assert result.impact is ControlPackImpact.EVIDENCE
+    assert result.base.authorized_tool_ids == ("cards.read@1",)
     assert "output_digest" in result.changed_fields
 
 

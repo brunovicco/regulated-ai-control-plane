@@ -13,6 +13,7 @@ from regulated_ai.adapters.yaml_files import (
     ConfigurationBoundaryError,
     load_capability_bytes,
     load_policy_bytes,
+    load_tool_catalog_bytes,
 )
 from regulated_ai.application import ControlPackScenarioReplayError, ReplayControlPackScenarios
 from regulated_ai.domain import (
@@ -28,9 +29,7 @@ from regulated_ai.domain import (
 def main(argv: Sequence[str] | None = None) -> int:
     """Verify releases, replay a bounded suite and print deterministic JSON."""
     parser = argparse.ArgumentParser(
-        description=(
-            "Replay metadata-only scenarios against two signed policy/provider control packs."
-        )
+        description=("Replay metadata-only scenarios against two signed control packs.")
     )
     parser.add_argument("--base-manifest", type=Path, required=True)
     parser.add_argument("--candidate-manifest", type=Path, required=True)
@@ -66,6 +65,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _load_release(manifest_path: Path, trust_store_path: Path) -> ControlPackRelease:
     pack = verify_control_pack(manifest_path, trust_store_path)
     identity = pack.identity
+    catalog_version, tools = load_tool_catalog_bytes(
+        pack.tool_files[0].content, pack.tool_files[0].path
+    )
     return ControlPackRelease(
         identity=ControlPackReleaseIdentity(
             pack_id=identity.pack_id,
@@ -77,6 +79,8 @@ def _load_release(manifest_path: Path, trust_store_path: Path) -> ControlPackRel
         provider_records=tuple(
             load_capability_bytes(item.content, item.path) for item in pack.capability_files
         ),
+        tool_catalog_version=catalog_version,
+        tools=tools,
     )
 
 
@@ -146,6 +150,8 @@ def _outcome_payload(outcome: ScenarioReplayOutcome) -> dict[str, object]:
         "reason_codes": list(outcome.reason_codes),
         "policy_set_version": outcome.policy_set_version,
         "provider_registry_version": outcome.provider_registry_version,
+        "tool_catalog_version": outcome.tool_catalog_version,
+        "authorized_tool_ids": list(outcome.authorized_tool_ids),
         "output_digest": outcome.output_digest,
         "error_code": outcome.error_code,
     }

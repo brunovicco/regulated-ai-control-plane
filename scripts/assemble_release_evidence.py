@@ -30,6 +30,7 @@ from regulated_ai.adapters.yaml_files import (
     ConfigurationBoundaryError,
     load_capability_bytes,
     load_policy_bytes,
+    load_tool_catalog_bytes,
 )
 from regulated_ai.application import (
     AnalyzeControlPackDiff,
@@ -145,11 +146,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             candidate_artifacts=_release_artifacts(
                 candidate_policy_drafts,
                 candidate_provider_drafts,
+                candidate_pack,
             ),
             review_evidence=review_evidence,
             base_artifacts=_release_artifacts(
                 base_policy_drafts,
                 base_provider_drafts,
+                base_pack,
             ),
         )
     except (
@@ -175,6 +178,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _release_from_pack(pack: VerifiedControlPack) -> ControlPackRelease:
     identity = pack.identity
+    catalog_version, tools = load_tool_catalog_bytes(
+        pack.tool_files[0].content, pack.tool_files[0].path
+    )
     return ControlPackRelease(
         identity=ControlPackReleaseIdentity(
             pack_id=identity.pack_id,
@@ -186,6 +192,8 @@ def _release_from_pack(pack: VerifiedControlPack) -> ControlPackRelease:
         provider_records=tuple(
             load_capability_bytes(item.content, item.path) for item in pack.capability_files
         ),
+        tool_catalog_version=catalog_version,
+        tools=tools,
     )
 
 
@@ -213,6 +221,7 @@ def _provider_drafts(pack: VerifiedControlPack) -> dict[str, ProviderCapabilityD
 def _release_artifacts(
     policies: dict[str, PolicyDraft],
     providers: dict[str, ProviderCapabilityDraft],
+    pack: VerifiedControlPack,
 ) -> tuple[ReleaseCandidateArtifact, ...]:
     return (
         *(
@@ -230,6 +239,11 @@ def _release_artifacts(
                 draft.content_digest,
             )
             for subject_id, draft in sorted(providers.items())
+        ),
+        ReleaseCandidateArtifact(
+            ReleaseReviewArtifactKind.TOOL_CATALOG,
+            "trusted-tool-catalog",
+            _content_digest(pack.tool_files[0].content),
         ),
     )
 
@@ -298,7 +312,10 @@ def _authenticated_review_evidence(
         approved = attestation.conclusion is ReleaseReviewConclusion.APPROVE
         review_id = attestation.attestation_id
         review_digest = attestation.attestation_digest
-        if attestation.change_type is ControlPackChangeType.MODIFIED:
+        if (
+            attestation.change_type is ControlPackChangeType.MODIFIED
+            and attestation.kind is not ReleaseReviewArtifactKind.TOOL_CATALOG
+        ):
             report = _detailed_report(attestation, policy_reports, provider_reports)
             if (
                 attestation.review_id != report["review_id"]
@@ -498,6 +515,8 @@ def _outcome_payload(outcome: ScenarioReplayOutcome) -> dict[str, object]:
         "reason_codes": list(outcome.reason_codes),
         "policy_set_version": outcome.policy_set_version,
         "provider_registry_version": outcome.provider_registry_version,
+        "tool_catalog_version": outcome.tool_catalog_version,
+        "authorized_tool_ids": list(outcome.authorized_tool_ids),
         "output_digest": outcome.output_digest,
         "error_code": outcome.error_code,
     }

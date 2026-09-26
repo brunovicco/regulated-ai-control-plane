@@ -116,7 +116,7 @@ Context
   -> Metadata-only operator control and sanitized approval context
   -> Digest-bound provider source and freshness snapshots
   -> Exact-ID server-rendered operator dashboard
-  -> Signed policy/provider pack verification before startup composition
+  -> Signed policy/provider/tool-catalog pack verification before startup composition
   -> Offline semantic impact analysis between verified pack releases
   -> Fixed-clock metadata-only scenario replay across verified releases
   -> Digest-bound provider capability review before separate pack signing
@@ -124,6 +124,7 @@ Context
   -> Verified static/replay/review evidence bundle for external promotion decisions
   -> Signed role-bound promotion quorum for the exact complete evidence bundle
   -> Signed reviewer authority for updates, onboarding and removal
+  -> Signed tool-catalog diff, metadata-only replay and release review
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -131,7 +132,7 @@ The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements/{enforcement_id}/tool-actions`, `GET /v1/tool-actions/{action_id}`,
 `GET /v1/operator/enforcements/{enforcement_id}/timeline`,
 `GET /operator?enforcement_id={enforcement_id}`, `GET /v1/providers` and `GET /health`. It
-verifies a signed policy/provider pack and validates its versioned YAML records at startup,
+verifies a signed policy/provider/tool-catalog pack and validates its versioned YAML records at startup,
 applies transformations
 inside the local trust boundary and stores only metadata evidence in SQLite. It still stops before
 real provider inference unless gateway mode is explicitly configured. Gateway mode uses bounded
@@ -195,6 +196,12 @@ Phase 6d/6e review and the signature binds that exact review digest. Whole polic
 and removals are governed by signed whole-entity digests from the candidate or approved base. This
 establishes reviewer attribution and lifecycle coverage, not legal correctness, provider truth,
 promotion authority or deployment permission.
+
+Phase 6i includes exactly one trusted tool catalog in every signed control pack. Runtime parsing,
+static diff, metadata-only replay and release evidence all use the same digest-verified catalog
+bytes. Catalog changes are visible as semantic impact and require a signed whole-catalog review.
+This authenticates tool definitions for evaluation only; it does not authorize arguments, execute
+tools or prove downstream implementation behavior.
 
 Not implemented in the first slice:
 

@@ -138,6 +138,8 @@ class ControlPackChangeKind(StrEnum):
     POLICY_RULE = "POLICY_RULE"
     PROVIDER_TARGET = "PROVIDER_TARGET"
     PROVIDER_CAPABILITY = "PROVIDER_CAPABILITY"
+    TOOL_CATALOG = "TOOL_CATALOG"
+    TOOL_DEFINITION = "TOOL_DEFINITION"
 
 
 class ControlPackChangeType(StrEnum):
@@ -215,6 +217,7 @@ class ReleaseReviewArtifactKind(StrEnum):
 
     POLICY_SET = "POLICY_SET"
     PROVIDER_TARGET = "PROVIDER_TARGET"
+    TOOL_CATALOG = "TOOL_CATALOG"
 
 
 class ReleaseEvidenceFindingCode(StrEnum):
@@ -228,6 +231,8 @@ class ReleaseEvidenceFindingCode(StrEnum):
     POLICY_LIFECYCLE_REVIEW_BLOCKED = "POLICY_LIFECYCLE_REVIEW_BLOCKED"
     PROVIDER_LIFECYCLE_REVIEW_MISSING = "PROVIDER_LIFECYCLE_REVIEW_MISSING"
     PROVIDER_LIFECYCLE_REVIEW_BLOCKED = "PROVIDER_LIFECYCLE_REVIEW_BLOCKED"
+    TOOL_CATALOG_REVIEW_MISSING = "TOOL_CATALOG_REVIEW_MISSING"
+    TOOL_CATALOG_REVIEW_BLOCKED = "TOOL_CATALOG_REVIEW_BLOCKED"
 
 
 class ReleaseReviewConclusion(StrEnum):
@@ -532,11 +537,13 @@ class ControlPackReleaseIdentity:
 
 @dataclass(frozen=True, slots=True)
 class ControlPackRelease:
-    """Strict domain records loaded from one verified policy/provider pack."""
+    """Strict domain records loaded from one verified control pack."""
 
     identity: ControlPackReleaseIdentity
     policy_sets: tuple[PolicySet, ...]
     provider_records: tuple[ProviderCapabilityRecord, ...]
+    tool_catalog_version: str | None = None
+    tools: tuple[AuthorizedTool, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -594,6 +601,7 @@ class ControlPackScenario:
     data_items: tuple[DataItem, ...]
     organization_assertions: tuple[tuple[str, bool], ...] = ()
     fallback_providers: tuple[ProviderTarget, ...] = ()
+    tools: tuple[ToolRequest, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -620,6 +628,8 @@ class ScenarioReplayOutcome:
     reason_codes: tuple[str, ...]
     policy_set_version: str | None
     provider_registry_version: str | None
+    tool_catalog_version: str | None
+    authorized_tool_ids: tuple[str, ...]
     output_digest: str | None
     error_code: str | None = None
 

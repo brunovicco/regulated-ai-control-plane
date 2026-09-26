@@ -48,6 +48,16 @@ def test_loads_metadata_only_suite_with_digest_and_fixed_clock(tmp_path: Path) -
     assert suite.scenarios[0].data_items[0].labels == (DataClassification.BRAZIL_CPF,)
 
 
+def test_schema_v2_loads_metadata_only_tool_requests(tmp_path: Path) -> None:
+    document = _document(extra='    tools:\n      - name: "cards.read"\n').replace(
+        'schema_version: "1"', 'schema_version: "2"'
+    )
+
+    suite = load_scenario_suite_file(_write(tmp_path, document))
+
+    assert suite.scenarios[0].tools[0].name == "cards.read"
+
+
 @pytest.mark.parametrize(
     "document",
     [

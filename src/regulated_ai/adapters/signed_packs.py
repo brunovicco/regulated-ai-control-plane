@@ -1,4 +1,4 @@
-"""Fail-closed verification for signed policy and provider control packs."""
+"""Fail-closed verification for signed control packs."""
 
 import base64
 import binascii
@@ -26,7 +26,7 @@ class _StrictModel(BaseModel):
 
 
 class _PackFileModel(_StrictModel):
-    kind: Literal["policy", "provider_capability"]
+    kind: Literal["policy", "provider_capability", "tool_catalog"]
     path: str = Field(min_length=1, max_length=512)
     sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
 
@@ -67,7 +67,7 @@ class _ManifestModel(_StrictModel):
         max_length=128,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._@-]*$",
     )
-    files: tuple[_PackFileModel, ...] = Field(min_length=2, max_length=256)
+    files: tuple[_PackFileModel, ...] = Field(min_length=3, max_length=256)
     signing: _SigningModel
 
     @model_validator(mode="after")
@@ -77,8 +77,12 @@ class _ManifestModel(_StrictModel):
         kinds = {item.kind for item in self.files}
         if len(paths) != len(set(paths)):
             raise ValueError("signed pack contains duplicate paths")
-        if kinds != {"policy", "provider_capability"}:
-            raise ValueError("signed pack must contain policy and provider capability files")
+        if kinds != {"policy", "provider_capability", "tool_catalog"}:
+            raise ValueError(
+                "signed pack must contain policy, provider capability and tool catalog files"
+            )
+        if sum(item.kind == "tool_catalog" for item in self.files) != 1:
+            raise ValueError("signed pack must contain exactly one tool catalog")
         return self
 
 
@@ -128,6 +132,7 @@ class VerifiedControlPack:
     identity: ControlPackIdentity
     policy_files: tuple[VerifiedControlFile, ...]
     capability_files: tuple[VerifiedControlFile, ...]
+    tool_files: tuple[VerifiedControlFile, ...]
 
 
 def verify_control_pack(manifest_path: Path, trust_store_path: Path) -> VerifiedControlPack:
@@ -186,6 +191,9 @@ def verify_control_pack(manifest_path: Path, trust_store_path: Path) -> Verified
             verified_files[item.path]
             for item in ordered_files
             if item.kind == "provider_capability"
+        ),
+        tool_files=tuple(
+            verified_files[item.path] for item in ordered_files if item.kind == "tool_catalog"
         ),
     )
 

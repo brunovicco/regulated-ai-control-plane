@@ -3,7 +3,7 @@ review:
   id: "openai-responses-2026-09-26"
   reviewer_role: "provider-governance-reviewer"
   reviewed_at: "2026-09-26"
-  base_pack_payload_digest: "sha256:04357a2bc0537aabc0740f46f74195310e43f5c5d09febd19a8c94aaa626b749"
+  base_pack_payload_digest: "sha256:c64743cf0d9c6b140a449d423663fbeedf6d4be8cdbd2f8ffdfbffc2517a3736"
   candidate_record_digest: "sha256:7d114ce4d8810a5db840df5d9f0ba154956a502a03c48a94465bec8cf54fd5c3"
   target:
     provider: "openai"

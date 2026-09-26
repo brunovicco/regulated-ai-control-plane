@@ -40,7 +40,7 @@ class _ReviewTrustKeyModel(_StrictModel):
     algorithm: Literal["ed25519"]
     public_key: str = Field(min_length=1, max_length=128)
     roles: tuple[str, ...] = Field(min_length=1, max_length=16)
-    artifact_kinds: tuple[ReleaseReviewArtifactKind, ...] = Field(min_length=1, max_length=2)
+    artifact_kinds: tuple[ReleaseReviewArtifactKind, ...] = Field(min_length=1, max_length=3)
     change_types: tuple[ControlPackChangeType, ...] = Field(min_length=1, max_length=3)
 
     @model_validator(mode="after")
@@ -96,12 +96,16 @@ class _ReviewAttestationModel(_StrictModel):
         ):
             raise ValueError("release review attestation time must be timezone-aware UTC")
         has_review = self.review_id is not None and self.review_digest is not None
-        if self.change_type is ControlPackChangeType.MODIFIED and not has_review:
+        detailed_review_required = (
+            self.change_type is ControlPackChangeType.MODIFIED
+            and self.artifact_kind is not ReleaseReviewArtifactKind.TOOL_CATALOG
+        )
+        if detailed_review_required and not has_review:
             raise ValueError("modified entity attestation requires a detailed review binding")
-        if self.change_type is not ControlPackChangeType.MODIFIED and (
+        if not detailed_review_required and (
             self.review_id is not None or self.review_digest is not None
         ):
-            raise ValueError("lifecycle attestation cannot bind an update-only review")
+            raise ValueError("attestation cannot bind an unsupported detailed review")
         return self
 
 

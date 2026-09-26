@@ -3,7 +3,7 @@ review:
   id: "br-financial-demo-review-2026-09-26"
   reviewer_role: "regulatory-governance"
   reviewed_at: "2026-09-26"
-  base_pack_payload_digest: "sha256:04357a2bc0537aabc0740f46f74195310e43f5c5d09febd19a8c94aaa626b749"
+  base_pack_payload_digest: "sha256:c64743cf0d9c6b140a449d423663fbeedf6d4be8cdbd2f8ffdfbffc2517a3736"
   candidate_policy_digest: "sha256:5c790ff67c1485b847de01aaeb567d2a869a2482428817333817b5083bf1f169"
   policy_set_id: "br-financial-demo"
   policy_set_review:
