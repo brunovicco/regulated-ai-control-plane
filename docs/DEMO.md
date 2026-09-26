@@ -249,3 +249,25 @@ The suite fixes the evaluation clock and contains only metadata, field names and
 labels. The report includes pack identities, the exact suite digest, allowlisted result metadata
 and digests, never scenario values. Tools are intentionally excluded until their catalog joins the
 same trusted release boundary.
+
+## Review a provider capability draft before signing
+
+Run the Phase 6d review gate against the authenticated packaged base and the synthetic-safe
+freshness-review example:
+
+```bash
+uv run python scripts/review_provider_capability_update.py \
+  --base-manifest src/regulated_ai/resources/control-pack-manifest.yaml \
+  --trust-store src/regulated_ai/resources/trust/control-pack-signing-keys.yaml \
+  --candidate-record examples/provider-capability-updates/openai-responses-candidate.yaml \
+  --review-record examples/provider-capability-reviews/openai-responses-2026-09-26.yaml
+```
+
+The expected status is `REVIEW_GATE_PASSED` with exit code `0`. A structurally valid review with
+missing, contradicted or inconclusive capability coverage returns `REVIEW_GATE_BLOCKED` and exit
+code `2`. Invalid schema, digest binding, source lineage or base verification returns `1`.
+
+The example advances record/registry versions and freshness metadata but is not a signed candidate
+release. The review contains only public source URLs, capability keys and a non-personal role. The
+report hashes uncovered source URLs and never includes source content. A separate organization-owned
+process still decides whether an authorized private key may sign a complete pack.

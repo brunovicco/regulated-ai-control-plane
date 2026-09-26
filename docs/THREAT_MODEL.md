@@ -244,6 +244,28 @@ Residual risks:
 - the suite itself is separately governed and is not authenticated by the control-pack signature;
 - tool behavior is not covered until trusted tool catalogs join the release boundary.
 
+### Provider capability freshness is asserted without bounded source review
+
+Threat:
+a provider record advances `verified_at` or changes a capability without binding the draft to the
+approved lineage, reviewing every record-wide claim, or surfacing contradictory source evidence.
+
+Mitigations:
+- the approved base pack must pass signature/digest verification;
+- the review binds the approved pack payload digest and exact candidate record bytes;
+- only an existing provider target may be updated in this phase;
+- every capability retained, changed or removed and every candidate source must be covered;
+- unchanged record/registry versions, date regression and review-date mismatch block the gate;
+- contradicted, inconclusive or missing coverage produces stable findings and exit code 2;
+- source content, quotes, credentials, personal reviewer identity and private keys are excluded;
+- passing does not invoke the signer or grant promotion authority.
+
+Residual risks:
+- conclusions remain human assertions and are not cryptographically attributable to a reviewer;
+- source URLs can change after review and no content snapshot or transparency log is retained;
+- a compromised base signing key or trust store remains outside this gate's guarantee;
+- new-target onboarding, reviewer quorum, signed attestations and key authorization remain external.
+
 ### Cross-tenant leakage (future SaaS)
 
 Not Phase 1, but architecture must not make tenant id optional once SaaS mode exists.

@@ -343,6 +343,28 @@ executes no transformation, provider, approval or tool boundary, and a finite un
 not evidence of exhaustive equivalence. See
 [ADR-0018](adr/0018-verified-control-pack-scenario-replay.md).
 
+## Phase 6d components
+
+- `adapters/provider_review_files.py`: bounded exact-byte loading for one provider draft and one
+  strict digest-bound source-review record.
+- `application/review_provider_capability_update.py`: framework-free lineage, coverage, date,
+  version and conclusion gate.
+- `scripts/review_provider_capability_update.py`: verifies the approved pack, composes the review
+  use case and emits deterministic metadata-only JSON before any separate signing step.
+
+```text
+verified approved pack + candidate provider draft + digest-bound human source review
+    -> lineage/binding/coverage/version/date/conclusion checks
+    -> REVIEW_GATE_PASSED | REVIEW_GATE_BLOCKED
+    -> separate organization-owned signing decision
+```
+
+The gate never retrieves or stores source content. One URL may have distinct conclusions for
+disjoint capability scopes. `CORROBORATED` means the reviewer concluded that the source is
+consistent with the recorded state, including an explicit `unknown`; it does not prove provider
+behavior. Passing grants no key access or promotion authority. See
+[ADR-0019](adr/0019-provider-capability-pre-signing-review-gate.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.

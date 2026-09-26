@@ -119,6 +119,7 @@ Context
   -> Signed policy/provider pack verification before startup composition
   -> Offline semantic impact analysis between verified pack releases
   -> Fixed-clock metadata-only scenario replay across verified releases
+  -> Digest-bound provider capability review before separate pack signing
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -156,6 +157,12 @@ Phase 6c replays a separately governed, metadata-only scenario suite against bot
 releases at one fixed timestamp. It reports observed decision, obligation and evidence changes,
 binds the exact suite bytes by digest and can fail CI on decision impact. The finite corpus contains
 classification labels but no values and does not prove equivalence or authorize promotion.
+
+Phase 6d adds an offline pre-signing gate for provider capability updates. A strict review record
+binds the authenticated base, exact candidate bytes, provider target, review date, reviewer role and
+source conclusions for every capability. Missing, contradicted, inconclusive, stale-date or
+unversioned reviews are blocked. Passing confirms bounded record consistency only; it does not
+authenticate a reviewer, retrieve sources, sign or promote a release, or prove provider behavior.
 
 Not implemented in the first slice:
 

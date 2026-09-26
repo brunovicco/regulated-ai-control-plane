@@ -122,6 +122,7 @@ Contexto
   -> Verificação do pack assinado de políticas/providers antes da composição do runtime
   -> Análise semântica offline de impacto entre releases verificadas do pack
   -> Replay de cenários apenas com metadados e relógio fixo entre releases verificadas
+  -> Revisão de capabilities vinculada por digest antes da assinatura separada do pack
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -160,6 +161,13 @@ dois releases verificados em um horário fixo. O relatório registra mudanças o
 obrigações e evidência, vincula os bytes exatos da suíte por digest e pode falhar o CI quando houver
 impacto em decisão. O corpus finito contém labels de classificação, nunca valores, e não comprova
 equivalência nem autoriza promoção.
+
+A Fase 6d adiciona um gate offline anterior à assinatura para atualizar capabilities de providers.
+Um registro estrito vincula a base autenticada, os bytes exatos da candidata, o alvo, a data, o papel
+revisor e as conclusões por fonte para cada capability. Revisões ausentes, contraditórias,
+inconclusivas, com data inconsistente ou sem nova versão são bloqueadas. A aprovação confirma
+somente consistência delimitada: não autentica o revisor, consulta fontes, assina ou promove o
+release, nem comprova o comportamento do provider.
 
 Fora do primeiro ciclo:
 

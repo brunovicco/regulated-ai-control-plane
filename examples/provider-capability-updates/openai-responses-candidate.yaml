@@ -1,0 +1,26 @@
+schema_version: "1"
+registry_version: "2026-09-26.1"
+provider: "openai"
+service: "responses_api"
+region: "global"
+record_version: 2
+verified_at: "2026-09-26"
+sources:
+  - "https://developers.openai.com/pt-BR/api/docs/guides/your-data"
+
+capabilities:
+  customer_data_used_for_training_by_default:
+    state: "unsupported"
+    notes:
+      - "Official docs state API data is not used for training by default unless the customer opts in."
+  store_false:
+    state: "supported"
+  zero_data_retention:
+    state: "conditional"
+    conditions:
+      - "eligible_organization_required"
+      - "endpoint_or_feature_must_be_zdr_eligible"
+  brazil_data_residency:
+    state: "unknown"
+  private_network_from_customer_vpc:
+    state: "unknown"

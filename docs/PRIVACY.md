@@ -74,6 +74,9 @@ Complete this document before processing personal or regulated data.
   prompts, tool arguments or customer data. Replay evidence reports only suite/release identities,
   decisions, obligation types/digests, control/capability identifiers, reason codes and output
   digests; its ephemeral evaluator does not retain an evidence database.
+- Phase 6d review records contain a non-personal reviewer role, public source URLs, capability keys,
+  conclusions, dates and digests. They exclude reviewer names, source text/quotes, credentials,
+  customer data and private keys. Reports replace uncovered source URLs with SHA-256 digests.
 - Incident-response owner:
 
 ## Prohibited logging
