@@ -1,5 +1,38 @@
 # Implementation plan
 
+## Phase 6d — provider capability review gate
+
+### Goal
+
+Require a bounded, source-by-source human review record for a provider capability draft before it
+can enter the existing control-pack signing workflow.
+
+### Work
+
+1. Verify the approved base pack and load its exact authenticated provider records.
+2. Parse one strict candidate capability draft and bind its exact bytes with SHA-256.
+3. Load a strict review record bound to the base pack digest, candidate digest, provider target,
+   review date and non-personal reviewer role.
+4. Require every capability in the record lineage and every candidate source to be covered; block
+   contradicted, inconclusive, missing, stale-date or unversioned updates.
+5. Emit deterministic metadata-only JSON and exit code 2 for a valid but blocked review gate.
+6. Add a synthetic-safe freshness-review example, unit/contract tests and ADR-0019.
+
+### Decisions and assumptions
+
+- Source retrieval and interpretation remain human activities; the workflow performs no scraping or
+  network access and stores no quotes or source content.
+- Phase 6d handles updates to an existing provider target. New-target onboarding remains a separate
+  governance decision.
+- Registry and record versions are opaque organization identifiers, so the gate requires change but
+  does not infer ordering.
+- A record-level `verified_at` date asserts review of the whole record; every retained, changed or
+  removed capability must therefore be covered by a source check.
+- The review record is digest-bound but not signed and does not authenticate an individual reviewer
+  or grant signing/promotion authority.
+- Passing the gate means the review evidence is internally consistent enough to proceed to the
+  separate signing boundary; it does not prove provider behavior, compliance or legal correctness.
+
 ## Phase 6c — verified control-pack scenario replay
 
 ### Goal

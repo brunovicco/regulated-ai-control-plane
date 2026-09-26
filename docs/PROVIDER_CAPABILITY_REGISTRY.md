@@ -138,3 +138,15 @@ Phase 6c runs curated metadata-only scenarios at a fixed timestamp against both 
 This can show an observed decision regression caused by capability state, condition or freshness
 changes while preserving the exact suite digest. It covers only selected contexts and does not
 replace the broader conservative Phase 6b report or human provider-source review.
+
+Phase 6d formalizes that human review before signing an update to an existing target. The review
+record binds the approved pack digest, exact candidate record digest, target, review date,
+non-personal reviewer role and one conclusion per public source. Every capability in the union of
+the base and candidate record must be covered because `verified_at` is record-wide. Every candidate
+source must also be reviewed. `CORROBORATED` means that the reviewer found the source consistent
+with the recorded state, including an explicit `unknown`; it is not a provider guarantee.
+
+The gate blocks unchanged versions, regressed or mismatched review dates, missing source/capability
+coverage and contradicted or inconclusive conclusions. It performs no retrieval, retains no source
+content and does not sign or promote the draft. New provider-target onboarding remains outside this
+phase because it has no authenticated record lineage.

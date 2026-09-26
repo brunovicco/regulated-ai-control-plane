@@ -163,6 +163,27 @@ class ScenarioReplayStatus(StrEnum):
     FAILED_CLOSED = "FAILED_CLOSED"
 
 
+class ProviderReviewConclusion(StrEnum):
+    """Human-recorded conclusion for one reviewed provider source."""
+
+    CORROBORATED = "CORROBORATED"
+    CONTRADICTED = "CONTRADICTED"
+    INCONCLUSIVE = "INCONCLUSIVE"
+
+
+class ProviderCapabilityReviewFindingCode(StrEnum):
+    """Stable reason that a provider capability draft cannot pass review."""
+
+    REGISTRY_VERSION_UNCHANGED = "REGISTRY_VERSION_UNCHANGED"
+    RECORD_VERSION_UNCHANGED = "RECORD_VERSION_UNCHANGED"
+    VERIFIED_AT_REGRESSION = "VERIFIED_AT_REGRESSION"
+    VERIFIED_AT_REVIEW_MISMATCH = "VERIFIED_AT_REVIEW_MISMATCH"
+    CANDIDATE_SOURCE_UNREVIEWED = "CANDIDATE_SOURCE_UNREVIEWED"
+    CAPABILITY_UNREVIEWED = "CAPABILITY_UNREVIEWED"
+    CAPABILITY_CONTRADICTED = "CAPABILITY_CONTRADICTED"
+    CAPABILITY_INCONCLUSIVE = "CAPABILITY_INCONCLUSIVE"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -560,6 +581,68 @@ class ControlPackScenarioReplayReport:
     def has_decision_impact(self) -> bool:
         """Return whether any curated scenario observed decision behavior change."""
         return any(item.impact is ControlPackImpact.DECISION for item in self.results)
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderCapabilityDraft:
+    """Strict candidate provider record bound to its exact pre-signing bytes."""
+
+    record: ProviderCapabilityRecord
+    content_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderSourceReview:
+    """One source check covering explicit capability keys without source content."""
+
+    source_url: str
+    capability_keys: tuple[str, ...]
+    conclusion: ProviderReviewConclusion
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderCapabilityUpdateReview:
+    """Digest-bound human governance metadata for one provider record draft."""
+
+    review_id: str
+    reviewer_role: str
+    reviewed_at: date
+    base_pack_payload_digest: str
+    candidate_record_digest: str
+    target: ProviderTarget
+    source_reviews: tuple[ProviderSourceReview, ...]
+    review_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderCapabilityReviewFinding:
+    """Metadata-only failed condition in a provider update review."""
+
+    code: ProviderCapabilityReviewFindingCode
+    capability_key: str | None = None
+    source_digest: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderCapabilityUpdateReport:
+    """Deterministic pre-signing review result for one provider record draft."""
+
+    base: ControlPackReleaseIdentity
+    target: ProviderTarget
+    candidate_registry_version: str
+    candidate_record_version: str
+    candidate_record_digest: str
+    review_id: str
+    reviewer_role: str
+    reviewed_at: date
+    review_digest: str
+    required_capability_keys: tuple[str, ...]
+    findings: tuple[ProviderCapabilityReviewFinding, ...]
+
+    @property
+    def approved(self) -> bool:
+        """Return whether every bounded review condition passed."""
+        return not self.findings
 
 
 @dataclass(frozen=True, slots=True)
