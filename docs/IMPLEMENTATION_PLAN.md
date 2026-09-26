@@ -1,5 +1,40 @@
 # Implementation plan
 
+## Phase 6e — policy regulatory review gate
+
+### Goal
+
+Require explicit, bounded human review of control-objective and regulatory-support mappings for an
+existing policy-set draft before it can enter the separate control-pack signing workflow.
+
+### Work
+
+1. Verify the approved base pack and load its exact authenticated policy sets.
+2. Parse one strict candidate policy draft and bind its exact bytes with SHA-256.
+3. Load a strict review record bound to the base pack digest, candidate digest, policy-set id,
+   review date and non-personal reviewer role.
+4. Compare rules by stable id and require exact review coverage for every addition, modification or
+   removal plus every changed policy-set metadata field.
+5. Require version advances and control-objective mappings; separate approved regulatory mappings
+   from explicitly non-regulatory enterprise rules and fail closed on rejected, revision-needed or
+   missing review.
+6. Emit deterministic metadata-only JSON, add a synthetic-safe example, unit/contract tests and
+   ADR-0020.
+
+### Decisions and assumptions
+
+- Source retrieval, legal interpretation, applicability and reviewer authorization remain human
+  and organization-owned activities; the workflow performs no network access and stores no source
+  text or reviewer identity.
+- Phase 6e handles updates to one policy set already authenticated in the approved base. New-policy
+  onboarding and a complete control-objective catalog remain separate governance decisions.
+- Rule ids are stable lineage identifiers. Added and modified rules bind candidate mappings;
+  removed rules bind their authenticated base mappings.
+- Rules with regulatory-support references require `APPROVED`; rules without them require
+  `NOT_APPLICABLE` so enterprise authority policy is not misrepresented as regulation.
+- Passing means the review record is internally consistent enough to proceed to separate signing;
+  it does not prove legal correctness, compliance, runtime safety or release authorization.
+
 ## Phase 6d — provider capability review gate
 
 ### Goal

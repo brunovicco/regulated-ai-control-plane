@@ -134,7 +134,9 @@ Backward-incompatible changes require:
 
 ## Policy review metadata
 
-Production policy sets should eventually support:
+Phase 6e represents pre-signing review metadata in a separate exact-byte, digest-bound artifact.
+Production policy governance may also need:
+
 - author;
 - reviewer role;
 - legal/privacy/security approval states;
@@ -142,4 +144,8 @@ Production policy sets should eventually support:
 - review due date;
 - supersedes version.
 
-The MVP may use synthetic metadata but preserve the fields.
+The current gate records reviewer role, review date and per-rule regulatory conclusion. It binds the
+approved base, candidate policy bytes, changed policy-set fields and exact rule mappings. Author,
+effective/review-due dates, supersession, reviewer authentication and quorum remain future external
+governance metadata. The runtime policy schema remains small and does not treat review metadata as
+an evaluation condition.

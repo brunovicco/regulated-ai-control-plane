@@ -123,6 +123,7 @@ Contexto
   -> Análise semântica offline de impacto entre releases verificadas do pack
   -> Replay de cenários apenas com metadados e relógio fixo entre releases verificadas
   -> Revisão de capabilities vinculada por digest antes da assinatura separada do pack
+  -> Revisão regulatória de políticas vinculada por digest antes da assinatura separada do pack
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -168,6 +169,14 @@ revisor e as conclusões por fonte para cada capability. Revisões ausentes, con
 inconclusivas, com data inconsistente ou sem nova versão são bloqueadas. A aprovação confirma
 somente consistência delimitada: não autentica o revisor, consulta fontes, assina ou promove o
 release, nem comprova o comportamento do provider.
+
+A Fase 6e adiciona um gate offline anterior à assinatura para atualizações de um policy set
+existente. Ele vincula a base autenticada e os bytes exatos da candidata, exige revisão de cada
+regra alterada e dos mappings exatos de objetivo de controle e suporte regulatório, e bloqueia
+conclusões ausentes, rejeitadas ou que exigem revisão. Regras sem referência regulatória devem ser
+marcadas como `NOT_APPLICABLE`, mantendo política corporativa de autoridade separada de requisitos
+regulatórios. A aprovação não consulta ou interpreta texto legal, não autentica o revisor, não
+assina ou promove o release e não declara compliance.
 
 Fora do primeiro ciclo:
 

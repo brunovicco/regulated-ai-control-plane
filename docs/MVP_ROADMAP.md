@@ -164,13 +164,14 @@ Status: Phase 6a implements signed local policy/provider releases with fail-clos
 signature, trust-anchor and path verification. Phase 6b adds offline semantic diff and conservative
 impact classification between verified releases. Phase 6c adds fixed-clock, metadata-only scenario
 replay for observed decision and evidence changes. Phase 6d adds a digest-bound offline review gate
-for updates to existing provider capability targets. Automated source ingestion, regulatory review,
-key lifecycle automation and enterprise distribution remain pending.
+for updates to existing provider capability targets. Phase 6e adds a digest-bound regulatory review
+gate for updates to existing policy sets. Automated source ingestion, reviewer authentication, key
+lifecycle automation and enterprise distribution remain pending.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
 - provider capability update workflow; **implemented in Phase 6d for existing targets**
-- regulatory review workflow;
+- regulatory review workflow; **implemented in Phase 6e for existing policy sets**
 - diff impact analysis; **implemented in Phase 6b**
 - curated scenario replay; **implemented in Phase 6c**
 - enterprise integrations;
@@ -207,6 +208,15 @@ Implemented in Phase 6d:
 - fail-closed version, date, lineage and review-conclusion checks;
 - deterministic metadata-only pass/block report before separate signing;
 - no scraping, reviewer authentication, signing or promotion authority.
+
+Implemented in Phase 6e:
+- authenticated approved-base selection and exact-byte policy-draft binding;
+- stable-rule lineage with exact change type, control-objective and support-reference coverage;
+- explicit review of changed policy-set metadata and per-rule conclusions;
+- fail-closed policy/rule version, objective, missing, rejected and revision checks;
+- explicit separation of regulatory mappings from non-regulatory enterprise authority policy;
+- deterministic metadata-only pass/block report before separate signing;
+- no source retrieval, legal interpretation, reviewer authentication, signing or promotion.
 
 ## Defer
 
