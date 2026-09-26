@@ -1,5 +1,37 @@
 # Implementation plan
 
+## Phase 6g — signed promotion attestations and quorum
+
+### Goal
+
+Authenticate an organization-owned approval quorum for one exact complete release-evidence bundle
+without signing the control pack, promoting it, distributing it or deploying it.
+
+### Work
+
+1. Parse a strict Phase 6f JSON bundle, recompute its canonical digest and require
+   `EVIDENCE_COMPLETE` with no findings.
+2. Load a strict promotion policy with normalized required roles and a minimum distinct-key quorum.
+3. Verify each exact attestation with Ed25519 against a separate public-key trust store that binds
+   keys to allowed non-personal roles.
+4. Require exact bundle/candidate/promotion-policy binding, one attestation per key, an active UTC
+   validity window, all required roles, no active rejection and the configured quorum.
+5. Emit deterministic metadata-only JSON with attestation/signature digests and an authorization
+   digest; return exit code 2 for a valid but blocked decision.
+6. Add unit/contract tests, documentation and ADR-0022.
+
+### Decisions and assumptions
+
+- Promotion authority is represented by external private keys; only public verification material
+  enters this repository or workflow.
+- A signed approval authenticates the exact bundle accepted by a role. It does not prove that the
+  evidence is exhaustive, that the release is safe/compliant or that deployment succeeded.
+- Distinct public keys, not attestation files, count toward quorum. One key cannot vote twice, and
+  one active rejection blocks authorization.
+- The evaluation clock is explicit UTC input so validity checks and output remain reproducible.
+- `PROMOTION_AUTHORIZED` is a handoff artifact for a separate release system. This workflow never
+  signs a pack, changes a branch, publishes, distributes, promotes or deploys anything.
+
 ## Phase 6f — verified release evidence bundle
 
 ### Goal

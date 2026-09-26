@@ -230,6 +230,23 @@ class ReleaseEvidenceFindingCode(StrEnum):
     PROVIDER_TARGET_REMOVAL_UNSUPPORTED = "PROVIDER_TARGET_REMOVAL_UNSUPPORTED"
 
 
+class PromotionAttestationDecision(StrEnum):
+    """Organization decision carried by one signed promotion attestation."""
+
+    APPROVE = "APPROVE"
+    REJECT = "REJECT"
+
+
+class PromotionFindingCode(StrEnum):
+    """Stable reason that a release is not authorized for external promotion."""
+
+    REQUIRED_ROLE_MISSING = "REQUIRED_ROLE_MISSING"
+    APPROVAL_QUORUM_NOT_MET = "APPROVAL_QUORUM_NOT_MET"
+    ACTIVE_REJECTION = "ACTIVE_REJECTION"
+    ATTESTATION_NOT_YET_VALID = "ATTESTATION_NOT_YET_VALID"
+    ATTESTATION_EXPIRED = "ATTESTATION_EXPIRED"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -799,6 +816,67 @@ class ControlPackReleaseEvidenceReport:
     @property
     def complete(self) -> bool:
         """Return whether all changed supported entities have passing review evidence."""
+        return not self.findings
+
+
+@dataclass(frozen=True, slots=True)
+class ReleaseEvidenceBundleIdentity:
+    """Verified canonical identity extracted from a complete Phase 6f bundle."""
+
+    bundle_digest: str
+    base: ControlPackReleaseIdentity
+    candidate: ControlPackReleaseIdentity
+
+
+@dataclass(frozen=True, slots=True)
+class PromotionPolicy:
+    """Organization-owned quorum policy for one promotion authority boundary."""
+
+    policy_id: str
+    policy_version: str
+    required_roles: tuple[str, ...]
+    minimum_approvals: int
+    policy_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedPromotionAttestation:
+    """Authenticated decision bound to one exact release evidence bundle."""
+
+    attestation_id: str
+    bundle_digest: str
+    candidate_pack_payload_digest: str
+    promotion_policy_digest: str
+    decision: PromotionAttestationDecision
+    role: str
+    key_id: str
+    issued_at: datetime
+    expires_at: datetime
+    attestation_digest: str
+    signature_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class PromotionFinding:
+    """Metadata-only failed condition in a promotion authorization decision."""
+
+    code: PromotionFindingCode
+    subject_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ControlPackPromotionReport:
+    """Deterministic offline authorization result without promotion side effects."""
+
+    evidence: ReleaseEvidenceBundleIdentity
+    policy: PromotionPolicy
+    evaluated_at: datetime
+    attestations: tuple[VerifiedPromotionAttestation, ...]
+    findings: tuple[PromotionFinding, ...]
+
+    @property
+    def authorized(self) -> bool:
+        """Return whether authenticated active approvals satisfy the policy."""
         return not self.findings
 
 

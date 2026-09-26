@@ -122,6 +122,7 @@ Context
   -> Digest-bound provider capability review before separate pack signing
   -> Digest-bound policy regulatory review before separate pack signing
   -> Verified static/replay/review evidence bundle for external promotion decisions
+  -> Signed role-bound promotion quorum for the exact complete evidence bundle
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -179,6 +180,13 @@ the exact scenario suite and any required provider/policy review records. It rec
 replay, re-runs reviews against authenticated candidate bytes and reports missing, blocked or
 unsupported review transitions. `EVIDENCE_COMPLETE` is evidence consistency, not impact acceptance,
 signing authority, promotion approval or a compliance result.
+
+Phase 6g verifies organization-owned Ed25519 promotion attestations against a separate public-key
+trust store and explicit required-role/distinct-key quorum policy. Every vote binds the exact
+complete Phase 6f bundle, candidate pack digest and canonical promotion-policy digest and must be
+active at an explicit UTC evaluation time. `PROMOTION_AUTHORIZED` is a signed-quorum handoff result
+only; the workflow never signs the pack, mutates a repository, promotes, distributes or deploys a
+release, or asserts safety or compliance.
 
 Not implemented in the first slice:
 

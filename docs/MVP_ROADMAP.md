@@ -166,8 +166,9 @@ impact classification between verified releases. Phase 6c adds fixed-clock, meta
 replay for observed decision and evidence changes. Phase 6d adds a digest-bound offline review gate
 for updates to existing provider capability targets. Phase 6e adds a digest-bound regulatory review
 gate for updates to existing policy sets. Phase 6f composes verified static, replay and exact-byte
-review evidence into one deterministic release bundle. Automated source ingestion, reviewer
-authentication, key lifecycle automation and enterprise distribution remain pending.
+review evidence into one deterministic release bundle. Phase 6g authenticates a role-bound Ed25519
+promotion quorum for that exact bundle. Automated source ingestion, key lifecycle automation,
+onboarding/removal governance and enterprise distribution remain pending.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -227,6 +228,15 @@ Implemented in Phase 6f:
 - explicit incomplete findings for missing/blocked reviews and unsupported additions/removals;
 - deterministic metadata-only JSON with a canonical bundle digest;
 - no automatic impact acceptance, signing, promotion, deployment or external calls.
+
+Implemented in Phase 6g:
+- canonical verification of one complete Phase 6f evidence bundle;
+- separate Ed25519 promotion trust store with key-to-role authorization;
+- explicit required-role and distinct-key quorum policy;
+- exact bundle/candidate/promotion-policy binding, UTC validity windows and active rejection
+  handling;
+- deterministic metadata-only authorization report and digest;
+- no control-pack signing, repository mutation, publication, promotion, distribution or deployment.
 
 ## Defer
 

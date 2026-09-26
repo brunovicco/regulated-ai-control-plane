@@ -320,3 +320,28 @@ schemas, digests or lineage return `1`.
 
 Completeness does not approve observed impact, authenticate reviewers, access a private key, sign,
 promote or deploy a release. Those remain separate organization-owned decisions.
+
+## Verify a signed promotion quorum
+
+After archiving an `EVIDENCE_COMPLETE` Phase 6f JSON bundle, evaluate externally produced Ed25519
+attestations against the organization's public-key trust store and quorum policy:
+
+```bash
+uv run python scripts/authorize_release_promotion.py \
+  --evidence-bundle /path/to/release-evidence.json \
+  --promotion-policy /path/to/promotion-policy.yaml \
+  --attestation-trust-store /path/to/promotion-trust-store.yaml \
+  --attestation /path/to/control-owner-attestation.yaml \
+  --attestation /path/to/release-manager-attestation.yaml \
+  --evaluated-at 2026-09-26T15:00:00+00:00
+```
+
+The expected successful status is `PROMOTION_AUTHORIZED` with exit code `0`. A valid but expired,
+rejected, role-incomplete or below-quorum set returns `PROMOTION_BLOCKED` and exit code `2`.
+Malformed metadata, a modified bundle, an unauthorized role, an untrusted key, a bad signature or
+an incorrect bundle/candidate binding returns `1`.
+
+Only public verification keys belong in the trust store; private keys remain in external
+organization-owned signers. The output exposes attestation and signature digests, never signature
+bytes or personal identity. Authorization is an offline handoff record, not an instruction that
+signs, publishes, promotes, distributes or deploys the candidate.

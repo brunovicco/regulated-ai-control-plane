@@ -317,6 +317,32 @@ Residual risks:
 - compromised signing keys/trust stores or malicious human assertions remain outside the guarantee;
 - external systems may ignore exit codes or misrepresent the documented evidence scope.
 
+### Promotion approval is forged, replayed or counted twice
+
+Threat:
+an attacker edits a release bundle, forges a human approval, reuses one key as multiple voters,
+substitutes a candidate digest, replays an expired vote or treats a quorum result as permission to
+deploy through an unrelated system.
+
+Mitigations:
+- the complete Phase 6f bundle is strictly parsed and its canonical SHA-256 digest is recomputed;
+- each attestation is Ed25519-verified against a separate organization-controlled public-key trust
+  store that binds the key to allowed non-personal roles;
+- signatures bind the exact bundle, candidate pack and promotion-policy digests plus decision,
+  role, key, identifier and UTC validity window;
+- duplicate attestation ids and repeated signing keys fail closed, so one key counts once;
+- all required roles, the configured distinct-key quorum and absence of an active rejection are
+  required at one explicit UTC evaluation time;
+- output contains only bounded identities and cryptographic digests and states that authorization
+  does not sign, promote, distribute or deploy the release.
+
+Residual risks:
+- compromised promotion private keys or trust/policy files can authorize a malicious release;
+- key issuance, custody, revocation, rotation and external timestamping remain organization-owned;
+- signers can approve incomplete real-world analysis even when the bundle is structurally complete;
+- a downstream system can ignore the report scope or deploy a different artifact unless it
+  independently enforces the candidate digest binding.
+
 ### Cross-tenant leakage (future SaaS)
 
 Not Phase 1, but architecture must not make tenant id optional once SaaS mode exists.
