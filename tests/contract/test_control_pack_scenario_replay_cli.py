@@ -47,6 +47,9 @@ def test_cli_verifies_releases_and_observes_decision_regression(
     trust_store["keys"]["scenario-candidate-key"] = {
         "algorithm": "ed25519",
         "public_key": public_key,
+        "status": "ACTIVE",
+        "valid_from": "2026-09-01T00:00:00Z",
+        "valid_until": "2099-09-01T00:00:00Z",
     }
     trust_store_path.write_text(yaml.safe_dump(trust_store, sort_keys=False), encoding="utf-8")
 

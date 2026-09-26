@@ -20,9 +20,7 @@ from regulated_ai.adapters.signed_packs import (
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Refresh and sign a strict policy/provider control-pack manifest."
-    )
+    parser = argparse.ArgumentParser(description="Refresh and sign a strict control-pack manifest.")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--trust-store", type=Path, required=True)
     parser.add_argument("--private-key", type=Path, required=True)

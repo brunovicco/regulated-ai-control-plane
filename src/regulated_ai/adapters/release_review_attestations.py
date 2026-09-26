@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
+from regulated_ai.adapters.trust_key_lifecycle import TrustKeyLifecycleModel
 from regulated_ai.domain import (
     ControlPackChangeType,
     ReleaseReviewArtifactKind,
@@ -36,7 +37,7 @@ class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class _ReviewTrustKeyModel(_StrictModel):
+class _ReviewTrustKeyModel(TrustKeyLifecycleModel):
     algorithm: Literal["ed25519"]
     public_key: str = Field(min_length=1, max_length=128)
     roles: tuple[str, ...] = Field(min_length=1, max_length=16)
@@ -58,7 +59,7 @@ class _ReviewTrustKeyModel(_StrictModel):
 
 
 class _ReviewTrustStoreModel(_StrictModel):
-    schema_version: Literal["1"]
+    schema_version: Literal["2"]
     keys: dict[str, _ReviewTrustKeyModel] = Field(min_length=1, max_length=64)
 
     @model_validator(mode="after")
@@ -131,6 +132,8 @@ def verify_release_review_attestations(
         key = trust_store.keys.get(attestation.signing_key_id)
         if key is None:
             raise ReleaseReviewAttestationError("Release review attestation key is not trusted")
+        if not key.active_at(attestation.attested_at):
+            raise ReleaseReviewAttestationError("Release review attestation key is not active")
         if attestation.reviewer_role not in key.roles:
             raise ReleaseReviewAttestationError(
                 "Release review attestation role is not authorized for its key"

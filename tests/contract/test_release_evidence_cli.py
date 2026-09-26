@@ -187,11 +187,14 @@ def _write_trust_store(path: Path, private_key: Ed25519PrivateKey) -> None:
     path.write_text(
         yaml.safe_dump(
             {
-                "schema_version": "1",
+                "schema_version": "2",
                 "keys": {
                     "test-key": {
                         "algorithm": "ed25519",
                         "public_key": public_key,
+                        "status": "ACTIVE",
+                        "valid_from": "2026-09-01T00:00:00Z",
+                        "valid_until": "2099-09-01T00:00:00Z",
                     }
                 },
             },
@@ -211,7 +214,7 @@ def _write_review_trust_store(path: Path, private_key: Ed25519PrivateKey) -> Non
     path.write_text(
         yaml.safe_dump(
             {
-                "schema_version": "1",
+                "schema_version": "2",
                 "keys": {
                     "review-key": {
                         "algorithm": "ed25519",
@@ -219,6 +222,9 @@ def _write_review_trust_store(path: Path, private_key: Ed25519PrivateKey) -> Non
                         "roles": ["regulatory-governance"],
                         "artifact_kinds": ["POLICY_SET"],
                         "change_types": ["MODIFIED"],
+                        "status": "ACTIVE",
+                        "valid_from": "2026-09-01T00:00:00Z",
+                        "valid_until": "2099-09-01T00:00:00Z",
                     }
                 },
             },

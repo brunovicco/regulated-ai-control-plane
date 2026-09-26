@@ -195,8 +195,29 @@ Residual risks:
   release;
 - signature validity does not establish legal correctness, source freshness, provider behavior or
   regulatory compliance;
-- key custody, reviewer authorization, revocation and distribution remain external operational
-  controls in Phase 6a.
+- private-key custody and trust-store distribution remain external operational controls.
+
+### Inactive verification key retains authority
+
+Threat:
+an expired, retired, revoked or not-yet-valid public key remains present in a trust store and a
+cryptographically valid signature continues to authorize a release, review or promotion vote.
+
+Mitigations:
+- release, reviewer and promotion trust stores use strict schema version 2;
+- every key declares an explicit state, UTC activation instant and optional UTC expiry;
+- only `ACTIVE` keys inside the half-open validity interval are accepted;
+- pack verification evaluates the selected key at an explicit instant, using UTC now at runtime;
+- review and promotion keys are evaluated at their signed attestation and issuance instants;
+- malformed windows, missing lifecycle fields and legacy trust-store schemas fail closed;
+- the rotation and emergency-revocation runbook separates public trust metadata from private keys.
+
+Residual risks:
+- trust-store compromise or stale distribution can restore or prolong authority;
+- system-clock integrity affects runtime pack verification;
+- historical verification after retirement requires retained trust snapshots, addressed by the
+  separate Phase 6k artifact-custody work;
+- the repository does not generate, store, rotate or destroy private keys.
 
 ### Control-pack change bypasses review
 
@@ -364,7 +385,8 @@ Residual risks:
 - compromised reviewer keys or trust-store role assignments can produce malicious approvals;
 - lifecycle review signs a whole entity and does not independently prove every regulatory mapping
   or provider source is correct;
-- revocation, rotation, hardware custody and external timestamping remain outside this phase;
+- Phase 6j enforces supplied revocation/retirement state and validity windows; hardware custody,
+  trust-store distribution and external timestamping remain organization-owned;
 - Phase 6g promotion signers must still accept the complete evidence and intended impact.
 
 ### Promotion approval is forged, replayed or counted twice
@@ -388,7 +410,8 @@ Mitigations:
 
 Residual risks:
 - compromised promotion private keys or trust/policy files can authorize a malicious release;
-- key issuance, custody, revocation, rotation and external timestamping remain organization-owned;
+- Phase 6j enforces supplied revocation/retirement state and validity windows; key issuance,
+  custody, distribution and external timestamping remain organization-owned;
 - signers can approve incomplete real-world analysis even when the bundle is structurally complete;
 - a downstream system can ignore the report scope or deploy a different artifact unless it
   independently enforces the candidate digest binding.

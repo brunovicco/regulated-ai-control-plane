@@ -209,6 +209,12 @@ bytes do catálogo verificados por digest. Mudanças no catálogo ficam visívei
 e exigem revisão assinada do artefato completo. Isso autentica definições para avaliação; não
 autoriza argumentos, executa ferramentas ou comprova o comportamento da implementação downstream.
 
+A Fase 6j atualiza os trust stores de release, review e promoção para o schema 2 com ciclo de vida.
+Cada chave pública possui início de vigência, expiração opcional e estado explícito `ACTIVE`,
+`RETIRED` ou `REVOKED`. Chaves inativas ou fora da janela falham de forma fechada antes que a
+assinatura conceda autoridade. Custódia das chaves privadas e distribuição dos trust stores
+continuam como operações externas.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
@@ -375,6 +381,7 @@ Comece por:
 - [Modelo de políticas](docs/POLICY_MODEL.md)
 - [Threat model](docs/THREAT_MODEL.md)
 - [Estratégia de evals](docs/EVAL_STRATEGY.md)
+- [Ciclo de vida das chaves de verificação](docs/TRUST_KEY_LIFECYCLE.md)
 - [Roadmap](docs/MVP_ROADMAP.md)
 - [Fontes primárias](SOURCES.md)
 

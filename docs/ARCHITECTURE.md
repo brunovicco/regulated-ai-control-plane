@@ -186,6 +186,24 @@ manifest signature -> policy bytes + provider bytes + tool-catalog bytes
 
 See [ADR-0024](adr/0024-signed-tool-catalog-release-boundary.md).
 
+## Phase 6j components
+
+- `adapters/trust_key_lifecycle.py`: shared strict public-key state and UTC validity window.
+- `adapters/signed_packs.py`: evaluates the selected release key at pack verification time.
+- `adapters/release_review_attestations.py`: evaluates reviewer authority at `attested_at`.
+- `adapters/promotion_attestations.py`: evaluates promotion authority at `issued_at`.
+- `docs/TRUST_KEY_LIFECYCLE.md`: rotation, retirement, emergency revocation and validation runbook.
+
+```text
+signature + selected public key + signed/event time
+    -> trust-store v2 lifecycle validation
+    -> ACTIVE and within [valid_from, valid_until)
+    -> cryptographic verification
+```
+
+Lifecycle authorization is additional to signature verification; it does not create or distribute
+keys. See [ADR-0025](adr/0025-verification-key-lifecycle-enforcement.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim
