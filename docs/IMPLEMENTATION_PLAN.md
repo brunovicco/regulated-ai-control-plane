@@ -1,5 +1,35 @@
 # Implementation plan
 
+## Phase 6f — verified release evidence bundle
+
+### Goal
+
+Compose static impact, fixed-clock replay and exact-byte human review results into one deterministic
+metadata-only artifact for a verified base/candidate pair without granting promotion authority.
+
+### Work
+
+1. Verify both signed packs through one trust store and parse only their exact authenticated bytes.
+2. Run the existing Phase 6b static analysis and Phase 6c scenario replay for the same release pair.
+3. Re-run supplied Phase 6d/6e review records against matching files from the verified candidate.
+4. Require one passing review for every modified existing policy set and provider target; report
+   whole-entity additions/removals as unsupported governance transitions.
+5. Emit stable metadata-only JSON containing full component evidence, review identities, findings
+   and a canonical SHA-256 bundle digest; return exit code 2 when evidence is incomplete.
+6. Add unit/contract tests, documentation and ADR-0021.
+
+### Decisions and assumptions
+
+- The composer recomputes analysis instead of trusting previously emitted unsigned JSON reports.
+- Evidence completeness means required artifacts are present, passing and bound to exact signed
+  candidate bytes. It does not mean impacts were accepted or the release is safe/compliant.
+- Potential and observed changes remain visible but do not automatically block completeness;
+  organization-owned promotion authority must decide whether to accept them.
+- Existing review gates cover updates to existing entities only, so whole policy/provider
+  additions and removals remain incomplete until separate governance contracts exist.
+- The workflow is offline and read-only: it does not sign, promote, deploy, persist or call any
+  provider, tool or regulatory source.
+
 ## Phase 6e — policy regulatory review gate
 
 ### Goal

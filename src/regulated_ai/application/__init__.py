@@ -4,6 +4,10 @@ from regulated_ai.application.analyze_control_pack_diff import (
     AnalyzeControlPackDiff,
     ControlPackDiffError,
 )
+from regulated_ai.application.assemble_release_evidence import (
+    AssembleControlPackReleaseEvidence,
+    ReleaseEvidenceError,
+)
 from regulated_ai.application.enforce_operation import (
     ApprovalFailedError,
     EnforceAiOperation,
@@ -54,6 +58,7 @@ __all__ = [
     "ActionApprovalFailedError",
     "AnalyzeControlPackDiff",
     "ApprovalFailedError",
+    "AssembleControlPackReleaseEvidence",
     "ControlPackDiffError",
     "ControlPackScenarioReplayError",
     "EnforceAiOperation",
@@ -73,6 +78,7 @@ __all__ = [
     "PolicyUpdateRegulatoryReviewError",
     "ProviderCapabilityUpdateReviewError",
     "ProviderRegistryError",
+    "ReleaseEvidenceError",
     "ReplayControlPackScenarios",
     "ReviewPolicyUpdate",
     "ReviewProviderCapabilityUpdate",

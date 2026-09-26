@@ -121,6 +121,7 @@ Context
   -> Fixed-clock metadata-only scenario replay across verified releases
   -> Digest-bound provider capability review before separate pack signing
   -> Digest-bound policy regulatory review before separate pack signing
+  -> Verified static/replay/review evidence bundle for external promotion decisions
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -172,6 +173,12 @@ revision-needed conclusions. Rules without regulatory references must be marked
 `NOT_APPLICABLE`, keeping enterprise authority policy distinct from regulatory requirements.
 Passing does not retrieve or interpret legal text, authenticate the reviewer, sign or promote a
 release, or assert compliance.
+
+Phase 6f composes one deterministic release-evidence bundle from a verified base/candidate pair,
+the exact scenario suite and any required provider/policy review records. It recomputes diff and
+replay, re-runs reviews against authenticated candidate bytes and reports missing, blocked or
+unsupported review transitions. `EVIDENCE_COMPLETE` is evidence consistency, not impact acceptance,
+signing authority, promotion approval or a compliance result.
 
 Not implemented in the first slice:
 

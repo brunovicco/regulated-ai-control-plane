@@ -124,6 +124,7 @@ Contexto
   -> Replay de cenários apenas com metadados e relógio fixo entre releases verificadas
   -> Revisão de capabilities vinculada por digest antes da assinatura separada do pack
   -> Revisão regulatória de políticas vinculada por digest antes da assinatura separada do pack
+  -> Bundle verificado de diff, replay e reviews para decisões externas de promoção
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -177,6 +178,12 @@ conclusões ausentes, rejeitadas ou que exigem revisão. Regras sem referência 
 marcadas como `NOT_APPLICABLE`, mantendo política corporativa de autoridade separada de requisitos
 regulatórios. A aprovação não consulta ou interpreta texto legal, não autentica o revisor, não
 assina ou promove o release e não declara compliance.
+
+A Fase 6f compõe um bundle determinístico de evidências a partir de uma base/candidata verificadas,
+da suíte exata de cenários e dos registros de review exigidos para policies/providers. Ela recalcula
+diff e replay, reexecuta os reviews contra os bytes autenticados da candidata e aponta cobertura
+ausente, bloqueada ou ainda sem governança definida. `EVIDENCE_COMPLETE` indica consistência das
+evidências, não aceitação de impacto, autoridade de assinatura, aprovação de promoção ou compliance.
 
 Fora do primeiro ciclo:
 

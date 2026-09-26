@@ -294,3 +294,29 @@ The example adds one approved control-objective mapping to an existing policy ru
 both rule and policy-set versions. The review contains only identifiers, conclusions, a date,
 digests and a non-personal role. It does not contain or retrieve legal text. Passing does not prove
 legal correctness or compliance and does not authorize the separate signer or promotion process.
+
+## Assemble verified release evidence
+
+Run Phase 6f with the packaged release as both base and candidate to exercise deterministic
+composition without creating a candidate:
+
+```bash
+uv run python scripts/assemble_release_evidence.py \
+  --base-manifest src/regulated_ai/resources/control-pack-manifest.yaml \
+  --candidate-manifest src/regulated_ai/resources/control-pack-manifest.yaml \
+  --trust-store src/regulated_ai/resources/trust/control-pack-signing-keys.yaml \
+  --scenario-suite examples/scenarios/control-pack-regression.yaml
+```
+
+The expected status is `EVIDENCE_COMPLETE`, with no semantic changes, no observed scenario changes
+and no required reviews. The output includes a deterministic `bundle_digest` over the canonical
+metadata payload.
+
+For a changed signed candidate, repeat `--provider-review-record PATH` and
+`--policy-review-record PATH` for every applicable Phase 6d/6e review. The composer re-runs those
+reviews against the exact candidate files authenticated by its manifest. Missing/blocked reviews or
+whole-entity additions/removals return `EVIDENCE_INCOMPLETE` and exit code `2`; invalid signatures,
+schemas, digests or lineage return `1`.
+
+Completeness does not approve observed impact, authenticate reviewers, access a private key, sign,
+promote or deploy a release. Those remain separate organization-owned decisions.

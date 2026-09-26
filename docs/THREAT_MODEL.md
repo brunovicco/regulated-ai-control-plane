@@ -293,6 +293,30 @@ Residual risks:
 - new-policy onboarding, control-objective catalog approval, reviewer quorum and signed
   attestations remain external.
 
+### Release evidence is mixed, omitted or mistaken for promotion authority
+
+Threat:
+a release pipeline combines diff, replay or review artifacts from different release pairs, omits a
+changed entity, reviews bytes that differ from the signed candidate, or treats complete evidence as
+authorization to promote.
+
+Mitigations:
+- base and candidate are verified through one explicit trust store;
+- static analysis and scenario replay are recomputed for the same in-memory release identities;
+- review records are re-run against exact candidate file bytes returned by signed-pack verification;
+- candidate entity/file-digest composition must match exactly and duplicate evidence is rejected;
+- every modified existing policy set and provider target requires one passing review;
+- additions/removals remain explicit incomplete findings rather than being inferred as reviewed;
+- output binds the canonical metadata payload with SHA-256 and states that completeness grants no
+  signing, impact-acceptance, promotion or deployment authority.
+
+Residual risks:
+- the bundle digest is not a signature or external timestamp;
+- reviewers and promotion actors are not authenticated and no quorum is enforced;
+- an incomplete scenario suite can miss behavior changes even when evidence is complete;
+- compromised signing keys/trust stores or malicious human assertions remain outside the guarantee;
+- external systems may ignore exit codes or misrepresent the documented evidence scope.
+
 ### Cross-tenant leakage (future SaaS)
 
 Not Phase 1, but architecture must not make tenant id optional once SaaS mode exists.
