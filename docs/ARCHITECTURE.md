@@ -430,6 +430,27 @@ trusted keys approved one exact evidence bundle under one explicit policy at one
 not a control-pack signature, deployment instruction, external timestamp or compliance/safety
 claim. See [ADR-0022](adr/0022-signed-promotion-attestations-and-quorum.md).
 
+## Phase 6h components
+
+- `adapters/release_review_attestations.py`: strict role/artifact/change-scoped public-key trust and
+  Ed25519 verification for exact review attestations.
+- `application/assemble_release_evidence.py`: exact base/candidate composition, change-type and
+  added/modified/removed content binding for authenticated reviews.
+- `scripts/assemble_release_evidence.py`: re-runs update reviews, joins their exact digests to signed
+  attestations, accepts lifecycle attestations and emits bundle schema version 2.
+
+```text
+verified base/candidate + detailed update reviews + signed review/lifecycle attestations
+    -> key authority + signature + pack/content/change/review binding
+    -> authenticated release-evidence bundle v2
+    -> separate signed promotion quorum
+```
+
+Modified policies and provider targets cannot bypass the semantic gates from Phases 6d/6e. Added
+entities bind candidate bytes; removed entities bind the approved-base bytes being retired. The
+review key authenticates a bounded role assertion but grants no pack-signing, promotion or
+deployment authority. See [ADR-0023](adr/0023-signed-review-and-lifecycle-governance.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.

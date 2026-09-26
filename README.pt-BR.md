@@ -126,6 +126,7 @@ Contexto
   -> Revisão regulatória de políticas vinculada por digest antes da assinatura separada do pack
   -> Bundle verificado de diff, replay e reviews para decisões externas de promoção
   -> Quórum de promoção assinado e vinculado ao bundle completo exato
+  -> Autoridade de review assinada para updates, onboarding e remoção
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -193,6 +194,13 @@ da política de promoção, com validade avaliada em um horário UTC explícito.
 `PROMOTION_AUTHORIZED` é somente um artefato de handoff com quórum autenticado: o fluxo não assina o
 pack, altera o repositório, promove, distribui ou implanta o release, nem declara segurança ou
 compliance.
+
+A Fase 6h autentica papéis revisores por um trust store público Ed25519 separado, limitando cada
+chave pelo tipo de artefato e de mudança. Entidades modificadas ainda precisam passar pelo review
+detalhado das Fases 6d/6e, e a assinatura vincula o digest exato desse review. Adições e remoções
+integrais de policies/providers são governadas pelo digest assinado dos bytes da candidata ou da
+base aprovada. Isso comprova atribuição do revisor e cobertura do ciclo de vida, não correção legal,
+verdade do provider, autoridade de promoção ou permissão de deployment.
 
 Fora do primeiro ciclo:
 

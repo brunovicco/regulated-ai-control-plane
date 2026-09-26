@@ -81,6 +81,9 @@ def test_cli_rebinds_policy_review_to_exact_signed_candidate(
     candidate_manifest = _sign_pack(candidate_root, "test.2", private_key)
 
     base_digest = verify_control_pack(base_manifest, trust_store).identity.payload_digest
+    candidate_pack_digest = verify_control_pack(
+        candidate_manifest, trust_store
+    ).identity.payload_digest
     candidate_digest = f"sha256:{hashlib.sha256(candidate_policy.read_bytes()).hexdigest()}"
     review_path = tmp_path / "policy-review.yaml"
     review_path.write_text(
@@ -130,12 +133,47 @@ def test_cli_rebinds_policy_review_to_exact_signed_candidate(
         {"code": "POLICY_REVIEW_MISSING", "subject_id": "br-financial-demo"}
     ]
 
-    assert evidence_main([*arguments, "--policy-review-record", str(review_path)]) == 0
+    assert evidence_main([*arguments, "--policy-review-record", str(review_path)]) == 2
+    unsigned = json.loads(capsys.readouterr().out)
+    assert unsigned["findings"] == [
+        {"code": "POLICY_REVIEW_MISSING", "subject_id": "br-financial-demo"}
+    ]
+
+    review_private_key = Ed25519PrivateKey.generate()
+    review_trust_store = tmp_path / "review-trust.yaml"
+    _write_review_trust_store(review_trust_store, review_private_key)
+    attestation_path = tmp_path / "policy-review-attestation.yaml"
+    _write_review_attestation(
+        attestation_path,
+        review_private_key,
+        base_digest=base_digest,
+        candidate_pack_digest=candidate_pack_digest,
+        candidate_content_digest=candidate_digest,
+        review_path=review_path,
+    )
+
+    assert (
+        evidence_main(
+            [
+                *arguments,
+                "--policy-review-record",
+                str(review_path),
+                "--review-trust-store",
+                str(review_trust_store),
+                "--review-attestation",
+                str(attestation_path),
+            ]
+        )
+        == 0
+    )
     complete_capture = capsys.readouterr()
     complete = json.loads(complete_capture.out)
     assert complete_capture.err == ""
     assert complete["status"] == "EVIDENCE_COMPLETE"
-    assert complete["review_evidence"][0]["candidate_content_digest"] == candidate_digest
+    assert complete["schema_version"] == "2"
+    assert complete["review_evidence"][0]["reviewed_content_digest"] == candidate_digest
+    assert complete["review_evidence"][0]["change_type"] == "MODIFIED"
+    assert complete["review_evidence"][0]["signing_key_id"] == "review-key"
     assert complete["review_evidence"][0]["approved"] is True
 
 
@@ -161,6 +199,66 @@ def _write_trust_store(path: Path, private_key: Ed25519PrivateKey) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def _write_review_trust_store(path: Path, private_key: Ed25519PrivateKey) -> None:
+    public_key = base64.b64encode(
+        private_key.public_key().public_bytes(
+            serialization.Encoding.Raw,
+            serialization.PublicFormat.Raw,
+        )
+    ).decode()
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "1",
+                "keys": {
+                    "review-key": {
+                        "algorithm": "ed25519",
+                        "public_key": public_key,
+                        "roles": ["regulatory-governance"],
+                        "artifact_kinds": ["POLICY_SET"],
+                        "change_types": ["MODIFIED"],
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_review_attestation(
+    path: Path,
+    private_key: Ed25519PrivateKey,
+    *,
+    base_digest: str,
+    candidate_pack_digest: str,
+    candidate_content_digest: str,
+    review_path: Path,
+) -> None:
+    review_digest = f"sha256:{hashlib.sha256(review_path.read_bytes()).hexdigest()}"
+    document = {
+        "schema_version": "1",
+        "attestation_id": "test-policy-review-attestation",
+        "artifact_kind": "POLICY_SET",
+        "subject_id": "br-financial-demo",
+        "change_type": "MODIFIED",
+        "base_pack_payload_digest": base_digest,
+        "candidate_pack_payload_digest": candidate_pack_digest,
+        "reviewed_content_digest": candidate_content_digest,
+        "review_id": "test-policy-review",
+        "review_digest": review_digest,
+        "reviewer_role": "regulatory-governance",
+        "conclusion": "APPROVE",
+        "attested_at": "2026-09-26T15:00:00+00:00",
+        "signing_key_id": "review-key",
+    }
+    encoded = json.dumps(
+        document, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode()
+    document["signature"] = base64.b64encode(private_key.sign(encoded)).decode()
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
 
 
 def _sign_pack(

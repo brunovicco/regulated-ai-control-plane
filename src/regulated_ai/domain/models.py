@@ -224,10 +224,17 @@ class ReleaseEvidenceFindingCode(StrEnum):
     POLICY_REVIEW_BLOCKED = "POLICY_REVIEW_BLOCKED"
     PROVIDER_REVIEW_MISSING = "PROVIDER_REVIEW_MISSING"
     PROVIDER_REVIEW_BLOCKED = "PROVIDER_REVIEW_BLOCKED"
-    POLICY_SET_ADDITION_UNSUPPORTED = "POLICY_SET_ADDITION_UNSUPPORTED"
-    POLICY_SET_REMOVAL_UNSUPPORTED = "POLICY_SET_REMOVAL_UNSUPPORTED"
-    PROVIDER_TARGET_ADDITION_UNSUPPORTED = "PROVIDER_TARGET_ADDITION_UNSUPPORTED"
-    PROVIDER_TARGET_REMOVAL_UNSUPPORTED = "PROVIDER_TARGET_REMOVAL_UNSUPPORTED"
+    POLICY_LIFECYCLE_REVIEW_MISSING = "POLICY_LIFECYCLE_REVIEW_MISSING"
+    POLICY_LIFECYCLE_REVIEW_BLOCKED = "POLICY_LIFECYCLE_REVIEW_BLOCKED"
+    PROVIDER_LIFECYCLE_REVIEW_MISSING = "PROVIDER_LIFECYCLE_REVIEW_MISSING"
+    PROVIDER_LIFECYCLE_REVIEW_BLOCKED = "PROVIDER_LIFECYCLE_REVIEW_BLOCKED"
+
+
+class ReleaseReviewConclusion(StrEnum):
+    """Authenticated conclusion for one release-entity review."""
+
+    APPROVE = "APPROVE"
+    REJECT = "REJECT"
 
 
 class PromotionAttestationDecision(StrEnum):
@@ -776,7 +783,7 @@ class PolicyUpdateRegulatoryReviewReport:
 
 @dataclass(frozen=True, slots=True)
 class ReleaseCandidateArtifact:
-    """Exact signed candidate file digest for one reviewable domain entity."""
+    """Exact signed release file digest for one reviewable domain entity."""
 
     kind: ReleaseReviewArtifactKind
     subject_id: str
@@ -785,15 +792,44 @@ class ReleaseCandidateArtifact:
 
 @dataclass(frozen=True, slots=True)
 class ReleaseReviewEvidence:
-    """Result of one review gate bound to base and candidate content."""
+    """Authenticated result bound to one exact release-entity change."""
 
     kind: ReleaseReviewArtifactKind
     subject_id: str
+    change_type: ControlPackChangeType
     base_pack_payload_digest: str
-    candidate_content_digest: str
+    candidate_pack_payload_digest: str
+    reviewed_content_digest: str
     review_id: str
     review_digest: str
+    reviewer_role: str
+    attested_at: datetime
+    attestation_id: str
+    signing_key_id: str
+    attestation_digest: str
+    signature_digest: str
     approved: bool
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedReleaseReviewAttestation:
+    """Cryptographically authenticated review of one exact release-entity change."""
+
+    attestation_id: str
+    kind: ReleaseReviewArtifactKind
+    subject_id: str
+    change_type: ControlPackChangeType
+    base_pack_payload_digest: str
+    candidate_pack_payload_digest: str
+    reviewed_content_digest: str
+    review_id: str | None
+    review_digest: str | None
+    reviewer_role: str
+    conclusion: ReleaseReviewConclusion
+    attested_at: datetime
+    signing_key_id: str
+    attestation_digest: str
+    signature_digest: str
 
 
 @dataclass(frozen=True, slots=True)
