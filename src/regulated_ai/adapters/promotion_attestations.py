@@ -137,7 +137,18 @@ class _PromotionAttestationModel(_StrictModel):
 
 def load_release_evidence_bundle(path: Path) -> ReleaseEvidenceBundleIdentity:
     """Validate a complete bundle and recompute its canonical Phase 6f digest."""
-    raw = _read_strict_json(path, maximum_bytes=8_388_608)
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        raise PromotionAttestationBoundaryError("Release evidence bundle is unavailable") from exc
+    return load_release_evidence_bundle_bytes(content, path.name)
+
+
+def load_release_evidence_bundle_bytes(
+    content: bytes, filename: str
+) -> ReleaseEvidenceBundleIdentity:
+    """Validate exact release-bundle bytes without reopening a path."""
+    raw = _read_strict_json_bytes(content, filename, maximum_bytes=8_388_608)
     try:
         bundle = _ReleaseEvidenceBundleModel.model_validate(raw)
     except ValidationError as exc:
@@ -268,15 +279,16 @@ def _canonical_attestation_payload(attestation: _PromotionAttestationModel) -> b
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
 
 
-def _read_strict_json(path: Path, *, maximum_bytes: int) -> dict[str, JsonValue]:
+def _read_strict_json_bytes(
+    encoded: bytes, filename: str, *, maximum_bytes: int
+) -> dict[str, JsonValue]:
     try:
-        encoded = path.read_bytes()
-        if len(encoded) > maximum_bytes:
+        if not encoded or len(encoded) > maximum_bytes:
             raise PromotionAttestationBoundaryError("Promotion input exceeds the size limit")
         parsed = json.loads(encoded.decode("utf-8"), object_pairs_hook=_unique_json_object)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise PromotionAttestationBoundaryError(
-            "Release evidence bundle is not valid JSON"
+            f"Release evidence bundle is not valid JSON: {filename}"
         ) from exc
     if not isinstance(parsed, dict):
         raise PromotionAttestationBoundaryError("Release evidence bundle must be a mapping")

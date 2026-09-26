@@ -215,6 +215,12 @@ Cada chave pública possui início de vigência, expiração opcional e estado e
 assinatura conceda autoridade. Custódia das chaves privadas e distribuição dos trust stores
 continuam como operações externas.
 
+A Fase 6k cria e verifica um pacote local de custódia content-addressed para o bundle completo de
+evidências, o relatório de promoção autorizada, as atestações e os snapshots públicos de confiança.
+Ela rejeita material PEM de chave privada, nunca sobrescreve um arquivo de custódia e detecta
+arquivos alterados ou não rastreados. O pacote oferece retenção local tamper-evident, não storage
+imutável, timestamp confiável ou backup.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
@@ -382,6 +388,7 @@ Comece por:
 - [Threat model](docs/THREAT_MODEL.md)
 - [Estratégia de evals](docs/EVAL_STRATEGY.md)
 - [Ciclo de vida das chaves de verificação](docs/TRUST_KEY_LIFECYCLE.md)
+- [Custódia dos artefatos de release](docs/RELEASE_CUSTODY.md)
 - [Roadmap](docs/MVP_ROADMAP.md)
 - [Fontes primárias](SOURCES.md)
 

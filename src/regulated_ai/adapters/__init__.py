@@ -24,10 +24,18 @@ from regulated_ai.adapters.policy_review_files import (
     load_policy_draft,
     load_policy_regulatory_review,
 )
+from regulated_ai.adapters.promotion_attestations import load_release_evidence_bundle_bytes
 from regulated_ai.adapters.provider_review_files import (
     ProviderReviewBoundaryError,
     load_provider_capability_draft,
     load_provider_capability_review,
+)
+from regulated_ai.adapters.release_custody import (
+    ReleaseCustodyArtifactKind,
+    ReleaseCustodyError,
+    ReleaseCustodyIdentity,
+    create_release_custody,
+    verify_release_custody,
 )
 from regulated_ai.adapters.scenario_files import ScenarioSuiteError, load_scenario_suite_file
 from regulated_ai.adapters.signed_packs import (
@@ -67,6 +75,9 @@ __all__ = [
     "MockToolExecutionAdapter",
     "PolicyReviewBoundaryError",
     "ProviderReviewBoundaryError",
+    "ReleaseCustodyArtifactKind",
+    "ReleaseCustodyError",
+    "ReleaseCustodyIdentity",
     "ScenarioSuiteError",
     "SignedPackError",
     "SqliteEnforcementRepository",
@@ -76,12 +87,15 @@ __all__ = [
     "StructuredEvaluationObserver",
     "UnsupportedSchemaVersionError",
     "VerifiedControlPack",
+    "create_release_custody",
     "load_policy_draft",
     "load_policy_regulatory_review",
     "load_provider_capability_draft",
     "load_provider_capability_review",
+    "load_release_evidence_bundle_bytes",
     "load_scenario_suite_file",
     "load_tool_catalog_bytes",
     "load_tool_catalog_file",
     "verify_control_pack",
+    "verify_release_custody",
 ]

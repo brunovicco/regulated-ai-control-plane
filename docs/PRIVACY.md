@@ -10,6 +10,7 @@ Complete this document before processing personal or regulated data.
 | Approval consumption metadata | External approval workflow | Prove scoped human authority and prevent replay | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate under the same approved evidence-retention procedure |
 | Tool-action metadata | Tool-action API | Prove exact action authority and execution state without retaining payloads | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate under the same approved evidence-retention procedure |
 | Tool-result metadata | Tool execution port | Prove output-schema enforcement without retaining result content | Organization-defined | Local SQLite evidence store | Organization-defined; configure before production | Delete/rotate under the same approved evidence-retention procedure |
+| Release custody metadata and public verification artifacts | Offline release workflow | Reproduce exact evidence and authority bindings | Organization-defined | Local content-addressed custody directory | Organization-defined; configure before production | Delete the archive as an approved unit after retention obligations expire |
 
 ## Controls
 
