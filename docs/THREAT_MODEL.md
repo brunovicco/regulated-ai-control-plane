@@ -215,9 +215,33 @@ Mitigations:
 Residual risks:
 - trust-store compromise or stale distribution can restore or prolong authority;
 - system-clock integrity affects runtime pack verification;
-- historical verification after retirement requires retained trust snapshots, addressed by the
-  separate Phase 6k artifact-custody work;
+- historical verification after retirement depends on the integrity and availability of retained
+  Phase 6k trust snapshots;
 - the repository does not generate, store, rotate or destroy private keys.
+
+### Release evidence is lost, altered or archived with secrets
+
+Threat:
+an operator retains an incomplete release record, silently alters one artifact, loses the trust
+snapshot needed for historical verification or accidentally archives a private key with evidence.
+
+Mitigations:
+- custody accepts only bounded allowlisted JSON/YAML artifact kinds with safe basenames;
+- one complete evidence bundle, one authorized promotion report and at least one public trust
+  snapshot are mandatory;
+- canonical bundle and authorization digests are recomputed and must bind each other;
+- each artifact is stored under its SHA-256 digest and listed with exact size in a canonical
+  manifest whose own digest is recomputed;
+- creation is fail-if-present and atomic, avoiding partial or accidental overwrite;
+- symlinks, untracked files and common PEM private-key markers fail closed;
+- verification is local, recursive and network-silent.
+
+Residual risks:
+- content addressing does not provide immutable storage, trusted time, access control, encryption,
+  replication, backup or proof that an artifact was complete in the real world;
+- non-PEM secrets or sensitive metadata can still be mislabeled as an allowed artifact;
+- local archive and manifest can be replaced together unless anchored externally;
+- retention duration, approved deletion and off-site recovery remain organization-owned.
 
 ### Control-pack change bypasses review
 

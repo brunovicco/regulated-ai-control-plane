@@ -1,5 +1,37 @@
 # Implementation plan
 
+## Phase 6k — content-addressed release artifact custody
+
+### Goal
+
+Create and verify a bounded local custody package for the exact metadata-only evidence, promotion
+authorization, attestations and public trust snapshots needed to reproduce a release decision.
+
+### Work
+
+1. Accept only allowlisted JSON/YAML artifact kinds with safe basenames, bounded per-file/total size
+   and no symlinks or PEM private-key material.
+2. Require exactly one complete release-evidence bundle, one authorized promotion report and at
+   least one public trust-store snapshot; recompute their canonical digests and exact binding.
+3. Store artifacts under content-addressed SHA-256 names and emit a canonical custody manifest with
+   archive identity, UTC creation time, original names, sizes and digests.
+4. Create a new archive through a sibling staging directory and atomic rename; never overwrite an
+   existing target.
+5. Verify the manifest, every artifact, core bundle/authorization binding and absence of untracked
+   files without external calls.
+6. Add create/verify CLI coverage, operating guidance and ADR-0026.
+
+### Decisions and assumptions
+
+- The archive is metadata/public-verification material only; policies, provider/tool content,
+  prompts, responses, credentials, private keys and customer data are excluded.
+- Local content addressing detects tampering but is not immutable storage, trusted timestamping,
+  backup, replication or legal-record certification.
+- Retention duration, access control, encryption at rest, off-site replication and deletion remain
+  organization-owned deployment policy.
+- Archive creation requires an already complete bundle and authorized promotion report; it cannot
+  create or replace review/promotion authority.
+
 ## Phase 6j — verification-key lifecycle enforcement
 
 ### Goal
