@@ -409,6 +409,27 @@ exact-byte review evidence. Whole policy/provider additions and removals remain 
 their onboarding/removal governance is not yet defined. See
 [ADR-0021](adr/0021-verified-release-evidence-bundle.md).
 
+## Phase 6g components
+
+- `adapters/promotion_attestations.py`: strict canonical bundle parsing, role-bound public-key trust
+  policy and Ed25519 attestation verification.
+- `application/authorize_release_promotion.py`: framework-free exact binding, UTC validity,
+  rejection, required-role and distinct-key quorum decisions.
+- `scripts/authorize_release_promotion.py`: offline orchestration and deterministic metadata-only
+  authorization output.
+
+```text
+complete evidence bundle + promotion policy + role-bound public keys + signed attestations
+    -> canonical digest/signature/binding/time/quorum checks
+    -> PROMOTION_AUTHORIZED | PROMOTION_BLOCKED
+    -> separate organization-owned promotion/distribution/deployment system
+```
+
+Private promotion keys never enter this workflow. An authorized report proves that the configured
+trusted keys approved one exact evidence bundle under one explicit policy at one fixed time. It is
+not a control-pack signature, deployment instruction, external timestamp or compliance/safety
+claim. See [ADR-0022](adr/0022-signed-promotion-attestations-and-quorum.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.

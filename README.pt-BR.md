@@ -125,6 +125,7 @@ Contexto
   -> Revisão de capabilities vinculada por digest antes da assinatura separada do pack
   -> Revisão regulatória de políticas vinculada por digest antes da assinatura separada do pack
   -> Bundle verificado de diff, replay e reviews para decisões externas de promoção
+  -> Quórum de promoção assinado e vinculado ao bundle completo exato
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -184,6 +185,14 @@ da suíte exata de cenários e dos registros de review exigidos para policies/pr
 diff e replay, reexecuta os reviews contra os bytes autenticados da candidata e aponta cobertura
 ausente, bloqueada ou ainda sem governança definida. `EVIDENCE_COMPLETE` indica consistência das
 evidências, não aceitação de impacto, autoridade de assinatura, aprovação de promoção ou compliance.
+
+A Fase 6g verifica atestações Ed25519 de promoção controladas pela organização contra um trust
+store público separado e uma política explícita de papéis obrigatórios e quórum de chaves distintas.
+Cada voto vincula o bundle completo exato da Fase 6f, o digest do pack candidato e o digest canônico
+da política de promoção, com validade avaliada em um horário UTC explícito.
+`PROMOTION_AUTHORIZED` é somente um artefato de handoff com quórum autenticado: o fluxo não assina o
+pack, altera o repositório, promove, distribui ou implanta o release, nem declara segurança ou
+compliance.
 
 Fora do primeiro ciclo:
 

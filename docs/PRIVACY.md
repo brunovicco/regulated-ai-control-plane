@@ -84,6 +84,9 @@ Complete this document before processing personal or regulated data.
 - Phase 6f bundles only the allowlisted metadata already produced by static analysis, scenario
   replay and human-review gates, plus release/file/review and bundle digests. It does not copy raw
   YAML, scenario values, source content, reviewer identity, credentials or signing material.
+- Phase 6g attestations use non-personal role and key identifiers plus bundle/candidate digests,
+  decision and UTC validity metadata. Reports replace signature bytes with digests and never retain
+  names, email addresses, private keys, credentials, source content or customer data.
 - Incident-response owner:
 
 ## Prohibited logging
