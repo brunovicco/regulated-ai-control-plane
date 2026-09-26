@@ -1,5 +1,34 @@
 # Implementation plan
 
+## Phase 6j — verification-key lifecycle enforcement
+
+### Goal
+
+Make public-key activation, expiry, retirement and revocation explicit and fail closed across
+control-pack signing, release review and promotion verification boundaries.
+
+### Work
+
+1. Define one shared strict lifecycle model with `ACTIVE`, `RETIRED` and `REVOKED` states, a required
+   UTC `valid_from` instant and an optional increasing UTC `valid_until` instant.
+2. Advance all three trust-store schemas to version 2 and reject missing, malformed or legacy
+   lifecycle metadata.
+3. Check control-pack keys at the explicit verification instant (UTC now by default), reviewer keys
+   at the signed review time and promotion keys at the signed issuance time.
+4. Reject retired, revoked, not-yet-valid and expired keys before accepting their authority.
+5. Add deterministic lifecycle tests, an operator rotation/revocation runbook and ADR-0025.
+
+### Decisions and assumptions
+
+- Trust-store status is deployment-controlled authority. A cryptographically valid signature from
+  an inactive key is insufficient.
+- Retirement is planned rollover; revocation is emergency removal. Both stop new verification in
+  the active trust store, while separately retained historical trust snapshots are a Phase 6k
+  custody concern.
+- Control-pack verification may receive an explicit clock for offline reproducibility. Runtime
+  startup uses the current UTC instant.
+- Private keys, key generation, hardware custody and trust-store distribution remain external.
+
 ## Phase 6i — signed tool-catalog release boundary
 
 ### Goal
@@ -59,7 +88,8 @@ without weakening the detailed Phase 6d/6e update gates or the separate Phase 6g
 - Update attestations supplement, never replace, the detailed provider-source and policy-mapping
   gates. Additions/removals sign the exact whole-entity digest because no same-entity lineage exists.
 - Reviewer roles and key ids are bounded non-personal identifiers. Private keys remain external.
-- Trust-store custody, revocation and rotation remain deployment/organization responsibilities.
+- Trust-store custody, status changes and distribution remain deployment/organization
+  responsibilities; Phase 6j enforces the supplied lifecycle state and validity window.
 - Authenticated review means attributable approval of exact metadata, not legal correctness,
   provider truth, compliance, safety, promotion or deployment authority.
 

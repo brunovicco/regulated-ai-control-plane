@@ -32,6 +32,8 @@ uv run python scripts/sign_control_pack.py \
 The helper refreshes file digests, signs the canonical manifest and verifies it against the trust
 store before replacement. Do not use the packaged demo trust anchor as a production key-management
 design; key custody, reviewer authorization and revocation belong to the deployment release process.
+Trust stores use schema version 2 and require an explicit status and UTC activation time for each
+public key; see [the lifecycle runbook](TRUST_KEY_LIFECYCLE.md) before rotation or revocation.
 Set both `REGULAAI_CONTROL_PACK_MANIFEST` and `REGULAAI_CONTROL_PACK_TRUST_STORE` to deployment
 paths to load an organization-managed release without modifying the packaged defaults.
 

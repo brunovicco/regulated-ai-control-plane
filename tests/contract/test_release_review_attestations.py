@@ -86,6 +86,18 @@ def test_modified_tool_catalog_attestation_uses_whole_artifact_binding(tmp_path:
     assert verified[0].review_id is None
 
 
+def test_rejects_review_key_outside_active_lifecycle(tmp_path: Path) -> None:
+    private_key = Ed25519PrivateKey.generate()
+    trust_store = _write_trust_store(tmp_path / "trust.yaml", private_key)
+    document = yaml.safe_load(trust_store.read_text(encoding="utf-8"))
+    document["keys"]["policy-review-key"]["status"] = "REVOKED"
+    trust_store.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    attestation = _write_attestation(tmp_path / "attestation.yaml", private_key)
+
+    with pytest.raises(ReleaseReviewAttestationError, match="key is not active"):
+        verify_release_review_attestations((attestation,), trust_store)
+
+
 def _write_trust_store(
     path: Path,
     private_key: Ed25519PrivateKey,
@@ -102,7 +114,7 @@ def _write_trust_store(
     path.write_text(
         yaml.safe_dump(
             {
-                "schema_version": "1",
+                "schema_version": "2",
                 "keys": {
                     "policy-review-key": {
                         "algorithm": "ed25519",
@@ -110,6 +122,9 @@ def _write_trust_store(
                         "roles": ["policy-governance"],
                         "artifact_kinds": [artifact_kind],
                         "change_types": list(change_types),
+                        "status": "ACTIVE",
+                        "valid_from": "2026-09-01T00:00:00Z",
+                        "valid_until": "2099-09-01T00:00:00Z",
                     }
                 },
             },

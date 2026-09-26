@@ -5,6 +5,7 @@ import binascii
 import hashlib
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
@@ -13,6 +14,8 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
+
+from regulated_ai.adapters.trust_key_lifecycle import TrustKeyLifecycleModel
 
 
 class SignedPackError(ValueError):
@@ -86,13 +89,13 @@ class _ManifestModel(_StrictModel):
         return self
 
 
-class _TrustedKeyModel(_StrictModel):
+class _TrustedKeyModel(TrustKeyLifecycleModel):
     algorithm: Literal["ed25519"]
     public_key: str = Field(min_length=1, max_length=128)
 
 
 class _TrustStoreModel(_StrictModel):
-    schema_version: Literal["1"]
+    schema_version: Literal["2"]
     keys: dict[str, _TrustedKeyModel] = Field(min_length=1, max_length=64)
 
     @field_validator("keys")
@@ -135,13 +138,24 @@ class VerifiedControlPack:
     tool_files: tuple[VerifiedControlFile, ...]
 
 
-def verify_control_pack(manifest_path: Path, trust_store_path: Path) -> VerifiedControlPack:
+def verify_control_pack(
+    manifest_path: Path,
+    trust_store_path: Path,
+    *,
+    evaluated_at: datetime | None = None,
+) -> VerifiedControlPack:
     """Validate hashes and signature before returning any configuration path."""
     manifest = _parse_manifest(manifest_path)
     trust_store = _parse_trust_store(trust_store_path)
     trusted_key = trust_store.keys.get(manifest.signing.key_id)
     if trusted_key is None or trusted_key.algorithm != manifest.signing.algorithm:
         raise SignedPackError("Control pack signing key is not trusted")
+    try:
+        key_active = trusted_key.active_at(evaluated_at or datetime.now(UTC))
+    except ValueError as exc:
+        raise SignedPackError("Control pack verification time is invalid") from exc
+    if not key_active:
+        raise SignedPackError("Control pack signing key is not active")
 
     payload = _canonical_payload(manifest)
     public_key_bytes = _decode_base64(trusted_key.public_key, expected_length=32)
