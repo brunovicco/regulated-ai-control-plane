@@ -365,6 +365,29 @@ consistent with the recorded state, including an explicit `unknown`; it does not
 behavior. Passing grants no key access or promotion authority. See
 [ADR-0019](adr/0019-provider-capability-pre-signing-review-gate.md).
 
+## Phase 6e components
+
+- `adapters/policy_review_files.py`: bounded exact-byte loading for one policy draft and one strict
+  digest-bound regulatory-review record.
+- `application/review_policy_update.py`: framework-free policy/rule lineage, mapping coverage,
+  version and conclusion gate.
+- `scripts/review_policy_update.py`: verifies the approved pack, composes the review use case and
+  emits deterministic metadata-only JSON before any separate signing step.
+
+```text
+verified approved pack + candidate policy draft + digest-bound human mapping review
+    -> lineage/binding/coverage/version/conclusion checks
+    -> REGULATORY_REVIEW_PASSED | REGULATORY_REVIEW_BLOCKED
+    -> separate organization-owned signing decision
+```
+
+The gate compares rules by stable id and binds each review to the exact control-objective and
+regulatory-support mappings. A rule with regulatory references requires `APPROVED`; an enterprise
+rule without them requires `NOT_APPLICABLE`, preventing internal authority policy from being
+presented as a regulatory mandate. It never retrieves or interprets source text, authenticates a
+reviewer, signs a pack or authorizes promotion. See
+[ADR-0020](adr/0020-digest-bound-policy-regulatory-review-gate.md).
+
 ## Diagrams
 
 Add C4 context/container diagrams and sequence diagrams for critical flows.

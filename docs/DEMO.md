@@ -271,3 +271,26 @@ The example advances record/registry versions and freshness metadata but is not 
 release. The review contains only public source URLs, capability keys and a non-personal role. The
 report hashes uncovered source URLs and never includes source content. A separate organization-owned
 process still decides whether an authorized private key may sign a complete pack.
+
+## Review a policy draft before signing
+
+Run the Phase 6e regulatory review gate against the authenticated packaged base and the
+synthetic-safe policy-mapping example:
+
+```bash
+uv run python scripts/review_policy_update.py \
+  --base-manifest src/regulated_ai/resources/control-pack-manifest.yaml \
+  --trust-store src/regulated_ai/resources/trust/control-pack-signing-keys.yaml \
+  --candidate-policy examples/policy-updates/br-financial-external-inference-candidate.yaml \
+  --review-record examples/regulatory-reviews/br-financial-external-inference-2026-09-26.yaml
+```
+
+The expected status is `REGULATORY_REVIEW_PASSED` with exit code `0`. A structurally valid review
+with missing coverage, `REJECTED`, `NEEDS_REVISION` or an invalid regulatory/enterprise conclusion
+returns `REGULATORY_REVIEW_BLOCKED` and exit code `2`. Invalid schema, digest binding, mapping or
+base lineage returns `1`.
+
+The example adds one approved control-objective mapping to an existing policy rule and advances
+both rule and policy-set versions. The review contains only identifiers, conclusions, a date,
+digests and a non-personal role. It does not contain or retrieve legal text. Passing does not prove
+legal correctness or compliance and does not authorize the separate signer or promotion process.

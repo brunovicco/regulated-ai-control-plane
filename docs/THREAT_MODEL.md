@@ -266,6 +266,33 @@ Residual risks:
 - a compromised base signing key or trust store remains outside this gate's guarantee;
 - new-target onboarding, reviewer quorum, signed attestations and key authorization remain external.
 
+### Policy mapping enters signing without bounded regulatory review
+
+Threat:
+a policy draft changes executable rules, control-objective mappings or regulatory-support
+references without binding a human conclusion to the authenticated base and exact candidate bytes;
+or an enterprise authority rule is presented as a regulatory requirement.
+
+Mitigations:
+- the approved base pack must pass signature/digest verification;
+- the review binds the approved pack payload digest, exact candidate policy bytes and policy-set id;
+- only an existing policy-set lineage may be updated in this phase;
+- every added, modified or removed rule must be reviewed with its exact change type and mappings;
+- changed policy-set metadata, policy version and modified rule versions fail closed when coverage
+  or version advancement is missing;
+- regulatory mappings pass only with `APPROVED`, while rules without regulatory references pass
+  only with `NOT_APPLICABLE`;
+- legal text, quotes, personal reviewer identity, customer data, credentials and private keys are
+  excluded;
+- passing never invokes the signer or grants promotion authority.
+
+Residual risks:
+- conclusions remain unauthenticated human assertions and may be wrong or malicious;
+- opaque support-reference ids do not prove source authenticity, applicability or current text;
+- a compromised base signing key or trust store remains outside this gate's guarantee;
+- new-policy onboarding, control-objective catalog approval, reviewer quorum and signed
+  attestations remain external.
+
 ### Cross-tenant leakage (future SaaS)
 
 Not Phase 1, but architecture must not make tenant id optional once SaaS mode exists.

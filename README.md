@@ -120,6 +120,7 @@ Context
   -> Offline semantic impact analysis between verified pack releases
   -> Fixed-clock metadata-only scenario replay across verified releases
   -> Digest-bound provider capability review before separate pack signing
+  -> Digest-bound policy regulatory review before separate pack signing
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -163,6 +164,14 @@ binds the authenticated base, exact candidate bytes, provider target, review dat
 source conclusions for every capability. Missing, contradicted, inconclusive, stale-date or
 unversioned reviews are blocked. Passing confirms bounded record consistency only; it does not
 authenticate a reviewer, retrieve sources, sign or promote a release, or prove provider behavior.
+
+Phase 6e adds an offline pre-signing gate for updates to an existing policy set. It binds the
+authenticated base and exact candidate bytes, requires review of every changed rule and exact
+control-objective/regulatory-support mapping, and fails closed on missing, rejected or
+revision-needed conclusions. Rules without regulatory references must be marked
+`NOT_APPLICABLE`, keeping enterprise authority policy distinct from regulatory requirements.
+Passing does not retrieve or interpret legal text, authenticate the reviewer, sign or promote a
+release, or assert compliance.
 
 Not implemented in the first slice:
 

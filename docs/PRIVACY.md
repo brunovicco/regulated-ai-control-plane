@@ -77,6 +77,10 @@ Complete this document before processing personal or regulated data.
 - Phase 6d review records contain a non-personal reviewer role, public source URLs, capability keys,
   conclusions, dates and digests. They exclude reviewer names, source text/quotes, credentials,
   customer data and private keys. Reports replace uncovered source URLs with SHA-256 digests.
+- Phase 6e review records contain a non-personal reviewer role, policy/rule/control/source
+  identifiers, conclusions, dates and digests. They exclude reviewer names, regulatory text,
+  quotes, free-form notes, customer data, credentials and private keys. Reports emit only bounded
+  identifiers and stable findings.
 - Incident-response owner:
 
 ## Prohibited logging

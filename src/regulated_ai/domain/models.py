@@ -184,6 +184,32 @@ class ProviderCapabilityReviewFindingCode(StrEnum):
     CAPABILITY_INCONCLUSIVE = "CAPABILITY_INCONCLUSIVE"
 
 
+class RegulatoryReviewConclusion(StrEnum):
+    """Human-recorded conclusion for one changed policy mapping."""
+
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    NEEDS_REVISION = "NEEDS_REVISION"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+class RegulatoryReviewFindingCode(StrEnum):
+    """Stable reason that a policy draft cannot pass regulatory review."""
+
+    POLICY_SET_VERSION_UNCHANGED = "POLICY_SET_VERSION_UNCHANGED"
+    POLICY_SET_FIELD_UNREVIEWED = "POLICY_SET_FIELD_UNREVIEWED"
+    POLICY_SET_REJECTED = "POLICY_SET_REJECTED"
+    POLICY_SET_NEEDS_REVISION = "POLICY_SET_NEEDS_REVISION"
+    POLICY_SET_NOT_APPLICABLE = "POLICY_SET_NOT_APPLICABLE"
+    RULE_REVIEW_MISSING = "RULE_REVIEW_MISSING"
+    RULE_VERSION_UNCHANGED = "RULE_VERSION_UNCHANGED"
+    CONTROL_OBJECTIVE_MISSING = "CONTROL_OBJECTIVE_MISSING"
+    RULE_REJECTED = "RULE_REJECTED"
+    RULE_NEEDS_REVISION = "RULE_NEEDS_REVISION"
+    REGULATORY_MAPPING_NOT_APPLICABLE = "REGULATORY_MAPPING_NOT_APPLICABLE"
+    ENTERPRISE_RULE_CONCLUSION_INVALID = "ENTERPRISE_RULE_CONCLUSION_INVALID"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -642,6 +668,72 @@ class ProviderCapabilityUpdateReport:
     @property
     def approved(self) -> bool:
         """Return whether every bounded review condition passed."""
+        return not self.findings
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyDraft:
+    """Strict candidate policy set bound to its exact pre-signing bytes."""
+
+    policy_set: PolicySet
+    content_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyRuleRegulatoryReview:
+    """Human conclusion for one exact changed rule and its support mappings."""
+
+    rule_id: str
+    change_type: ControlPackChangeType
+    control_objective_ids: tuple[str, ...]
+    regulatory_support_refs: tuple[str, ...]
+    conclusion: RegulatoryReviewConclusion
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyUpdateRegulatoryReview:
+    """Digest-bound human governance metadata for one policy-set draft."""
+
+    review_id: str
+    reviewer_role: str
+    reviewed_at: date
+    base_pack_payload_digest: str
+    candidate_policy_digest: str
+    policy_set_id: str
+    reviewed_policy_set_fields: tuple[str, ...]
+    policy_set_conclusion: RegulatoryReviewConclusion
+    rule_reviews: tuple[PolicyRuleRegulatoryReview, ...]
+    review_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class RegulatoryReviewFinding:
+    """Metadata-only failed condition in a policy regulatory review."""
+
+    code: RegulatoryReviewFindingCode
+    rule_id: str | None = None
+    policy_set_field: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyUpdateRegulatoryReviewReport:
+    """Deterministic pre-signing regulatory-review result for one policy draft."""
+
+    base: ControlPackReleaseIdentity
+    policy_set_id: str
+    candidate_policy_version: str
+    candidate_policy_digest: str
+    review_id: str
+    reviewer_role: str
+    reviewed_at: date
+    review_digest: str
+    required_policy_set_fields: tuple[str, ...]
+    required_rule_ids: tuple[str, ...]
+    findings: tuple[RegulatoryReviewFinding, ...]
+
+    @property
+    def approved(self) -> bool:
+        """Return whether every bounded regulatory-review condition passed."""
         return not self.findings
 
 

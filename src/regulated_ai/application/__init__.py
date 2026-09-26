@@ -41,6 +41,10 @@ from regulated_ai.application.replay_control_pack_scenarios import (
     ControlPackScenarioReplayError,
     ReplayControlPackScenarios,
 )
+from regulated_ai.application.review_policy_update import (
+    PolicyUpdateRegulatoryReviewError,
+    ReviewPolicyUpdate,
+)
 from regulated_ai.application.review_provider_capability_update import (
     ProviderCapabilityUpdateReviewError,
     ReviewProviderCapabilityUpdate,
@@ -66,9 +70,11 @@ __all__ = [
     "OperatorTimelineIntegrityError",
     "OperatorTimelineNotFoundError",
     "PolicySetNotFoundError",
+    "PolicyUpdateRegulatoryReviewError",
     "ProviderCapabilityUpdateReviewError",
     "ProviderRegistryError",
     "ReplayControlPackScenarios",
+    "ReviewPolicyUpdate",
     "ReviewProviderCapabilityUpdate",
     "ToolActionConflictError",
     "ToolActionExecutionFailedError",
