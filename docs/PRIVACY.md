@@ -87,6 +87,9 @@ Complete this document before processing personal or regulated data.
 - Phase 6g attestations use non-personal role and key identifiers plus bundle/candidate digests,
   decision and UTC validity metadata. Reports replace signature bytes with digests and never retain
   names, email addresses, private keys, credentials, source content or customer data.
+- Phase 6h review attestations contain bounded non-personal role/key/subject identifiers, change
+  type, conclusion, UTC time and cryptographic digests. Bundle v2 emits signature digests instead of
+  signature bytes and excludes names, email addresses, source text, raw YAML and private keys.
 - Incident-response owner:
 
 ## Prohibited logging
