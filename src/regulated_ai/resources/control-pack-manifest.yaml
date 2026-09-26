@@ -1,6 +1,6 @@
 schema_version: "1"
 pack_id: "br-financial-runtime"
-pack_version: "2026-09-25.1"
+pack_version: "2026-09-26.2"
 files:
   - kind: "policy"
     path: "policies/br-financial-external-inference.yaml"
@@ -11,7 +11,10 @@ files:
   - kind: "provider_capability"
     path: "provider-capabilities/openai-responses.yaml"
     sha256: "sha256:0986fc86f84381100d671210c93eb0036bc5c09358de68cdfe3f026f5f1adff8"
+  - kind: "tool_catalog"
+    path: "tools/br-financial-tools.yaml"
+    sha256: "sha256:f4296151c9bb8832fe5f339c7113cb74b7a7ab0311cdeed8ea48dc20a65bd179"
 signing:
   algorithm: "ed25519"
-  key_id: "regulaai-demo-2026-09"
-  signature: "qr1Pvw+eNKr0txn5gMu1YhrcxzeWVzHASHNcw1JTgIj0yXrV+7CeKP/ChmvI7EGKVmUlVfu27ncFZecInwaNCA=="
+  key_id: "regulaai-demo-2026-09-tools"
+  signature: "jsM/A4HGVxJ+hVGx2wfxN4yKDytCzY1n5GCqI96R25e2sEVEu/9ippHw9QuKjDDuAuceO6wyAQRstx5V7gWkCw=="

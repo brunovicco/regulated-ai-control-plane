@@ -393,12 +393,25 @@ def _load_capability_document(raw: dict[str, Any], filename: str) -> ProviderCap
 
 def load_tool_catalog_file(path: Path) -> tuple[str, tuple[AuthorizedTool, ...]]:
     """Translate one strict tool catalog into immutable trusted definitions."""
+    return _load_tool_catalog_document(_read_yaml(path), path.name)
+
+
+def load_tool_catalog_bytes(
+    content: bytes, filename: str
+) -> tuple[str, tuple[AuthorizedTool, ...]]:
+    """Translate authenticated tool-catalog bytes without reopening a path."""
+    return _load_tool_catalog_document(_read_yaml_bytes(content, filename), filename)
+
+
+def _load_tool_catalog_document(
+    raw: dict[str, Any], filename: str
+) -> tuple[str, tuple[AuthorizedTool, ...]]:
     try:
-        document = _ToolCatalogFileModel.model_validate(_read_yaml(path))
+        document = _ToolCatalogFileModel.model_validate(raw)
     except UnsupportedSchemaVersionError:
         raise
     except (TypeError, ValidationError, ValueError) as exc:
-        raise MalformedYamlError(f"Tool catalog failed schema validation: {path.name}") from exc
+        raise MalformedYamlError(f"Tool catalog failed schema validation: {filename}") from exc
     tools = tuple(
         _authorized_tool(document.catalog_version, name, item)
         for name, item in sorted(document.tools.items())
@@ -584,6 +597,16 @@ class FileToolCatalogRepository:
         self._items = {item.name: item for item in loaded}
         if len(self._items) != len(loaded):
             raise ConfigurationBoundaryError("Duplicate tool name")
+
+    @classmethod
+    def from_bytes(cls, content: bytes, filename: str) -> "FileToolCatalogRepository":
+        """Build from exact bytes authenticated by a signed control pack."""
+        instance = cls.__new__(cls)
+        instance._catalog_version, loaded = load_tool_catalog_bytes(content, filename)
+        instance._items = {item.name: item for item in loaded}
+        if len(instance._items) != len(loaded):
+            raise ConfigurationBoundaryError("Duplicate tool name")
+        return instance
 
     @property
     def catalog_version(self) -> str:

@@ -44,6 +44,7 @@ from regulated_ai.adapters.yaml_files import (
     FileToolCatalogRepository,
     MalformedYamlError,
     UnsupportedSchemaVersionError,
+    load_tool_catalog_bytes,
     load_tool_catalog_file,
 )
 
@@ -80,6 +81,7 @@ __all__ = [
     "load_provider_capability_draft",
     "load_provider_capability_review",
     "load_scenario_suite_file",
+    "load_tool_catalog_bytes",
     "load_tool_catalog_file",
     "verify_control_pack",
 ]

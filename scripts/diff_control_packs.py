@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare two verified policy/provider packs and emit metadata-only JSON."""
+"""Compare two verified control packs and emit metadata-only JSON."""
 
 import argparse
 import json
@@ -16,6 +16,7 @@ from regulated_ai.adapters.yaml_files import (
     ConfigurationBoundaryError,
     load_capability_bytes,
     load_policy_bytes,
+    load_tool_catalog_bytes,
 )
 from regulated_ai.application import AnalyzeControlPackDiff, ControlPackDiffError
 from regulated_ai.domain import (
@@ -63,6 +64,9 @@ def _load_release(manifest_path: Path, trust_store_path: Path) -> ControlPackRel
 
 def _release_from_verified_pack(pack: VerifiedControlPack) -> ControlPackRelease:
     identity = pack.identity
+    catalog_version, tools = load_tool_catalog_bytes(
+        pack.tool_files[0].content, pack.tool_files[0].path
+    )
     return ControlPackRelease(
         identity=ControlPackReleaseIdentity(
             pack_id=identity.pack_id,
@@ -74,6 +78,8 @@ def _release_from_verified_pack(pack: VerifiedControlPack) -> ControlPackRelease
         provider_records=tuple(
             load_capability_bytes(item.content, item.path) for item in pack.capability_files
         ),
+        tool_catalog_version=catalog_version,
+        tools=tools,
     )
 
 

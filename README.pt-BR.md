@@ -119,7 +119,7 @@ Contexto
   -> Contexto operacional de controles e aprovação sanitizada, apenas com metadados
   -> Snapshots de fontes e frescor do provedor vinculados ao digest
   -> Dashboard operacional server-rendered por ID exato
-  -> Verificação do pack assinado de políticas/providers antes da composição do runtime
+  -> Verificação do pack assinado de políticas/providers/catálogo antes da composição do runtime
   -> Análise semântica offline de impacto entre releases verificadas do pack
   -> Replay de cenários apenas com metadados e relógio fixo entre releases verificadas
   -> Revisão de capabilities vinculada por digest antes da assinatura separada do pack
@@ -127,6 +127,7 @@ Contexto
   -> Bundle verificado de diff, replay e reviews para decisões externas de promoção
   -> Quórum de promoção assinado e vinculado ao bundle completo exato
   -> Autoridade de review assinada para updates, onboarding e remoção
+  -> Diff, replay sem argumentos e review do catálogo assinado de ferramentas
 ```
 
 O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -134,7 +135,7 @@ O serviço expõe `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
 `POST /v1/enforcements/{enforcement_id}/tool-actions`, `GET /v1/tool-actions/{action_id}`,
 `GET /v1/operator/enforcements/{enforcement_id}/timeline`,
 `GET /operator?enforcement_id={enforcement_id}`, `GET /v1/providers` e `GET /health`. O modo
-padrão verifica o pack local assinado de políticas/providers e continua sem rede. Quando
+padrão verifica o pack local assinado de políticas/providers/catálogo e continua sem rede. Quando
 configurado explicitamente, o modo gateway
 usa timeouts limitados, não realiza retry local, descarta a saída do modelo e aceita somente
 definições de ferramentas resolvidas pelo catálogo versionado da organização. Chamadas de
@@ -201,6 +202,12 @@ detalhado das Fases 6d/6e, e a assinatura vincula o digest exato desse review. A
 integrais de policies/providers são governadas pelo digest assinado dos bytes da candidata ou da
 base aprovada. Isso comprova atribuição do revisor e cobertura do ciclo de vida, não correção legal,
 verdade do provider, autoridade de promoção ou permissão de deployment.
+
+A Fase 6i inclui exatamente um catálogo confiável de ferramentas em cada control pack assinado. O
+runtime, o diff estático, o replay somente com metadados e as evidências de release usam os mesmos
+bytes do catálogo verificados por digest. Mudanças no catálogo ficam visíveis como impacto semântico
+e exigem revisão assinada do artefato completo. Isso autentica definições para avaliação; não
+autoriza argumentos, executa ferramentas ou comprova o comportamento da implementação downstream.
 
 Fora do primeiro ciclo:
 

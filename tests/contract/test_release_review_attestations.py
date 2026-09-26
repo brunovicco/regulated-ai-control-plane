@@ -66,11 +66,32 @@ def test_modified_attestation_requires_detailed_review_binding(tmp_path: Path) -
         verify_release_review_attestations((attestation,), trust_store)
 
 
+def test_modified_tool_catalog_attestation_uses_whole_artifact_binding(tmp_path: Path) -> None:
+    private_key = Ed25519PrivateKey.generate()
+    trust_store = _write_trust_store(
+        tmp_path / "trust.yaml",
+        private_key,
+        change_types=("MODIFIED",),
+        artifact_kind="TOOL_CATALOG",
+    )
+    attestation = _write_attestation(
+        tmp_path / "tool-catalog.yaml",
+        private_key,
+        change_type="MODIFIED",
+        artifact_kind="TOOL_CATALOG",
+    )
+
+    verified = verify_release_review_attestations((attestation,), trust_store)
+
+    assert verified[0].review_id is None
+
+
 def _write_trust_store(
     path: Path,
     private_key: Ed25519PrivateKey,
     *,
     change_types: tuple[str, ...] = ("ADDED",),
+    artifact_kind: str = "POLICY_SET",
 ) -> Path:
     public_key = base64.b64encode(
         private_key.public_key().public_bytes(
@@ -87,7 +108,7 @@ def _write_trust_store(
                         "algorithm": "ed25519",
                         "public_key": public_key,
                         "roles": ["policy-governance"],
-                        "artifact_kinds": ["POLICY_SET"],
+                        "artifact_kinds": [artifact_kind],
                         "change_types": list(change_types),
                     }
                 },
@@ -104,12 +125,13 @@ def _write_attestation(
     private_key: Ed25519PrivateKey,
     *,
     change_type: str = "ADDED",
+    artifact_kind: str = "POLICY_SET",
 ) -> Path:
     document = {
         "schema_version": "1",
         "attestation_id": f"test-{change_type.lower()}",
-        "artifact_kind": "POLICY_SET",
-        "subject_id": "new-policy",
+        "artifact_kind": artifact_kind,
+        "subject_id": ("trusted-tool-catalog" if artifact_kind == "TOOL_CATALOG" else "new-policy"),
         "change_type": change_type,
         "base_pack_payload_digest": f"sha256:{'a' * 64}",
         "candidate_pack_payload_digest": f"sha256:{'b' * 64}",

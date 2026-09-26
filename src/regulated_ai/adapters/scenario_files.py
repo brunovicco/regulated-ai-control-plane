@@ -20,6 +20,7 @@ from regulated_ai.domain import (
     ProviderTarget,
     Purpose,
     Sector,
+    ToolRequest,
 )
 
 
@@ -67,6 +68,11 @@ class _DataItemModel(_StrictModel):
         return value
 
 
+class _ToolRequestModel(_StrictModel):
+    name: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    claimed_risk_class: str | None = Field(default=None, min_length=1, max_length=128)
+
+
 class _ScenarioModel(_StrictModel):
     id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._@-]*$")
     policy_set_id: str = Field(
@@ -81,6 +87,7 @@ class _ScenarioModel(_StrictModel):
     data: tuple[_DataItemModel, ...] = Field(default=(), max_length=128)
     organization_assertions: dict[str, bool] = Field(default_factory=dict, max_length=128)
     fallback_providers: tuple[_TargetModel, ...] = Field(default=(), max_length=8)
+    tools: tuple[_ToolRequestModel, ...] = Field(default=(), max_length=32)
 
     @model_validator(mode="after")
     def unique_metadata(self) -> "_ScenarioModel":
@@ -90,13 +97,16 @@ class _ScenarioModel(_StrictModel):
             raise ValueError("scenario data fields must be unique")
         if len(targets) != len(set(targets)):
             raise ValueError("scenario fallback providers must be unique")
+        tool_names = tuple(tool.name for tool in self.tools)
+        if len(tool_names) != len(set(tool_names)):
+            raise ValueError("scenario tool names must be unique")
         if any(_SAFE_IDENTIFIER.fullmatch(key) is None for key in self.organization_assertions):
             raise ValueError("scenario assertion identifier is invalid")
         return self
 
 
 class _ScenarioFileModel(_StrictModel):
-    schema_version: Literal["1"]
+    schema_version: Literal["1", "2"]
     suite: _SuiteModel
     scenarios: tuple[_ScenarioModel, ...] = Field(min_length=1, max_length=256)
 
@@ -107,6 +117,12 @@ class _ScenarioFileModel(_StrictModel):
         if len(identifiers) != len(set(identifiers)):
             raise ValueError("scenario identifiers must be unique")
         return value
+
+    @model_validator(mode="after")
+    def tools_require_v2(self) -> "_ScenarioFileModel":
+        if self.schema_version == "1" and any(item.tools for item in self.scenarios):
+            raise ValueError("scenario tools require schema version 2")
+        return self
 
 
 _SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}\Z")
@@ -155,6 +171,7 @@ def _scenario(item: _ScenarioModel) -> ControlPackScenario:
         ),
         organization_assertions=tuple(sorted(item.organization_assertions.items())),
         fallback_providers=tuple(_target(target) for target in item.fallback_providers),
+        tools=tuple(ToolRequest(tool.name, tool.claimed_risk_class) for tool in item.tools),
     )
 
 

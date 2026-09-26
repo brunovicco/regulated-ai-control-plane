@@ -5,6 +5,7 @@ import json
 
 from regulated_ai.application.evaluate_operation import EvaluateAiOperation, EvaluationError
 from regulated_ai.domain import (
+    AuthorizedTool,
     ControlPackImpact,
     ControlPackRelease,
     ControlPackScenario,
@@ -80,12 +81,18 @@ class _ReleaseEvaluator:
     def __init__(self, release: ControlPackRelease, suite: ControlPackScenarioSuite) -> None:
         self._policies = _ReleasePolicyRepository(release.policy_sets)
         capabilities = _ReleaseCapabilityRepository(release.provider_records)
+        tools = (
+            _ReleaseToolCatalogRepository(release.tool_catalog_version, release.tools)
+            if release.tool_catalog_version is not None or release.tools
+            else None
+        )
         self._evaluator = EvaluateAiOperation(
             policies=self._policies,
             capabilities=capabilities,
             evidence=_DiscardingEvidenceRepository(),
             classifier=_MetadataOnlyClassifier(),
             clock=lambda: suite.evaluated_at,
+            tools=tools,
         )
 
     def evaluate(self, scenario: ControlPackScenario) -> ScenarioReplayOutcome:
@@ -101,7 +108,7 @@ class _ReleaseEvaluator:
             assurance_level=scenario.assurance_level,
             provider=scenario.provider,
             data_items=scenario.data_items,
-            tools=(),
+            tools=scenario.tools,
             policy_set_version=policy.identifier,
             organization_assertions=scenario.organization_assertions,
             fallback_providers=scenario.fallback_providers,
@@ -120,6 +127,8 @@ class _ReleaseEvaluator:
             reason_codes=result.reason_codes,
             policy_set_version=result.policy_set_version,
             provider_registry_version=result.provider_registry_version,
+            tool_catalog_version=result.tool_catalog_version,
+            authorized_tool_ids=tuple(tool.identifier for tool in result.authorized_tools),
             output_digest=result.output_digest,
         )
 
@@ -186,6 +195,28 @@ class _MetadataOnlyClassifier:
         return (item,)
 
 
+class _ReleaseToolCatalogRepository:
+    def __init__(self, version: str | None, tools: tuple[AuthorizedTool, ...]) -> None:
+        if version is None or not tools:
+            raise ControlPackScenarioReplayError("Release tool catalog must not be empty")
+        if any(item.catalog_version != version for item in tools):
+            raise ControlPackScenarioReplayError("Release tools must share the catalog version")
+        self._catalog_version = version
+        self._items = {item.name: item for item in tools}
+        if len(self._items) != len(tools):
+            raise ControlPackScenarioReplayError("Release tool names must be unique")
+
+    @property
+    def catalog_version(self) -> str:
+        return self._catalog_version
+
+    def get(self, name: str) -> AuthorizedTool | None:
+        return self._items.get(name)
+
+    def list(self) -> tuple[AuthorizedTool, ...]:
+        return tuple(self._items[name] for name in sorted(self._items))
+
+
 class _DiscardingEvidenceRepository:
     def save(self, evidence: EvidenceMetadata) -> EvidenceMetadata:
         return evidence
@@ -206,6 +237,8 @@ def _failed_outcome(error_code: str) -> ScenarioReplayOutcome:
         reason_codes=(),
         policy_set_version=None,
         provider_registry_version=None,
+        tool_catalog_version=None,
+        authorized_tool_ids=(),
         output_digest=None,
         error_code=error_code,
     )
@@ -225,6 +258,8 @@ def _compare(
         "reason_codes",
         "policy_set_version",
         "provider_registry_version",
+        "tool_catalog_version",
+        "authorized_tool_ids",
         "output_digest",
         "error_code",
     )
