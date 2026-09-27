@@ -239,6 +239,11 @@ Phase 6p verifies provider-neutral signed time-authority receipts for exact rele
 bytes. It enforces explicit artifact kind, authority/key lifecycle and caller-pinned time bounds,
 without claiming RFC 3161 compatibility, acquiring receipts or selecting a timestamp provider.
 
+Phase 6q adds interoperable offline RFC 3161 verification for an original DER request and response.
+It binds the exact artifact imprint, nonce and allowlisted policy, then delegates CMS signature,
+timestamping EKU and PKIX-chain verification at the asserted time to OpenSSL. Timestamp acquisition,
+provider selection, online revocation and long-term evidence renewal remain deployment concerns.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;

@@ -1,5 +1,27 @@
 # Implementation plan
 
+## Phase 6q — offline RFC 3161 timestamp verification
+
+### Goal
+
+Verify a standards-based RFC 3161 timestamp token for the exact bytes of an allowlisted release or
+trust artifact, using deployment-supplied PKIX trust and no network access.
+
+### Work
+
+1. Parse strict DER timestamp requests and responses with bounded input sizes.
+2. Require an exact SHA-256/SHA-384/SHA-512 message imprint, matching nonce and allowlisted policy.
+3. Verify CMS signature, timestamping EKU and certificate chain with OpenSSL at the asserted time.
+4. Apply explicit UTC evaluation and optional caller-pinned minimum generation times.
+5. Emit a deterministic metadata-only report and permit that report in release custody.
+6. Add CLI, regression tests, operating guidance and ADR-0032.
+
+### Decisions and assumptions
+
+- `asn1crypto` parses RFC 3161/CMS metadata; OpenSSL performs cryptographic and PKIX verification.
+- The original request is required so the response cannot supply its own nonce or artifact claim.
+- Acquisition, provider selection, online revocation, immutable retention and renewal remain external.
+
 ## Phase 6p — provider-neutral signed time-authority receipts
 
 ### Goal

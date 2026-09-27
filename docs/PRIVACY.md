@@ -111,6 +111,10 @@ Complete this document before processing personal or regulated data.
   and cryptographic digests/signatures. They exclude artifact content, credentials, private keys,
   people and customer data. Authority ids remain organization metadata requiring normal access
   controls.
+- Phase 6q reports contain artifact/request/response/certificate/signature digests, an RFC 3161
+  policy OID, serial number and UTC generation time. They exclude artifact bytes, certificate
+  subjects, credentials, private keys, people and customer data. Original DER inputs and CA bundles
+  remain controlled evidence outside the report.
 - Incident-response owner:
 
 ## Prohibited logging

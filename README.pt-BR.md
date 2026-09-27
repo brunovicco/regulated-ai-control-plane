@@ -251,6 +251,11 @@ artefatos de release/trust. Ela exige tipo explícito, ciclo de vida da autorida
 tempo fixados pelo chamador, sem alegar compatibilidade RFC 3161, adquirir recibos ou selecionar um
 provedor.
 
+A Fase 6q adiciona verificação RFC 3161 interoperável e offline para a requisição e a resposta DER
+originais. Ela vincula o imprint exato do artefato, nonce e política permitida, e delega ao OpenSSL a
+verificação da assinatura CMS, EKU de timestamp e cadeia PKIX no instante declarado. Aquisição,
+seleção de provedor, revogação online e renovação de evidência de longo prazo permanecem externas.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
