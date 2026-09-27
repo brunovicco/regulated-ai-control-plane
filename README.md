@@ -208,6 +208,11 @@ Every public key has an activation instant, optional expiry and explicit `ACTIVE
 `REVOKED` state. Inactive or out-of-window keys fail closed before their signatures can grant
 authority. Private-key custody and trust-store distribution remain external operations.
 
+Phase 6k creates and verifies a local content-addressed custody package for the complete evidence
+bundle, authorized promotion report, attestations and public trust snapshots. It rejects private-key
+PEM material, never overwrites an archive and detects changed or untracked files. The package is
+tamper-evident local retention, not immutable storage, trusted timestamping or backup.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;
@@ -361,6 +366,7 @@ Start with:
 - [Threat model](docs/THREAT_MODEL.md)
 - [Evaluation strategy](docs/EVAL_STRATEGY.md)
 - [Verification-key lifecycle](docs/TRUST_KEY_LIFECYCLE.md)
+- [Release artifact custody](docs/RELEASE_CUSTODY.md)
 - [MVP roadmap](docs/MVP_ROADMAP.md)
 - [Primary sources](SOURCES.md)
 

@@ -204,6 +204,23 @@ signature + selected public key + signed/event time
 Lifecycle authorization is additional to signature verification; it does not create or distribute
 keys. See [ADR-0025](adr/0025-verification-key-lifecycle-enforcement.md).
 
+## Phase 6k components
+
+- `adapters/release_custody.py`: bounded content-addressed archive creation and recursive
+  verification.
+- `scripts/manage_release_custody.py`: offline `create` and `verify` operator commands.
+- `docs/RELEASE_CUSTODY.md`: allowlist, retention boundary and operating procedure.
+
+```text
+complete evidence bundle + authorized promotion report + public release artifacts
+    -> canonical core-digest verification -> private-key marker rejection
+    -> content-addressed blobs + canonical custody manifest -> atomic new directory
+    -> later recursive digest/binding/untracked-file verification
+```
+
+The archive is a local tamper-evident package, not an immutable or externally timestamped store.
+See [ADR-0026](adr/0026-content-addressed-release-artifact-custody.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim
