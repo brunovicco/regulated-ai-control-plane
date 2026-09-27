@@ -241,6 +241,11 @@ explícita de targets permitidos/obrigatórios e quórum de targets distintos. E
 chaves duplicados, recibos futuros e vínculos com outro checkpoint. O resultado é evidência de
 rollout; ele não distribui o trust store nem comprova que um processo em execução o carregou.
 
+A Fase 6o verifica declarações recentes e assinadas dos targets para o digest exato do trust store
+vinculado ao checkpoint. Targets obrigatórios, quórum e idade máxima falham de modo fechado em um
+instante UTC explícito. A evidência continua offline: não implementa probes nem comprova enforcement
+contínuo.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;

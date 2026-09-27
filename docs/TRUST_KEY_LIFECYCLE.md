@@ -39,6 +39,8 @@ supplies a trusted digest, minimum sequence or predecessor; distribution monitor
 Phase 6n can additionally require signed acknowledgements from explicitly authorized consumer
 targets and enforce required-target coverage plus a minimum quorum. These receipts prove acceptance
 of the checkpoint metadata, not continuous runtime loading or enforcement.
+Phase 6o can verify fresh signed target assertions for the exact loaded trust-store digest. These
+assertions remain dependent on target integrity, target clocks and the deployment-owned probe.
 
 ## Verification clocks
 

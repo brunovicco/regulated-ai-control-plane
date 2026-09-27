@@ -37,6 +37,11 @@ from regulated_ai.adapters.release_custody import (
     create_release_custody,
     verify_release_custody,
 )
+from regulated_ai.adapters.runtime_trust_state import (
+    RuntimeTrustStateError,
+    load_runtime_trust_state_policy,
+    verify_runtime_trust_state_attestations,
+)
 from regulated_ai.adapters.scenario_files import ScenarioSuiteError, load_scenario_suite_file
 from regulated_ai.adapters.signed_packs import (
     ControlPackIdentity,
@@ -95,6 +100,7 @@ __all__ = [
     "ReleaseCustodyArtifactKind",
     "ReleaseCustodyError",
     "ReleaseCustodyIdentity",
+    "RuntimeTrustStateError",
     "ScenarioSuiteError",
     "SignedPackError",
     "SqliteEnforcementRepository",
@@ -116,6 +122,7 @@ __all__ = [
     "load_provider_capability_draft",
     "load_provider_capability_review",
     "load_release_evidence_bundle_bytes",
+    "load_runtime_trust_state_policy",
     "load_scenario_suite_file",
     "load_tool_catalog_bytes",
     "load_tool_catalog_draft",
@@ -124,6 +131,7 @@ __all__ = [
     "load_trust_store_rollout_policy",
     "verify_control_pack",
     "verify_release_custody",
+    "verify_runtime_trust_state_attestations",
     "verify_trust_store_acknowledgements",
     "verify_trust_store_checkpoint",
 ]

@@ -61,6 +61,10 @@ from regulated_ai.application.review_tool_catalog_update import (
     ReviewToolCatalogUpdate,
     ToolCatalogUpdateReviewError,
 )
+from regulated_ai.application.verify_runtime_trust_state import (
+    RuntimeTrustStateVerificationError,
+    VerifyRuntimeTrustState,
+)
 from regulated_ai.application.verify_trust_store_rollout import (
     TrustStoreRolloutError,
     VerifyTrustStoreRollout,
@@ -97,6 +101,7 @@ __all__ = [
     "ReviewPolicyUpdate",
     "ReviewProviderCapabilityUpdate",
     "ReviewToolCatalogUpdate",
+    "RuntimeTrustStateVerificationError",
     "ToolActionConflictError",
     "ToolActionExecutionFailedError",
     "ToolActionNotFoundError",
@@ -106,6 +111,7 @@ __all__ = [
     "ToolResultRejectedError",
     "TransformationFailedError",
     "TrustStoreRolloutError",
+    "VerifyRuntimeTrustState",
     "VerifyTrustStoreRollout",
     "normalize_evaluation_context",
 ]

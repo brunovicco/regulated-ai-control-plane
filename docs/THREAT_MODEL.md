@@ -262,6 +262,27 @@ Residual risks:
 - compromised target signing keys and incorrect target assignments can create false acceptance;
 - delivery, target health, external trusted timestamping and recovery remain deployment-owned.
 
+### Runtime target reports stale or false loaded trust state
+
+Threat:
+a target replays an old observation, reports a different trust-store digest as current or another
+target substitutes its signed state so stale runtime authority is treated as active.
+
+Mitigations:
+- Phase 6o binds every signed assertion to the exact checkpoint, runtime-policy digest, store
+  identity/kind, sequence, target and loaded trust-store digest;
+- lifecycle-aware Ed25519 keys are explicitly authorized for bounded target ids;
+- observations before the checkpoint or after the evaluation time fail closed;
+- a bounded maximum age, required-target coverage and distinct-target quorum block stale or
+  incomplete evidence;
+- duplicate attestation, key and target identities cannot increase coverage.
+
+Residual risks:
+- a compromised target or authorized signing key can falsely assert loaded state;
+- target and evaluator clock integrity is deployment-owned;
+- the verifier authenticates supplied assertions but does not independently probe processes or
+  prove continuous enforcement.
+
 ### Release evidence is lost, altered or archived with secrets
 
 Threat:

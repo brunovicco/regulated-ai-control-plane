@@ -174,6 +174,7 @@ implementation-reference review for every changed tool definition. Automated sou
 automated key distribution, external timestamping and enterprise distribution remain pending.
 Phase 6m provides provider-neutral trust-store lineage and rollback-floor verification for those
 future distribution systems. Phase 6n adds signed consumer acknowledgement coverage and quorum.
+Phase 6o adds fresh signed target assertions for the exact loaded trust-store digest.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -187,6 +188,7 @@ Explore:
 - detailed tool-definition review; **implemented in Phase 6l**
 - trust-store lineage checkpoints; **implemented in Phase 6m**
 - signed trust-store rollout acknowledgements; **implemented in Phase 6n**
+- signed runtime trust-state attestations; **implemented in Phase 6o**
 - enterprise integrations;
 - additional sectors.
 
@@ -262,6 +264,14 @@ Implemented in Phase 6n:
 - duplicate target/key/receipt and future/mismatched acknowledgement rejection;
 - deterministic metadata-only complete/incomplete report and custody artifact kinds;
 - no configuration delivery, node contact, runtime mutation or adoption claim.
+
+Implemented in Phase 6o:
+- exact checkpoint, runtime-policy and loaded trust-store digest binding;
+- lifecycle-aware target keys authorized by explicit non-personal target id;
+- required-target coverage, minimum fresh-target quorum and bounded maximum age;
+- duplicate target/key/attestation, pre-checkpoint, future and mismatched assertion rejection;
+- deterministic metadata-only current/blocked report and custody artifact kinds;
+- no runtime probe, process contact, mutation or continuous-enforcement claim.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;
