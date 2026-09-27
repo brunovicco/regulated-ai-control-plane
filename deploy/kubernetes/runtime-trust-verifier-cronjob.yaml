@@ -1,0 +1,93 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: regulaai-runtime-trust-verifier
+  labels:
+    app.kubernetes.io/name: regulaai-runtime-trust-verifier
+    app.kubernetes.io/part-of: regulaai
+    app.kubernetes.io/component: runtime-trust-verifier
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: regulaai-runtime-trust-verifier
+            app.kubernetes.io/part-of: regulaai
+            app.kubernetes.io/component: runtime-trust-verifier
+        spec:
+          serviceAccountName: regulaai-control-plane
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: verifier
+              image: example.invalid/regulated-ai-control-plane
+              imagePullPolicy: IfNotPresent
+              command:
+                - python
+                - scripts/verify_runtime_trust_state.py
+              args:
+                - --trust-store
+                - /runtime-input/trust-store.yaml
+                - --checkpoint
+                - /runtime-input/checkpoint.yaml
+                - --checkpoint-public-key
+                - /runtime-input/checkpoint-public-key.pem
+                - --checkpoint-signing-key-id
+                - $(CHECKPOINT_SIGNING_KEY_ID)
+                - --runtime-policy
+                - /runtime-input/runtime-policy.yaml
+                - --attestation-trust-store
+                - /runtime-input/attestation-trust-store.yaml
+                - --attestation-directory
+                - /runtime-input/attestations
+                - --evaluated-at-now
+              env:
+                - name: CHECKPOINT_SIGNING_KEY_ID
+                  valueFrom:
+                    configMapKeyRef:
+                      name: regulaai-runtime-trust-settings
+                      key: checkpoint-signing-key-id
+              volumeMounts:
+                - name: runtime-input
+                  mountPath: /runtime-input
+                  readOnly: true
+                - name: temporary
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                  ephemeral-storage: 32Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+                  ephemeral-storage: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          volumes:
+            - name: runtime-input
+              persistentVolumeClaim:
+                claimName: regulaai-runtime-trust-input
+            - name: temporary
+              emptyDir:
+                sizeLimit: 32Mi

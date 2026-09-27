@@ -178,6 +178,7 @@ Phase 6o adds fresh signed target assertions for the exact loaded trust-store di
 Phase 6p adds offline verification for provider-neutral signed external time-authority receipts.
 Phase 6q adds offline RFC 3161 verification with exact request, artifact and PKIX trust binding.
 Phase 6r adds deterministic OCI image-layout packaging and offline content-addressed verification.
+Phase 6s adds restricted Kubernetes/OpenShift service and runtime-state verifier references.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -195,6 +196,7 @@ Explore:
 - provider-neutral signed time-authority receipt verification; **implemented in Phase 6p**
 - standards-based RFC 3161 timestamp verification; **implemented in Phase 6q**
 - provider-neutral OCI evidence artifacts; **implemented in Phase 6r**
+- Kubernetes/OpenShift deployment reference; **implemented in Phase 6s**
 - enterprise integrations;
 - additional sectors.
 
@@ -299,6 +301,14 @@ Implemented in Phase 6r:
 - complete descriptor, digest, size, metadata and tracked-blob inventory verification;
 - bounded JSON/YAML inputs with safe names, no symlinks and private-key marker rejection;
 - no registry access, credentials, transport policy, signing, retention or availability claim.
+
+Implemented in Phase 6s:
+- real non-root API container entrypoint and digest-substituted Kustomize image;
+- restricted single-replica SQLite service with external state, signed-pack, trust and secret mounts;
+- startup/readiness/liveness probes, resource limits, no token and read-only root filesystem;
+- default-deny egress, labeled-client ingress and network-silent verifier policy;
+- periodic mounted-attestation discovery and offline runtime trust-state verification;
+- OpenShift restricted-SCC overlay with no cluster mutation or provider-specific operator.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;

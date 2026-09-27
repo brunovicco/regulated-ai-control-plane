@@ -345,6 +345,33 @@ Residual risks:
   digest pinning and an organization-approved OCI signing/verification control;
 - registry ACLs, authentication, availability, retention, replication and deletion remain external.
 
+### Cluster deployment broadens authority or weakens evidence state
+
+Threat:
+a mutable image, injected service-account token, writable root filesystem, broad network access,
+embedded secret or multiple SQLite writers weakens the control boundary; stale runtime assertions
+may also be mistaken for a live probe.
+
+Mitigations:
+- Phase 6s requires image substitution by SHA-256 digest and references secrets/trust/pack volumes
+  without embedding their values;
+- service-account tokens are disabled, containers are non-root with read-only roots, dropped
+  capabilities, bounded resources and restricted seccomp profiles;
+- NetworkPolicies deny verifier traffic and control-plane egress while limiting ingress to labeled
+  clients;
+- the SQLite deployment is exactly one replica with `Recreate`, state PVC and health probes;
+- the CronJob reads a mounted checkpoint/policy/attestation set, verifies it offline and treats a
+  blocked result as a failed job rather than mutating workloads.
+
+Residual risks:
+- the example image digest is deliberately non-routable and deployment automation must replace and
+  independently verify it before apply;
+- PVC population, CSI permissions, Secret/ConfigMap integrity, admission, node security, backup,
+  alerting and cluster control-plane availability remain external;
+- signed assertions depend on target/signer integrity and are not independent continuous probes;
+- gateway mode requires reviewed egress/DNS/credential overlays and is unsafe with the default
+  network policy unchanged.
+
 ### Release evidence is lost, altered or archived with secrets
 
 Threat:

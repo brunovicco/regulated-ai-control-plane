@@ -249,6 +249,11 @@ index, manifest and config documents bind normalized package references and cont
 SHA-256 layers, while offline verification rejects changed, missing or untracked content. Registry
 transport, access control, artifact signing and retention remain external deployment controls.
 
+Phase 6s adds a non-applied Kubernetes/OpenShift Kustomize reference for the control-plane service
+and periodic runtime trust-state verifier. It pins the image through the Kustomize digest field,
+mounts authority from external PVC/ConfigMap/Secret objects, uses restricted non-root contexts and
+denies egress by default. The SQLite reference intentionally remains a single replica.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;
