@@ -20,6 +20,10 @@ signed time-authority receipts plus metadata-only scenario suites. Input files m
 JSON/YAML files with safe basenames. Symlinks, oversized inputs and common PEM private-key markers
 are rejected.
 
+An `RFC3161_TIMESTAMP_REPORT` may be retained as metadata-only custody evidence. The binary DER
+request/response and CA material are deliberately not accepted by this JSON/YAML archive and must
+be preserved through a separately approved evidence-retention control.
+
 ## Create an archive
 
 Use a new output path. The command never overwrites an existing file or directory.

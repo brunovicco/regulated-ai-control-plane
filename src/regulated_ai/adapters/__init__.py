@@ -37,6 +37,11 @@ from regulated_ai.adapters.release_custody import (
     create_release_custody,
     verify_release_custody,
 )
+from regulated_ai.adapters.rfc3161_timestamp import (
+    Rfc3161TimestampError,
+    Rfc3161TimestampIdentity,
+    verify_rfc3161_timestamp,
+)
 from regulated_ai.adapters.runtime_trust_state import (
     RuntimeTrustStateError,
     load_runtime_trust_state_policy,
@@ -106,6 +111,8 @@ __all__ = [
     "ReleaseCustodyArtifactKind",
     "ReleaseCustodyError",
     "ReleaseCustodyIdentity",
+    "Rfc3161TimestampError",
+    "Rfc3161TimestampIdentity",
     "RuntimeTrustStateError",
     "ScenarioSuiteError",
     "SignedPackError",
@@ -140,6 +147,7 @@ __all__ = [
     "load_trust_store_rollout_policy",
     "verify_control_pack",
     "verify_release_custody",
+    "verify_rfc3161_timestamp",
     "verify_runtime_trust_state_attestations",
     "verify_trust_store_acknowledgements",
     "verify_trust_store_checkpoint",

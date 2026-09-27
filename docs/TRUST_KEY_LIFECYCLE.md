@@ -43,6 +43,9 @@ Phase 6o can verify fresh signed target assertions for the exact loaded trust-st
 assertions remain dependent on target integrity, target clocks and the deployment-owned probe.
 Phase 6p time-authority keys use the same active/retired/revoked lifecycle semantics. Their trust
 store and rotation are a separate external-authority boundary; never reuse release or target keys.
+Phase 6q instead consumes an X.509 CA bundle and validates a timestamping certificate at the token's
+generation time. CA rotation, distrust, revocation evidence and historical bundle retention are
+deployment-owned PKIX lifecycle controls and are not represented by the schema-v2 Ed25519 stores.
 
 ## Verification clocks
 

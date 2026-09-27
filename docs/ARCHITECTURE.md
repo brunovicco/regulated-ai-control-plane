@@ -317,6 +317,25 @@ RFC 3161, certify the authority or provide immutable retention.
 
 See [ADR-0031](adr/0031-provider-neutral-signed-time-authority-receipts.md).
 
+## Phase 6q components
+
+- `adapters/rfc3161_timestamp.py`: bounded DER parsing, exact imprint/nonce/policy binding and the
+  OpenSSL verification boundary.
+- `scripts/verify_rfc3161_timestamp.py`: deterministic offline metadata-only report command.
+- `docs/RFC3161_TIMESTAMP.md`: PKIX trust, input-preservation and revocation boundary runbook.
+
+```text
+exact artifact bytes + original DER request/response + CA bundle
+    -> strict imprint/nonce/policy/time validation
+    -> CMS signature + timestamping EKU + PKIX chain verification at generation time
+    -> metadata-only RFC 3161 verification report or fail closed
+```
+
+ASN.1 parsing does not establish trust. OpenSSL performs signature and PKIX verification against the
+deployment-supplied CA bundle. No network, timestamp acquisition or online revocation occurs.
+
+See [ADR-0032](adr/0032-offline-rfc3161-timestamp-verification.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim

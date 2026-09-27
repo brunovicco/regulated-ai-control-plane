@@ -176,6 +176,7 @@ Phase 6m provides provider-neutral trust-store lineage and rollback-floor verifi
 future distribution systems. Phase 6n adds signed consumer acknowledgement coverage and quorum.
 Phase 6o adds fresh signed target assertions for the exact loaded trust-store digest.
 Phase 6p adds offline verification for provider-neutral signed external time-authority receipts.
+Phase 6q adds offline RFC 3161 verification with exact request, artifact and PKIX trust binding.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -191,6 +192,7 @@ Explore:
 - signed trust-store rollout acknowledgements; **implemented in Phase 6n**
 - signed runtime trust-state attestations; **implemented in Phase 6o**
 - provider-neutral signed time-authority receipt verification; **implemented in Phase 6p**
+- standards-based RFC 3161 timestamp verification; **implemented in Phase 6q**
 - enterprise integrations;
 - additional sectors.
 
@@ -281,6 +283,13 @@ Implemented in Phase 6p:
 - explicit evaluation time, future-receipt rejection and optional caller-pinned issue-time floor;
 - deterministic metadata-only verification report and custody artifact kind;
 - no receipt acquisition, provider selection, RFC 3161 compatibility or immutable-storage claim.
+
+Implemented in Phase 6q:
+- strict bounded DER request/response parsing and exact artifact message-imprint binding;
+- required matching nonce and caller-allowlisted RFC 3161 policy OID;
+- OpenSSL CMS signature, timestamping EKU and PKIX-chain verification at generation time;
+- explicit evaluation time, optional minimum generation time and metadata-only report;
+- no acquisition, provider selection, online revocation or long-term evidence-renewal claim.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;

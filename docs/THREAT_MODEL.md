@@ -303,6 +303,26 @@ Residual risks:
 - the custom provider-neutral format is not RFC 3161 and has no implicit interoperability;
 - receipt acquisition, authority availability, immutable retention and transparency remain external.
 
+### An RFC 3161 token is accepted without exact request or PKIX binding
+
+Threat:
+an operator accepts a token for different bytes, permits a substituted policy or nonce, validates a
+certificate at the wrong time, or assumes offline verification checked current revocation state.
+
+Mitigations:
+- Phase 6q requires the preserved original request and matches its imprint, nonce and policy to the
+  response and exact artifact bytes;
+- only SHA-256, SHA-384 and SHA-512 plus caller-allowlisted policy OIDs are accepted;
+- OpenSSL verifies CMS signature, timestamping EKU and the deployment-supplied PKIX chain at the
+  asserted generation time with a bounded timeout;
+- future and below-floor timestamps fail closed and reports contain only metadata and digests.
+
+Residual risks:
+- offline verification performs no CRL/OCSP retrieval and depends on a current, correctly scoped CA
+  bundle and preserved revocation evidence where policy requires it;
+- a compromised or dishonest timestamp authority can assert false time;
+- acquisition availability, immutable retention and long-term archival renewal remain external.
+
 ### Release evidence is lost, altered or archived with secrets
 
 Threat:
