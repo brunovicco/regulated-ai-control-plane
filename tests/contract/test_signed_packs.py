@@ -2,6 +2,7 @@ import base64
 import hashlib
 import json
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -82,11 +83,14 @@ def _write_signed_pack(root: Path) -> tuple[Path, Path]:
     trust_store_path.write_text(
         yaml.safe_dump(
             {
-                "schema_version": "1",
+                "schema_version": "2",
                 "keys": {
                     "synthetic-key": {
                         "algorithm": "ed25519",
                         "public_key": public_key,
+                        "status": "ACTIVE",
+                        "valid_from": "2026-09-01T00:00:00Z",
+                        "valid_until": "2099-09-01T00:00:00Z",
                     }
                 },
             },
@@ -164,6 +168,25 @@ def test_signed_pack_rejects_unknown_key(tmp_path: Path) -> None:
 
     with pytest.raises(SignedPackError, match="not trusted"):
         verify_control_pack(manifest_path, trust_store_path)
+
+
+def test_signed_pack_rejects_revoked_and_expired_keys(tmp_path: Path) -> None:
+    manifest_path, trust_store_path = _write_signed_pack(tmp_path)
+    trust_store = yaml.safe_load(trust_store_path.read_text(encoding="utf-8"))
+    trust_store["keys"]["synthetic-key"]["status"] = "REVOKED"
+    trust_store_path.write_text(yaml.safe_dump(trust_store, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(SignedPackError, match="key is not active"):
+        verify_control_pack(manifest_path, trust_store_path)
+
+    trust_store["keys"]["synthetic-key"]["status"] = "ACTIVE"
+    trust_store_path.write_text(yaml.safe_dump(trust_store, sort_keys=False), encoding="utf-8")
+    with pytest.raises(SignedPackError, match="key is not active"):
+        verify_control_pack(
+            manifest_path,
+            trust_store_path,
+            evaluated_at=datetime(2100, 1, 1, tzinfo=UTC),
+        )
 
 
 def test_signed_pack_rejects_path_traversal_before_file_access(tmp_path: Path) -> None:

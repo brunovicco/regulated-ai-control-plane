@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError, model_validator
 from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
+from regulated_ai.adapters.trust_key_lifecycle import TrustKeyLifecycleModel
 from regulated_ai.domain import (
     ControlPackReleaseIdentity,
     PromotionAttestationDecision,
@@ -78,7 +79,7 @@ class _PromotionPolicyModel(_StrictModel):
         return self
 
 
-class _PromotionKeyModel(_StrictModel):
+class _PromotionKeyModel(TrustKeyLifecycleModel):
     algorithm: Literal["ed25519"]
     public_key: str = Field(min_length=1, max_length=128)
     roles: tuple[str, ...] = Field(min_length=1, max_length=16)
@@ -94,7 +95,7 @@ class _PromotionKeyModel(_StrictModel):
 
 
 class _PromotionTrustStoreModel(_StrictModel):
-    schema_version: Literal["1"]
+    schema_version: Literal["2"]
     keys: dict[str, _PromotionKeyModel] = Field(min_length=1, max_length=64)
 
     @model_validator(mode="after")
@@ -209,6 +210,8 @@ def verify_promotion_attestations(
         key = trust_store.keys.get(attestation.signing_key_id)
         if key is None:
             raise PromotionAttestationBoundaryError("Promotion attestation key is not trusted")
+        if not key.active_at(attestation.issued_at):
+            raise PromotionAttestationBoundaryError("Promotion attestation key is not active")
         if attestation.role not in key.roles:
             raise PromotionAttestationBoundaryError(
                 "Promotion attestation role is not authorized for its key"

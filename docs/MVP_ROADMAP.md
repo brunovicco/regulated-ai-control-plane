@@ -170,7 +170,7 @@ review evidence into one deterministic release bundle. Phase 6g authenticates a 
 promotion quorum for that exact bundle. Phase 6h authenticates release reviewers and governs whole
 policy/provider onboarding and removal by exact digest. Phase 6i moves the trusted tool catalog into
 the signed release, diff, replay and review-evidence boundary. Automated source ingestion, detailed
-tool-definition review, key lifecycle automation and enterprise distribution remain pending.
+tool-definition review, automated key distribution and enterprise distribution remain pending.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -179,6 +179,7 @@ Explore:
 - diff impact analysis; **implemented in Phase 6b**
 - curated scenario replay; **implemented in Phase 6c**
 - signed tool catalog and replay; **implemented in Phase 6i**
+- verification-key lifecycle enforcement; **implemented in Phase 6j**
 - enterprise integrations;
 - additional sectors.
 
@@ -213,6 +214,14 @@ Implemented in Phase 6i:
 - schema-v2 metadata-only tool scenarios without arguments or execution;
 - signed whole-catalog review required for changed release evidence;
 - fail-closed rejection of independent runtime catalog overrides.
+
+Implemented in Phase 6j:
+- trust-store schema v2 for release, review and promotion public keys;
+- explicit active, retired and revoked states;
+- required UTC activation and optional expiry instants;
+- authority checks at pack verification, review attestation and promotion issuance times;
+- fail-closed not-yet-valid, expired, retired and revoked keys;
+- documented overlap rotation and emergency revocation procedure.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;

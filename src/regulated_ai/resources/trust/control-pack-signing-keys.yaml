@@ -1,5 +1,7 @@
-schema_version: "1"
+schema_version: "2"
 keys:
   regulaai-demo-2026-09-tools:
     algorithm: "ed25519"
     public_key: "keDo4F6qr/VuLZDPGepOvRqopGlBrk+zV0I41A03DhQ="
+    status: "ACTIVE"
+    valid_from: "2026-09-26T00:00:00Z"

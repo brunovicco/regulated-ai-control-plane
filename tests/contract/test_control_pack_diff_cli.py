@@ -47,6 +47,9 @@ def test_cli_verifies_both_packs_and_reports_decision_impact(
     trust_store["keys"]["candidate-test-key"] = {
         "algorithm": "ed25519",
         "public_key": public_key,
+        "status": "ACTIVE",
+        "valid_from": "2026-09-01T00:00:00Z",
+        "valid_until": "2099-09-01T00:00:00Z",
     }
     trust_store_path.write_text(yaml.safe_dump(trust_store, sort_keys=False), encoding="utf-8")
 

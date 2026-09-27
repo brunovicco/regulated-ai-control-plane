@@ -152,6 +152,34 @@ def test_cli_rejects_tampered_or_incomplete_bundle(
     assert "bundle digest does not match" in capture.err
 
 
+def test_cli_rejects_revoked_promotion_key(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    bundle_path = _write_bundle(tmp_path / "bundle.json")
+    key = Ed25519PrivateKey.generate()
+    trust_store = _write_trust_store(
+        tmp_path / "trust.yaml", {"control-key": (key, "CONTROL_OWNER")}
+    )
+    trust_document = yaml.safe_load(trust_store.read_text(encoding="utf-8"))
+    trust_document["keys"]["control-key"]["status"] = "REVOKED"
+    trust_store.write_text(yaml.safe_dump(trust_document, sort_keys=False), encoding="utf-8")
+    policy = _write_policy(tmp_path / "policy.yaml")
+    bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    attestation = _write_attestation(
+        tmp_path / "control.yaml",
+        key,
+        "control-key",
+        "CONTROL_OWNER",
+        bundle,
+        _policy_digest(policy),
+    )
+
+    assert promotion_main(_arguments(bundle_path, policy, trust_store, attestation)) == 1
+    capture = capsys.readouterr()
+    assert "key is not active" in capture.err
+
+
 def _arguments(
     bundle: Path,
     policy: Path,
@@ -229,7 +257,7 @@ def _write_trust_store(
     path.write_text(
         yaml.safe_dump(
             {
-                "schema_version": "1",
+                "schema_version": "2",
                 "keys": {
                     key_id: {
                         "algorithm": "ed25519",
@@ -240,6 +268,9 @@ def _write_trust_store(
                             )
                         ).decode(),
                         "roles": [role],
+                        "status": "ACTIVE",
+                        "valid_from": "2026-09-01T00:00:00Z",
+                        "valid_until": "2099-09-01T00:00:00Z",
                     }
                     for key_id, (private_key, role) in keys.items()
                 },

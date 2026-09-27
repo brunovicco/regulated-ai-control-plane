@@ -203,6 +203,11 @@ bytes. Catalog changes are visible as semantic impact and require a signed whole
 This authenticates tool definitions for evaluation only; it does not authorize arguments, execute
 tools or prove downstream implementation behavior.
 
+Phase 6j upgrades release, reviewer and promotion trust stores to lifecycle-aware schema version 2.
+Every public key has an activation instant, optional expiry and explicit `ACTIVE`, `RETIRED` or
+`REVOKED` state. Inactive or out-of-window keys fail closed before their signatures can grant
+authority. Private-key custody and trust-store distribution remain external operations.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;
@@ -355,6 +360,7 @@ Start with:
 - [Policy model](docs/POLICY_MODEL.md)
 - [Threat model](docs/THREAT_MODEL.md)
 - [Evaluation strategy](docs/EVAL_STRATEGY.md)
+- [Verification-key lifecycle](docs/TRUST_KEY_LIFECYCLE.md)
 - [MVP roadmap](docs/MVP_ROADMAP.md)
 - [Primary sources](SOURCES.md)
 
