@@ -64,6 +64,10 @@ def test_deployment_is_single_replica_non_root_and_uses_external_authority() -> 
     } == {"/health"}
     assert set(container["resources"]) == {"requests", "limits"}
     env = {item["name"]: item for item in container["env"]}
+    assert env["REGULAAI_ENVIRONMENT"]["value"] == "production"
+    assert env["REGULAAI_SERVICE_VERSION"]["valueFrom"]["configMapKeyRef"]["name"] == (
+        "regulaai-deployment-metadata"
+    )
     assert env["REGULAAI_EXECUTION_MODE"]["value"] == "mock"
     assert env["REGULAAI_CONTROL_PACK_MANIFEST"]["value"].startswith("/etc/regulaai/")
     assert env["REGULAAI_TOKENIZATION_KEY"]["valueFrom"]["secretKeyRef"]["name"] == (
@@ -125,4 +129,5 @@ def test_openshift_overlay_defers_ids_to_restricted_scc_and_image_starts_api() -
     }
     dockerfile = (_ROOT / "Dockerfile").read_text(encoding="utf-8")
     assert "USER app" in dockerfile
+    assert "--extra observability" in dockerfile
     assert 'CMD ["uvicorn", "regulated_ai.entrypoints.api:app"' in dockerfile

@@ -372,6 +372,30 @@ Residual risks:
 - gateway mode requires reviewed egress/DNS/credential overlays and is unsafe with the default
   network policy unchanged.
 
+### Observability exports sensitive content or controls availability
+
+Threat:
+an event/span includes prompt, response, credential, personal data, arbitrary URL or exception
+detail; forged baggage crosses trust boundaries; or collector failure blocks a policy decision.
+
+Mitigations:
+- Phase 6t accepts only stable lifecycle event names and a small bounded metadata allowlist;
+- CloudEvent source/type are fixed, event ids are generated, time must be timezone-aware UTC and
+  unsafe fields are dropped before serialization;
+- the safe tracer limits resource/span/link/event attributes, redacts unsafe names, omits status
+  descriptions and records only exception type;
+- W3C trace context propagates `traceparent`/`tracestate` but never baggage;
+- exporter construction is opt-in and emit/setup/flush/shutdown failures are isolated and bounded;
+- the deployment has no OTLP endpoint or egress by default.
+
+Residual risks:
+- allowed organization identifiers may still be sensitive operational metadata and need scoped
+  collector/log access;
+- a deployment can misconfigure OTLP TLS/auth, collector tenancy, sampling, routing or retention;
+- structured log transport can duplicate, reorder or drop CloudEvents and is not an audit ledger;
+- observability isolation means collector outage requires independent monitoring rather than
+  failing policy execution.
+
 ### Release evidence is lost, altered or archived with secrets
 
 Threat:

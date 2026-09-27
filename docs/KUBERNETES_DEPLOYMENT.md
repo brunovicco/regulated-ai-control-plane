@@ -16,7 +16,9 @@ Before rendering for deployment:
 5. use the cluster secret manager to create `regulaai-runtime-keys` with distinct
    `tokenization-key`, `decision-approval-hmac-key` and `action-approval-hmac-key` values;
 6. configure backup, restore and encryption for the `regulaai-data` PVC;
-7. label only approved caller pods with `regulaai.openai.com/client: "true"`.
+7. create `regulaai-deployment-metadata` with the non-secret immutable `service-version` matching
+   the image release;
+8. label only approved caller pods with `regulaai.openai.com/client: "true"`.
 
 Do not place private keys, HMAC keys or credentials in Kustomize files, ConfigMaps, command lines or
 Git. Admission policy should verify the image signature/digest and reject privileged exceptions.
@@ -65,3 +67,8 @@ Do not increase replicas until persistence, migrations and consistency semantics
 The default NetworkPolicy permits no egress; gateway mode needs a separate reviewed overlay with
 specific DNS/HTTPS destinations and credential delivery. Cluster ingress, TLS, OIDC, external
 routes, storage classes, registry authentication, backups and disaster recovery remain external.
+
+OTLP is also inactive by default even though the image contains the observability extra. Enabling it
+requires an explicit OTLP endpoint plus a narrowly reviewed DNS/HTTPS NetworkPolicy, collector
+authentication/TLS, metadata residency, sampling, retention and outage monitoring. Do not add
+collector credentials to the manifests or permit broad egress.
