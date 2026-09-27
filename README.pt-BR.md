@@ -221,6 +221,13 @@ Ela rejeita material PEM de chave privada, nunca sobrescreve um arquivo de cust�
 arquivos alterados ou não rastreados. O pacote oferece retenção local tamper-evident, não storage
 imutável, timestamp confiável ou backup.
 
+A Fase 6l adiciona um gate detalhado, vinculado por digest, para cada definição de ferramenta
+confiável alterada. Cada mudança exige um papel proprietário não pessoal, referências HTTPS da
+implementação, o tipo exato da mudança e uma conclusão de aprovação; mudanças de schema precisam
+avançar a versão do schema da ferramenta. A atestação de um catálogo modificado deve vincular o
+resultado detalhado aprovado antes de completar a evidência de release. O gate não acessa a rede,
+valida a implementação referenciada nem executa ferramentas.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;

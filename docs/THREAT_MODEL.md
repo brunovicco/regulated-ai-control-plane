@@ -390,16 +390,16 @@ Residual risks:
 
 Threat:
 an attacker invents a reviewer role, swaps a detailed review result, signs a different entity,
-removes an approved entity without review or introduces a new policy/provider outside the existing
-update-only lineage.
+removes an approved entity without review, introduces a new policy/provider outside the existing
+update-only lineage or approves a modified tool catalog without detailed coverage.
 
 Mitigations:
 - review attestations are Ed25519-verified against a separate public-key trust store;
-- each trusted key is constrained by reviewer role, policy/provider artifact kind and
+- each trusted key is constrained by reviewer role, policy/provider/tool artifact kind and
   added/modified/removed change type;
 - signatures bind both pack payload digests, stable subject id, exact reviewed content digest,
   change type, conclusion and UTC attestation time;
-- modified entities must bind the exact Phase 6d/6e review id/digest and cannot sign an approval
+- modified entities must bind the exact Phase 6d/6e/6l review id/digest and cannot sign an approval
   over a blocked detailed review;
 - additions bind candidate bytes and removals bind approved-base bytes;
 - duplicate attestation ids and duplicate entity targets fail closed; raw signatures are replaced
@@ -412,6 +412,25 @@ Residual risks:
 - Phase 6j enforces supplied revocation/retirement state and validity windows; hardware custody,
   trust-store distribution and external timestamping remain organization-owned;
 - Phase 6g promotion signers must still accept the complete evidence and intended impact.
+
+### Tool authority expands without per-definition review
+
+Threat:
+a signed catalog adds, removes or changes a tool while a broad whole-catalog approval conceals a
+missing owner, an unreviewed implementation reference or a schema change that reuses its version.
+
+Mitigations:
+- the detailed record binds the authenticated base payload and exact candidate catalog digest;
+- every semantic tool change requires one matching change type, non-personal owner role, bounded
+  HTTPS implementation references and explicit conclusion;
+- changed input or output schemas require a different tool schema version;
+- missing, rejected or revision-requested coverage blocks the gate;
+- a modified catalog's signed attestation must bind the passing detailed review id and digest.
+
+Residual risks:
+- references may change or describe a different deployment and are not retrieved by this workflow;
+- a malicious or mistaken owner/reviewer can approve an unsafe implementation;
+- implementation deployment identity and live enterprise credentials remain outside this gate.
 
 ### Promotion approval is forged, replayed or counted twice
 

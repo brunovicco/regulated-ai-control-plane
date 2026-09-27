@@ -177,6 +177,103 @@ def test_cli_rebinds_policy_review_to_exact_signed_candidate(
     assert complete["review_evidence"][0]["approved"] is True
 
 
+def test_cli_requires_detailed_review_for_modified_tool_catalog(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repository = Path(__file__).resolve().parents[2]
+    source = repository / "src" / "regulated_ai" / "resources"
+    base_root = tmp_path / "tool-base"
+    candidate_root = tmp_path / "tool-candidate"
+    shutil.copytree(source, base_root)
+    shutil.copytree(source, candidate_root)
+
+    private_key = Ed25519PrivateKey.generate()
+    trust_store = tmp_path / "tool-trust.yaml"
+    _write_trust_store(trust_store, private_key)
+    base_manifest = _sign_pack(base_root, "tool.1", private_key)
+    candidate_catalog = candidate_root / "tools" / "br-financial-tools.yaml"
+    catalog_document = yaml.safe_load(candidate_catalog.read_text(encoding="utf-8"))
+    catalog_document["catalog_version"] = "br-financial-tools@1.2.0"
+    catalog_document["tools"]["cards.read"]["description"] = (
+        "Read synthetic card status through the reviewed implementation."
+    )
+    candidate_catalog.write_text(
+        yaml.safe_dump(catalog_document, sort_keys=False), encoding="utf-8"
+    )
+    candidate_manifest = _sign_pack(candidate_root, "tool.2", private_key)
+
+    base_digest = verify_control_pack(base_manifest, trust_store).identity.payload_digest
+    candidate_pack_digest = verify_control_pack(
+        candidate_manifest, trust_store
+    ).identity.payload_digest
+    candidate_digest = f"sha256:{hashlib.sha256(candidate_catalog.read_bytes()).hexdigest()}"
+    review = tmp_path / "tool-review.yaml"
+    review.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "1",
+                "review": {
+                    "id": "test-tool-review",
+                    "reviewer_role": "tool-governance",
+                    "reviewed_at": "2026-09-27",
+                    "base_pack_payload_digest": base_digest,
+                    "candidate_catalog_digest": candidate_digest,
+                    "tool_reviews": [
+                        {
+                            "tool_name": "cards.read",
+                            "change_type": "MODIFIED",
+                            "owner_role": "payments-platform-owner",
+                            "implementation_refs": ["https://engineering.invalid/tools/cards-read"],
+                            "conclusion": "APPROVED",
+                        }
+                    ],
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    review_private_key = Ed25519PrivateKey.generate()
+    review_trust_store = tmp_path / "tool-review-trust.yaml"
+    _write_review_trust_store(
+        review_trust_store,
+        review_private_key,
+        role="tool-governance",
+        artifact_kind="TOOL_CATALOG",
+    )
+    attestation = tmp_path / "tool-review-attestation.yaml"
+    _write_tool_review_attestation(
+        attestation,
+        review_private_key,
+        base_digest=base_digest,
+        candidate_pack_digest=candidate_pack_digest,
+        candidate_content_digest=candidate_digest,
+        review_path=review,
+    )
+    arguments = [
+        "--base-manifest",
+        str(base_manifest),
+        "--candidate-manifest",
+        str(candidate_manifest),
+        "--trust-store",
+        str(trust_store),
+        "--scenario-suite",
+        str(repository / "examples" / "scenarios" / "control-pack-regression.yaml"),
+        "--review-trust-store",
+        str(review_trust_store),
+        "--review-attestation",
+        str(attestation),
+    ]
+
+    assert evidence_main(arguments) == 1
+    assert "requires its detailed review record" in capsys.readouterr().err
+    assert evidence_main([*arguments, "--tool-catalog-review-record", str(review)]) == 0
+    complete = json.loads(capsys.readouterr().out)
+    assert complete["status"] == "EVIDENCE_COMPLETE"
+    assert complete["review_evidence"][0]["review_id"] == "test-tool-review"
+
+
 def _write_trust_store(path: Path, private_key: Ed25519PrivateKey) -> None:
     public_key = base64.b64encode(
         private_key.public_key().public_bytes(
@@ -204,7 +301,13 @@ def _write_trust_store(path: Path, private_key: Ed25519PrivateKey) -> None:
     )
 
 
-def _write_review_trust_store(path: Path, private_key: Ed25519PrivateKey) -> None:
+def _write_review_trust_store(
+    path: Path,
+    private_key: Ed25519PrivateKey,
+    *,
+    role: str = "regulatory-governance",
+    artifact_kind: str = "POLICY_SET",
+) -> None:
     public_key = base64.b64encode(
         private_key.public_key().public_bytes(
             serialization.Encoding.Raw,
@@ -219,8 +322,8 @@ def _write_review_trust_store(path: Path, private_key: Ed25519PrivateKey) -> Non
                     "review-key": {
                         "algorithm": "ed25519",
                         "public_key": public_key,
-                        "roles": ["regulatory-governance"],
-                        "artifact_kinds": ["POLICY_SET"],
+                        "roles": [role],
+                        "artifact_kinds": [artifact_kind],
                         "change_types": ["MODIFIED"],
                         "status": "ACTIVE",
                         "valid_from": "2026-09-01T00:00:00Z",
@@ -258,6 +361,39 @@ def _write_review_attestation(
         "reviewer_role": "regulatory-governance",
         "conclusion": "APPROVE",
         "attested_at": "2026-09-26T15:00:00+00:00",
+        "signing_key_id": "review-key",
+    }
+    encoded = json.dumps(
+        document, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode()
+    document["signature"] = base64.b64encode(private_key.sign(encoded)).decode()
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+
+def _write_tool_review_attestation(
+    path: Path,
+    private_key: Ed25519PrivateKey,
+    *,
+    base_digest: str,
+    candidate_pack_digest: str,
+    candidate_content_digest: str,
+    review_path: Path,
+) -> None:
+    review_digest = f"sha256:{hashlib.sha256(review_path.read_bytes()).hexdigest()}"
+    document = {
+        "schema_version": "1",
+        "attestation_id": "test-tool-review-attestation",
+        "artifact_kind": "TOOL_CATALOG",
+        "subject_id": "trusted-tool-catalog",
+        "change_type": "MODIFIED",
+        "base_pack_payload_digest": base_digest,
+        "candidate_pack_payload_digest": candidate_pack_digest,
+        "reviewed_content_digest": candidate_content_digest,
+        "review_id": "test-tool-review",
+        "review_digest": review_digest,
+        "reviewer_role": "tool-governance",
+        "conclusion": "APPROVE",
+        "attested_at": "2026-09-27T15:00:00+00:00",
         "signing_key_id": "review-key",
     }
     encoded = json.dumps(

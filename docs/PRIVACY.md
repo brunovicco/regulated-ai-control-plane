@@ -91,6 +91,9 @@ Complete this document before processing personal or regulated data.
 - Phase 6h review attestations contain bounded non-personal role/key/subject identifiers, change
   type, conclusion, UTC time and cryptographic digests. Bundle v2 emits signature digests instead of
   signature bytes and excludes names, email addresses, source text, raw YAML and private keys.
+- Phase 6l tool reviews contain bounded non-personal owner/reviewer roles, public HTTPS
+  implementation references, change types, conclusions, dates and digests. They exclude source
+  content, code, tool arguments/results, credentials, personal reviewer identity and private keys.
 - Incident-response owner:
 
 ## Prohibited logging

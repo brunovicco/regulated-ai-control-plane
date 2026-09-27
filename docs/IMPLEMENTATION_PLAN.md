@@ -1,5 +1,31 @@
 # Implementation plan
 
+## Phase 6l — detailed tool-definition review gate
+
+### Goal
+
+Require per-definition ownership and implementation evidence before a modified trusted tool catalog
+can complete release evidence.
+
+### Work
+
+1. Parse a strict metadata-only review record bound to the approved pack and exact candidate bytes.
+2. Compare tools by stable name and require exact change-type coverage for every changed definition.
+3. Require a non-personal owner role, bounded HTTPS implementation references and an approving
+   conclusion for each changed tool.
+4. Block input/output schema changes that reuse the prior tool schema version.
+5. Bind a modified catalog's signed review attestation to the passing detailed review result.
+6. Add CLI, regression tests, operating guidance and ADR-0027.
+
+### Decisions and assumptions
+
+- References are metadata pointers and are not fetched or treated as proof of implementation safety.
+- The detailed review supplements authenticated whole-catalog review; it does not replace it.
+- Additions and removals inside an existing catalog are reviewed here; a catalog remains one signed
+  release artifact.
+- Tool execution, implementation deployment and enterprise-system credentials remain outside this
+  offline workflow.
+
 ## Phase 6k — content-addressed release artifact custody
 
 ### Goal

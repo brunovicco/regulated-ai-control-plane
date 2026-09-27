@@ -221,6 +221,24 @@ complete evidence bundle + authorized promotion report + public release artifact
 The archive is a local tamper-evident package, not an immutable or externally timestamped store.
 See [ADR-0026](adr/0026-content-addressed-release-artifact-custody.md).
 
+## Phase 6l components
+
+- `adapters/tool_review_files.py`: strict candidate/review parsing and exact-byte digests.
+- `application/review_tool_catalog_update.py`: per-tool lineage, ownership, implementation-reference
+  and schema-version checks.
+- `scripts/review_tool_catalog_update.py`: deterministic offline pass/block report.
+- `scripts/assemble_release_evidence.py`: requires modified catalog attestations to bind the passing
+  detailed review.
+
+```text
+authenticated base + candidate catalog + metadata-only per-tool review
+    -> exact changed-tool coverage + owner/reference/conclusion checks
+    -> signed whole-catalog attestation binds detailed result
+    -> complete release evidence (never tool execution authority)
+```
+
+See [ADR-0027](adr/0027-detailed-tool-definition-review-gate.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim

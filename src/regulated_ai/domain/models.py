@@ -212,6 +212,24 @@ class RegulatoryReviewFindingCode(StrEnum):
     ENTERPRISE_RULE_CONCLUSION_INVALID = "ENTERPRISE_RULE_CONCLUSION_INVALID"
 
 
+class ToolDefinitionReviewConclusion(StrEnum):
+    """Human-recorded conclusion for one changed trusted-tool definition."""
+
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    NEEDS_REVISION = "NEEDS_REVISION"
+
+
+class ToolDefinitionReviewFindingCode(StrEnum):
+    """Stable reason that a tool-catalog draft cannot pass detailed review."""
+
+    CATALOG_VERSION_UNCHANGED = "CATALOG_VERSION_UNCHANGED"
+    TOOL_REVIEW_MISSING = "TOOL_REVIEW_MISSING"
+    TOOL_SCHEMA_VERSION_UNCHANGED = "TOOL_SCHEMA_VERSION_UNCHANGED"
+    TOOL_REJECTED = "TOOL_REJECTED"
+    TOOL_NEEDS_REVISION = "TOOL_NEEDS_REVISION"
+
+
 class ReleaseReviewArtifactKind(StrEnum):
     """Reviewable signed-pack entity kind in a release evidence bundle."""
 
@@ -788,6 +806,67 @@ class PolicyUpdateRegulatoryReviewReport:
     @property
     def approved(self) -> bool:
         """Return whether every bounded regulatory-review condition passed."""
+        return not self.findings
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCatalogDraft:
+    """Strict candidate tool catalog bound to its exact pre-signing bytes."""
+
+    catalog_version: str
+    tools: tuple[AuthorizedTool, ...]
+    content_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class ToolDefinitionReview:
+    """Ownership and implementation evidence for one changed tool definition."""
+
+    tool_name: str
+    change_type: ControlPackChangeType
+    owner_role: str
+    implementation_refs: tuple[str, ...]
+    conclusion: ToolDefinitionReviewConclusion
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCatalogUpdateReview:
+    """Digest-bound detailed governance metadata for one tool-catalog draft."""
+
+    review_id: str
+    reviewer_role: str
+    reviewed_at: date
+    base_pack_payload_digest: str
+    candidate_catalog_digest: str
+    tool_reviews: tuple[ToolDefinitionReview, ...]
+    review_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class ToolDefinitionReviewFinding:
+    """Metadata-only failed condition in a detailed tool-definition review."""
+
+    code: ToolDefinitionReviewFindingCode
+    tool_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCatalogUpdateReviewReport:
+    """Deterministic pre-signing detailed review result for one tool catalog."""
+
+    base: ControlPackReleaseIdentity
+    candidate_catalog_version: str
+    candidate_catalog_digest: str
+    review_id: str
+    reviewer_role: str
+    reviewed_at: date
+    review_digest: str
+    required_tool_names: tuple[str, ...]
+    findings: tuple[ToolDefinitionReviewFinding, ...]
+
+    @property
+    def approved(self) -> bool:
+        """Return whether every changed tool has passing detailed evidence."""
         return not self.findings
 
 

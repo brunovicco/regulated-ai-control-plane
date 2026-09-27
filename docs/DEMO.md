@@ -315,7 +315,8 @@ and no required reviews. The output includes a deterministic `bundle_digest` ove
 metadata payload.
 
 For a changed signed candidate, repeat `--provider-review-record PATH` and
-`--policy-review-record PATH` for every applicable Phase 6d/6e review, then provide the Phase 6h
+`--policy-review-record PATH` for every applicable Phase 6d/6e review. When the catalog changes,
+also provide the Phase 6l record with `--tool-catalog-review-record PATH`. Then provide the Phase 6h
 review trust store and one signed attestation per changed entity:
 
 ```bash
@@ -324,7 +325,7 @@ review trust store and one signed attestation per changed entity:
 ```
 
 The composer re-runs detailed update reviews against exact candidate files and requires their id and
-digest inside the signed attestation. Additions bind candidate entity bytes; removals bind the
+digest inside each modified-entity attestation. Additions bind candidate entity bytes; removals bind the
 approved-base entity bytes. Missing or rejected authenticated reviews return `EVIDENCE_INCOMPLETE`
 and exit code `2`; invalid signatures, unauthorized key roles/change types, schemas, digests or
 lineage return `1`. Bundle schema version 2 includes only attestation/signature metadata and digests.

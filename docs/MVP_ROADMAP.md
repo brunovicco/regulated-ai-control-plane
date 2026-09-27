@@ -169,9 +169,9 @@ gate for updates to existing policy sets. Phase 6f composes verified static, rep
 review evidence into one deterministic release bundle. Phase 6g authenticates a role-bound Ed25519
 promotion quorum for that exact bundle. Phase 6h authenticates release reviewers and governs whole
 policy/provider onboarding and removal by exact digest. Phase 6i moves the trusted tool catalog into
-the signed release, diff, replay and review-evidence boundary. Automated source ingestion, detailed
-tool-definition review, automated key distribution, external timestamping and enterprise
-distribution remain pending.
+the signed release, diff, replay and review-evidence boundary. Phase 6l adds detailed owner and
+implementation-reference review for every changed tool definition. Automated source ingestion,
+automated key distribution, external timestamping and enterprise distribution remain pending.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -182,6 +182,7 @@ Explore:
 - signed tool catalog and replay; **implemented in Phase 6i**
 - verification-key lifecycle enforcement; **implemented in Phase 6j**
 - content-addressed release custody; **implemented in Phase 6k**
+- detailed tool-definition review; **implemented in Phase 6l**
 - enterprise integrations;
 - additional sectors.
 
@@ -232,6 +233,14 @@ Implemented in Phase 6k:
 - atomic fail-if-present archive creation;
 - private-key marker and symlink rejection;
 - recursive tamper and untracked-file verification without network access.
+
+Implemented in Phase 6l:
+- exact approved-base and candidate-catalog digest binding;
+- per-tool owner role, HTTPS implementation references and exact change-type coverage;
+- explicit approved, rejected and needs-revision conclusions;
+- schema-version bump enforcement for changed input/output contracts;
+- mandatory detailed-review binding for modified signed catalog attestations;
+- deterministic metadata-only pass/block output without source retrieval or tool execution.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;
