@@ -15,7 +15,8 @@ Every archive requires:
 
 Additional allowlisted artifacts are control-pack manifests, release-review attestations, promotion
 attestations, promotion policies, trust-store lineage checkpoints, rollout policies, consumer
-acknowledgements, rollout reports and metadata-only scenario suites. Input files must be regular
+acknowledgements, rollout reports, runtime trust-state policies/attestations/reports and
+metadata-only scenario suites. Input files must be regular
 JSON/YAML files with safe basenames. Symlinks, oversized inputs and common PEM private-key markers
 are rejected.
 

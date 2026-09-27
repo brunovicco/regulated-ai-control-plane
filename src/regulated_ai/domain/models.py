@@ -284,6 +284,14 @@ class TrustStoreRolloutFindingCode(StrEnum):
     ACKNOWLEDGEMENT_QUORUM_NOT_MET = "ACKNOWLEDGEMENT_QUORUM_NOT_MET"
 
 
+class RuntimeTrustStateFindingCode(StrEnum):
+    """Stable reason that current runtime trust state is not established."""
+
+    REQUIRED_TARGET_MISSING = "REQUIRED_TARGET_MISSING"
+    ATTESTATION_QUORUM_NOT_MET = "ATTESTATION_QUORUM_NOT_MET"
+    ATTESTATION_STALE = "ATTESTATION_STALE"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -1066,6 +1074,66 @@ class TrustStoreRolloutReport:
     @property
     def complete(self) -> bool:
         """Return whether authenticated acknowledgements satisfy the rollout policy."""
+        return not self.findings
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeTrustStatePolicy:
+    """Organization-owned freshness and coverage policy for runtime trust state."""
+
+    policy_id: str
+    policy_version: str
+    checkpoint_digest: str
+    allowed_target_ids: tuple[str, ...]
+    required_target_ids: tuple[str, ...]
+    minimum_attestations: int
+    maximum_age_seconds: int
+    policy_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedRuntimeTrustStateAttestation:
+    """Authenticated target assertion about its loaded public trust-store digest."""
+
+    attestation_id: str
+    checkpoint_digest: str
+    runtime_policy_digest: str
+    store_id: str
+    store_kind: str
+    sequence: int
+    loaded_trust_store_digest: str
+    target_id: str
+    observed_at: datetime
+    signing_key_id: str
+    attestation_digest: str
+    signature_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeTrustStateFinding:
+    """Metadata-only failed condition in a runtime trust-state decision."""
+
+    code: RuntimeTrustStateFindingCode
+    subject_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeTrustStateReport:
+    """Deterministic runtime trust-state report without probing side effects."""
+
+    checkpoint_digest: str
+    trust_store_digest: str
+    store_id: str
+    store_kind: str
+    sequence: int
+    policy: RuntimeTrustStatePolicy
+    evaluated_at: datetime
+    attestations: tuple[VerifiedRuntimeTrustStateAttestation, ...]
+    findings: tuple[RuntimeTrustStateFinding, ...]
+
+    @property
+    def current(self) -> bool:
+        """Return whether fresh authenticated state satisfies the runtime policy."""
         return not self.findings
 
 

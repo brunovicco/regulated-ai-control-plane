@@ -103,6 +103,10 @@ Complete this document before processing personal or regulated data.
   They exclude hostnames, network addresses, operators, private keys, raw trust-store bytes,
   customer data and runtime payloads. Target ids remain organization metadata requiring normal
   access controls.
+- Phase 6o runtime policies, attestations and reports contain bounded target/key/store ids, UTC
+  observation/evaluation times and cryptographic digests/signatures. They exclude hostnames,
+  network addresses, process payloads, operators, private keys and customer data. Target ids remain
+  organization metadata requiring normal access controls.
 - Incident-response owner:
 
 ## Prohibited logging

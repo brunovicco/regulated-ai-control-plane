@@ -231,6 +231,10 @@ allowed/required target policy and distinct-target quorum. It rejects duplicate 
 cross-checkpoint or future receipts. The result is rollout evidence only: it neither distributes
 the trust store nor proves that a running process loaded it.
 
+Phase 6o verifies fresh signed target assertions for the exact trust-store digest bound to that
+checkpoint. Required targets, quorum and maximum age fail closed at an explicit UTC evaluation
+time. This remains offline evidence: it does not implement probes or prove continuous enforcement.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;

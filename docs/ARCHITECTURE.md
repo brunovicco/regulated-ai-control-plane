@@ -277,6 +277,27 @@ remain deployment-owned.
 
 See [ADR-0029](adr/0029-signed-trust-store-rollout-acknowledgements.md).
 
+## Phase 6o components
+
+- `adapters/runtime_trust_state.py`: strict runtime-state policy, target authority and signed
+  attestation verification.
+- `application/verify_runtime_trust_state.py`: exact loaded-digest binding, freshness, target
+  coverage and quorum evaluation.
+- `scripts/verify_runtime_trust_state.py`: deterministic offline runtime-state evidence command.
+- `docs/RUNTIME_TRUST_STATE.md`: operator workflow and assertion boundary.
+
+```text
+verified Phase 6m checkpoint + runtime-state policy + signed target assertions
+    -> signature/lifecycle/target authorization + exact loaded-digest binding
+    -> freshness + required-target coverage + distinct-target quorum
+    -> current metadata-only state report or fail closed
+```
+
+The report authenticates target assertions but does not independently observe processes or prove
+continuous enforcement.
+
+See [ADR-0030](adr/0030-signed-runtime-trust-state-attestations.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim

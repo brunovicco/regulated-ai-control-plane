@@ -1,5 +1,29 @@
 # Implementation plan
 
+## Phase 6o — signed runtime trust-state attestations
+
+### Goal
+
+Produce deterministic evidence that required runtime target identities freshly report one exact
+checkpoint trust-store digest as loaded, without probing or mutating processes.
+
+### Work
+
+1. Define strict checkpoint/policy-bound Ed25519 runtime-state attestations.
+2. Authorize lifecycle-aware public keys for explicit runtime target ids.
+3. Bind the reported loaded trust-store digest to the verified Phase 6m checkpoint.
+4. Enforce unique attestation, key and target identities plus checkpoint-time ordering.
+5. Apply required-target coverage, distinct-target quorum and maximum observation age.
+6. Emit deterministic current/blocked metadata-only reports and custody artifact kinds.
+7. Add CLI, tests, operating guidance and ADR-0030.
+
+### Decisions and assumptions
+
+- A signed target assertion is stronger than delivery evidence but is not an independent runtime
+  probe or proof of continuous enforcement.
+- Target and key ids are bounded non-personal deployment identifiers.
+- Probe implementation, collection, clock integrity, alerts and remediation remain external.
+
 ## Phase 6n — signed trust-store rollout acknowledgements
 
 ### Goal
