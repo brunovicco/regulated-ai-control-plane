@@ -172,6 +172,8 @@ policy/provider onboarding and removal by exact digest. Phase 6i moves the trust
 the signed release, diff, replay and review-evidence boundary. Phase 6l adds detailed owner and
 implementation-reference review for every changed tool definition. Automated source ingestion,
 automated key distribution, external timestamping and enterprise distribution remain pending.
+Phase 6m provides provider-neutral trust-store lineage and rollback-floor verification for those
+future distribution systems.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -183,6 +185,7 @@ Explore:
 - verification-key lifecycle enforcement; **implemented in Phase 6j**
 - content-addressed release custody; **implemented in Phase 6k**
 - detailed tool-definition review; **implemented in Phase 6l**
+- trust-store lineage checkpoints; **implemented in Phase 6m**
 - enterprise integrations;
 - additional sectors.
 
@@ -241,6 +244,15 @@ Implemented in Phase 6l:
 - schema-version bump enforcement for changed input/output contracts;
 - mandatory detailed-review binding for modified signed catalog attestations;
 - deterministic metadata-only pass/block output without source retrieval or tool execution.
+
+Implemented in Phase 6m:
+- Ed25519-signed exact-byte checkpoints for all three public trust-store authority kinds;
+- monotonic sequence, increasing UTC time and predecessor-digest linkage;
+- deployment-pinned digest/minimum-sequence verification and stale-package rejection;
+- fail-if-present creation plus duplicate-key, symlink and private-key marker rejection;
+- optional checkpoint retention in content-addressed release custody;
+- external private-key use only during offline signing; no key generation, remote distribution or
+  trusted-time claim.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;

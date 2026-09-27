@@ -1,5 +1,28 @@
 # Implementation plan
 
+## Phase 6m — trust-store lineage checkpoints
+
+### Goal
+
+Detect stale, forked or rolled-back public trust-store packages against a deployment-pinned digest,
+minimum sequence or exact predecessor without selecting a distribution provider.
+
+### Work
+
+1. Bind exact schema-v2 public trust-store bytes to a strict Ed25519-signed canonical checkpoint.
+2. Require stable store identity/kind, monotonic sequence, increasing UTC time and prior digest.
+3. Reject unchanged successors, malformed/duplicate-key inputs, symlinks and private-key markers.
+4. Require a pinned distribution public key and explicit trusted rollback floor during verification.
+5. Allow checkpoint retention in Phase 6k custody packages.
+6. Add create/verify CLI coverage, operating guidance and ADR-0028.
+
+### Decisions and assumptions
+
+- The signature authenticates checkpoint contents; the accepted floor and pinned public key must
+  live outside the newly distributed package.
+- Checkpoints cover public verification material only and never generate, hold or rotate keys.
+- Provider-specific distribution, consensus, trusted time and startup wiring remain external.
+
 ## Phase 6l — detailed tool-definition review gate
 
 ### Goal

@@ -219,6 +219,27 @@ Residual risks:
   Phase 6k trust snapshots;
 - the repository does not generate, store, rotate or destroy private keys.
 
+### Public trust store is rolled back during distribution
+
+Threat:
+an attacker or stale deployment replaces a current public trust store with an older valid copy,
+restoring a retired/revoked key or removing a not-yet-distributed replacement.
+
+Mitigations:
+- Phase 6m binds exact trust-store bytes to a stable id, authority kind and monotonic sequence and
+  authenticates the checkpoint with a dedicated Ed25519 distribution key;
+- every successor binds the exact prior checkpoint digest and must advance both sequence and UTC
+  issue time while changing the trust-store bytes;
+- verification requires a pinned distribution public key plus a caller-pinned digest, minimum
+  accepted sequence or exact predecessor;
+- schema/duplicate-key errors, symlinks, private-key markers, gaps, forks and stale floors fail closed;
+- checkpoints can be retained with the content-addressed Phase 6k custody evidence.
+
+Residual risks:
+- an attacker who replaces the package, pinned public key and every trusted floor can still roll back;
+- checkpoint issue time is asserted local metadata, not an external trusted timestamp;
+- automated distribution, node acknowledgement and recovery remain deployment-owned.
+
 ### Release evidence is lost, altered or archived with secrets
 
 Threat:

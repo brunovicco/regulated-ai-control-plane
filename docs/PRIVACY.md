@@ -94,6 +94,10 @@ Complete this document before processing personal or regulated data.
 - Phase 6l tool reviews contain bounded non-personal owner/reviewer roles, public HTTPS
   implementation references, change types, conclusions, dates and digests. They exclude source
   content, code, tool arguments/results, credentials, personal reviewer identity and private keys.
+- Phase 6m checkpoints contain a bounded store id/kind, sequence, UTC time and cryptographic
+  digests/signatures of public trust metadata. The offline signer reads but never emits the private
+  key. Checkpoints exclude credentials, people, customer data and runtime content; store ids remain
+  organization metadata requiring normal access controls.
 - Incident-response owner:
 
 ## Prohibited logging
