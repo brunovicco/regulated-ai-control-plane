@@ -1,5 +1,27 @@
 # Implementation plan
 
+## Phase 6p — provider-neutral signed time-authority receipts
+
+### Goal
+
+Verify that an explicitly trusted external authority signed a time assertion for the exact bytes of
+an allowlisted release or trust artifact, without contacting or selecting a provider.
+
+### Work
+
+1. Define a strict artifact-kind/digest/time/authority Ed25519 receipt.
+2. Validate authority keys through a lifecycle-aware schema-v2 public trust store.
+3. Require caller-selected subject kind and evaluation time with an optional pinned issue-time floor.
+4. Reject changed bytes, wrong kind/authority, inactive keys, bad signatures and future/stale floors.
+5. Emit deterministic metadata-only verification reports and custody support.
+6. Add CLI, tests, operating guidance and ADR-0031.
+
+### Decisions and assumptions
+
+- The format is provider-neutral and explicitly not an RFC 3161 compatibility claim.
+- Receipt acquisition, authority operations, immutable retention and transparency remain external.
+- Authority and key ids are bounded non-personal identifiers.
+
 ## Phase 6o — signed runtime trust-state attestations
 
 ### Goal

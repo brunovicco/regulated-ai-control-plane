@@ -235,6 +235,10 @@ Phase 6o verifies fresh signed target assertions for the exact trust-store diges
 checkpoint. Required targets, quorum and maximum age fail closed at an explicit UTC evaluation
 time. This remains offline evidence: it does not implement probes or prove continuous enforcement.
 
+Phase 6p verifies provider-neutral signed time-authority receipts for exact release/trust artifact
+bytes. It enforces explicit artifact kind, authority/key lifecycle and caller-pinned time bounds,
+without claiming RFC 3161 compatibility, acquiring receipts or selecting a timestamp provider.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;

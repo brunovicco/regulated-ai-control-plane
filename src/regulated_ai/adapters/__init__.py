@@ -67,6 +67,12 @@ from regulated_ai.adapters.trust_store_lineage import (
     create_trust_store_checkpoint,
     verify_trust_store_checkpoint,
 )
+from regulated_ai.adapters.trusted_timestamp import (
+    TimestampSubjectKind,
+    TrustedTimestampError,
+    TrustedTimestampIdentity,
+    verify_trusted_timestamp,
+)
 from regulated_ai.adapters.yaml_files import (
     ConfigurationBoundaryError,
     FilePolicyRepository,
@@ -108,11 +114,14 @@ __all__ = [
     "SqliteOperatorLifecycleEventRepository",
     "SqliteToolActionRepository",
     "StructuredEvaluationObserver",
+    "TimestampSubjectKind",
     "ToolReviewBoundaryError",
     "TrustStoreAcknowledgementError",
     "TrustStoreCheckpointIdentity",
     "TrustStoreKind",
     "TrustStoreLineageError",
+    "TrustedTimestampError",
+    "TrustedTimestampIdentity",
     "UnsupportedSchemaVersionError",
     "VerifiedControlPack",
     "create_release_custody",
@@ -134,4 +143,5 @@ __all__ = [
     "verify_runtime_trust_state_attestations",
     "verify_trust_store_acknowledgements",
     "verify_trust_store_checkpoint",
+    "verify_trusted_timestamp",
 ]

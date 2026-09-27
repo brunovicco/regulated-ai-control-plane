@@ -298,6 +298,25 @@ continuous enforcement.
 
 See [ADR-0030](adr/0030-signed-runtime-trust-state-attestations.md).
 
+## Phase 6p components
+
+- `adapters/trusted_timestamp.py`: strict artifact binding, authority trust-store parsing and
+  Ed25519 receipt verification.
+- `scripts/verify_trusted_timestamp.py`: deterministic offline metadata-only report command.
+- `docs/TRUSTED_TIMESTAMP.md`: authority, trust-floor and provider boundary runbook.
+
+```text
+exact artifact bytes + signed time receipt + authority public trust store
+    -> digest/kind/authority/key lifecycle/signature verification
+    -> explicit evaluation time + optional caller-pinned issue-time floor
+    -> metadata-only trusted-time assertion evidence or fail closed
+```
+
+This boundary verifies the configured authority assertion; it does not acquire a receipt, implement
+RFC 3161, certify the authority or provide immutable retention.
+
+See [ADR-0031](adr/0031-provider-neutral-signed-time-authority-receipts.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim

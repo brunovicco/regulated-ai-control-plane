@@ -41,6 +41,8 @@ targets and enforce required-target coverage plus a minimum quorum. These receip
 of the checkpoint metadata, not continuous runtime loading or enforcement.
 Phase 6o can verify fresh signed target assertions for the exact loaded trust-store digest. These
 assertions remain dependent on target integrity, target clocks and the deployment-owned probe.
+Phase 6p time-authority keys use the same active/retired/revoked lifecycle semantics. Their trust
+store and rotation are a separate external-authority boundary; never reuse release or target keys.
 
 ## Verification clocks
 
