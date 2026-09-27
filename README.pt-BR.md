@@ -236,6 +236,11 @@ predecessor fixado pelo deployment, impedindo que um pacote recém-distribuído 
 antirrollback. Isso não distribui chaves, fornece tempo confiável nem protege um anchor substituído
 junto com o pacote.
 
+A Fase 6n verifica recibos assinados de consumidores para um checkpoint exato contra uma política
+explícita de targets permitidos/obrigatórios e quórum de targets distintos. Ela rejeita targets ou
+chaves duplicados, recibos futuros e vínculos com outro checkpoint. O resultado é evidência de
+rollout; ele não distribui o trust store nem comprova que um processo em execução o carregou.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;

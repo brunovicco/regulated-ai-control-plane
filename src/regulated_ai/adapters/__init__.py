@@ -50,6 +50,11 @@ from regulated_ai.adapters.tool_review_files import (
     load_tool_catalog_draft,
     load_tool_catalog_review,
 )
+from regulated_ai.adapters.trust_store_acknowledgements import (
+    TrustStoreAcknowledgementError,
+    load_trust_store_rollout_policy,
+    verify_trust_store_acknowledgements,
+)
 from regulated_ai.adapters.trust_store_lineage import (
     TrustStoreCheckpointIdentity,
     TrustStoreKind,
@@ -98,6 +103,7 @@ __all__ = [
     "SqliteToolActionRepository",
     "StructuredEvaluationObserver",
     "ToolReviewBoundaryError",
+    "TrustStoreAcknowledgementError",
     "TrustStoreCheckpointIdentity",
     "TrustStoreKind",
     "TrustStoreLineageError",
@@ -115,7 +121,9 @@ __all__ = [
     "load_tool_catalog_draft",
     "load_tool_catalog_file",
     "load_tool_catalog_review",
+    "load_trust_store_rollout_policy",
     "verify_control_pack",
     "verify_release_custody",
+    "verify_trust_store_acknowledgements",
     "verify_trust_store_checkpoint",
 ]

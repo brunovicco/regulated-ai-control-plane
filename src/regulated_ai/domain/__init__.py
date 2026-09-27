@@ -100,8 +100,13 @@ from regulated_ai.domain.models import (
     ToolResultClassification,
     ToolResultHandling,
     TransformationReceipt,
+    TrustStoreRolloutFinding,
+    TrustStoreRolloutFindingCode,
+    TrustStoreRolloutPolicy,
+    TrustStoreRolloutReport,
     VerifiedPromotionAttestation,
     VerifiedReleaseReviewAttestation,
+    VerifiedTrustStoreAcknowledgement,
     strongest_outcome,
 )
 
@@ -205,7 +210,12 @@ __all__ = [
     "ToolResultClassification",
     "ToolResultHandling",
     "TransformationReceipt",
+    "TrustStoreRolloutFinding",
+    "TrustStoreRolloutFindingCode",
+    "TrustStoreRolloutPolicy",
+    "TrustStoreRolloutReport",
     "VerifiedPromotionAttestation",
     "VerifiedReleaseReviewAttestation",
+    "VerifiedTrustStoreAcknowledgement",
     "strongest_outcome",
 ]

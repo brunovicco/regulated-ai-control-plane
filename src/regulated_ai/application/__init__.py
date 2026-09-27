@@ -61,6 +61,10 @@ from regulated_ai.application.review_tool_catalog_update import (
     ReviewToolCatalogUpdate,
     ToolCatalogUpdateReviewError,
 )
+from regulated_ai.application.verify_trust_store_rollout import (
+    TrustStoreRolloutError,
+    VerifyTrustStoreRollout,
+)
 
 __all__ = [
     "ActionApprovalFailedError",
@@ -101,5 +105,7 @@ __all__ = [
     "ToolCatalogUpdateReviewError",
     "ToolResultRejectedError",
     "TransformationFailedError",
+    "TrustStoreRolloutError",
+    "VerifyTrustStoreRollout",
     "normalize_evaluation_context",
 ]

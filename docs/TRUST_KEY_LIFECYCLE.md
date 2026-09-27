@@ -36,6 +36,9 @@ reports or trust stores.
 Revocation metadata is not a remote revocation service. Verification is only as current as the
 local trust-store copy. Phase 6m checkpoints can detect stale/rolled-back copies when deployment
 supplies a trusted digest, minimum sequence or predecessor; distribution monitoring remains required.
+Phase 6n can additionally require signed acknowledgements from explicitly authorized consumer
+targets and enforce required-target coverage plus a minimum quorum. These receipts prove acceptance
+of the checkpoint metadata, not continuous runtime loading or enforcement.
 
 ## Verification clocks
 
