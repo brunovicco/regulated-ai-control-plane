@@ -226,6 +226,11 @@ key plus a deployment-pinned digest, minimum sequence or exact predecessor,
 so a newly distributed package cannot establish its own rollback floor. This does not distribute
 keys, provide trusted time or protect an anchor that is replaced with the package.
 
+Phase 6n verifies signed consumer acknowledgements for one exact checkpoint against an explicit
+allowed/required target policy and distinct-target quorum. It rejects duplicate targets/keys and
+cross-checkpoint or future receipts. The result is rollout evidence only: it neither distributes
+the trust store nor proves that a running process loaded it.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;

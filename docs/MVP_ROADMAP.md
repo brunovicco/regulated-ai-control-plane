@@ -173,7 +173,7 @@ the signed release, diff, replay and review-evidence boundary. Phase 6l adds det
 implementation-reference review for every changed tool definition. Automated source ingestion,
 automated key distribution, external timestamping and enterprise distribution remain pending.
 Phase 6m provides provider-neutral trust-store lineage and rollback-floor verification for those
-future distribution systems.
+future distribution systems. Phase 6n adds signed consumer acknowledgement coverage and quorum.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -186,6 +186,7 @@ Explore:
 - content-addressed release custody; **implemented in Phase 6k**
 - detailed tool-definition review; **implemented in Phase 6l**
 - trust-store lineage checkpoints; **implemented in Phase 6m**
+- signed trust-store rollout acknowledgements; **implemented in Phase 6n**
 - enterprise integrations;
 - additional sectors.
 
@@ -253,6 +254,14 @@ Implemented in Phase 6m:
 - optional checkpoint retention in content-addressed release custody;
 - external private-key use only during offline signing; no key generation, remote distribution or
   trusted-time claim.
+
+Implemented in Phase 6n:
+- exact checkpoint and rollout-policy binding in every consumer acknowledgement;
+- lifecycle-aware consumer keys authorized by explicit non-personal target id;
+- allowed/required target coverage and minimum distinct-target quorum;
+- duplicate target/key/receipt and future/mismatched acknowledgement rejection;
+- deterministic metadata-only complete/incomplete report and custody artifact kinds;
+- no configuration delivery, node contact, runtime mutation or adoption claim.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;

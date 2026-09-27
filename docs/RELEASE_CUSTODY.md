@@ -14,7 +14,8 @@ Every archive requires:
 - at least one `PUBLIC_TRUST_STORE` snapshot.
 
 Additional allowlisted artifacts are control-pack manifests, release-review attestations, promotion
-attestations, promotion policies, trust-store lineage checkpoints and metadata-only scenario suites. Input files must be regular
+attestations, promotion policies, trust-store lineage checkpoints, rollout policies, consumer
+acknowledgements, rollout reports and metadata-only scenario suites. Input files must be regular
 JSON/YAML files with safe basenames. Symlinks, oversized inputs and common PEM private-key markers
 are rejected.
 

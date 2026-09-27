@@ -1,5 +1,27 @@
 # Implementation plan
 
+## Phase 6n — signed trust-store rollout acknowledgements
+
+### Goal
+
+Produce deterministic evidence that required consumers accepted one exact signed trust-store
+checkpoint without performing distribution or node mutation.
+
+### Work
+
+1. Define strict checkpoint/policy-bound Ed25519 consumer acknowledgements.
+2. Authorize lifecycle-aware public keys for explicit consumer target ids.
+3. Enforce unique receipt, key and target identities plus exact store/checkpoint binding.
+4. Apply allowed/required target coverage and a minimum distinct-target quorum.
+5. Emit deterministic complete/incomplete metadata-only reports and custody artifact kinds.
+6. Add CLI, tests, operating guidance and ADR-0029.
+
+### Decisions and assumptions
+
+- A receipt proves signed acceptance metadata, not delivery or runtime-loaded state.
+- Target and key ids are bounded non-personal deployment identifiers.
+- Distribution, collection, health probes, alerting and remediation remain external.
+
 ## Phase 6m — trust-store lineage checkpoints
 
 ### Goal

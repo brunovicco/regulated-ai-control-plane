@@ -98,6 +98,11 @@ Complete this document before processing personal or regulated data.
   digests/signatures of public trust metadata. The offline signer reads but never emits the private
   key. Checkpoints exclude credentials, people, customer data and runtime content; store ids remain
   organization metadata requiring normal access controls.
+- Phase 6n rollout policies, acknowledgements and reports contain bounded target/key/store ids,
+  checkpoint and policy digests, sequence, UTC acceptance time, findings and signature digests.
+  They exclude hostnames, network addresses, operators, private keys, raw trust-store bytes,
+  customer data and runtime payloads. Target ids remain organization metadata requiring normal
+  access controls.
 - Incident-response owner:
 
 ## Prohibited logging

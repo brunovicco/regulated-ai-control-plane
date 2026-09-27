@@ -240,6 +240,28 @@ Residual risks:
 - checkpoint issue time is asserted local metadata, not an external trusted timestamp;
 - automated distribution, node acknowledgement and recovery remain deployment-owned.
 
+### Trust-store rollout is declared complete while required consumers remain stale
+
+Threat:
+an operator marks a signed trust-store checkpoint as deployed even though a required verifier did
+not accept it, or reuses, forges or redirects another consumer's receipt to satisfy coverage.
+
+Mitigations:
+- Phase 6n binds every acknowledgement to the exact checkpoint digest, rollout-policy digest,
+  store id/kind and sequence;
+- acknowledgement signatures use a separate lifecycle-aware Ed25519 trust store whose keys are
+  explicitly authorized for bounded target ids;
+- required-target coverage and a configured minimum acknowledgement quorum must both pass;
+- duplicate receipt ids, keys or targets, unknown targets, future acceptance times and stale or
+  mismatched checkpoint metadata fail closed;
+- reports retain only bounded ids, UTC metadata and cryptographic digests.
+
+Residual risks:
+- a signed acknowledgement proves acceptance by the authorized target identity, not that every
+  running process loaded the trust store or continuously enforced it;
+- compromised target signing keys and incorrect target assignments can create false acceptance;
+- delivery, target health, external trusted timestamping and recovery remain deployment-owned.
+
 ### Release evidence is lost, altered or archived with secrets
 
 Threat:

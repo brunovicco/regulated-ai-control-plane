@@ -277,6 +277,13 @@ class PromotionFindingCode(StrEnum):
     ATTESTATION_EXPIRED = "ATTESTATION_EXPIRED"
 
 
+class TrustStoreRolloutFindingCode(StrEnum):
+    """Stable reason that a trust-store rollout is not acknowledged."""
+
+    REQUIRED_TARGET_MISSING = "REQUIRED_TARGET_MISSING"
+    ACKNOWLEDGEMENT_QUORUM_NOT_MET = "ACKNOWLEDGEMENT_QUORUM_NOT_MET"
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     """Normalized jurisdiction identifier."""
@@ -1002,6 +1009,63 @@ class ControlPackPromotionReport:
     @property
     def authorized(self) -> bool:
         """Return whether authenticated active approvals satisfy the policy."""
+        return not self.findings
+
+
+@dataclass(frozen=True, slots=True)
+class TrustStoreRolloutPolicy:
+    """Organization-owned acknowledgement coverage for one exact checkpoint."""
+
+    policy_id: str
+    policy_version: str
+    checkpoint_digest: str
+    allowed_target_ids: tuple[str, ...]
+    required_target_ids: tuple[str, ...]
+    minimum_acknowledgements: int
+    policy_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedTrustStoreAcknowledgement:
+    """Authenticated consumer acceptance of one exact trust-store checkpoint."""
+
+    acknowledgement_id: str
+    checkpoint_digest: str
+    rollout_policy_digest: str
+    store_id: str
+    store_kind: str
+    sequence: int
+    target_id: str
+    accepted_at: datetime
+    signing_key_id: str
+    acknowledgement_digest: str
+    signature_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class TrustStoreRolloutFinding:
+    """Metadata-only failed condition in a rollout acknowledgement decision."""
+
+    code: TrustStoreRolloutFindingCode
+    subject_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TrustStoreRolloutReport:
+    """Deterministic rollout coverage report without distribution side effects."""
+
+    checkpoint_digest: str
+    store_id: str
+    store_kind: str
+    sequence: int
+    policy: TrustStoreRolloutPolicy
+    evaluated_at: datetime
+    acknowledgements: tuple[VerifiedTrustStoreAcknowledgement, ...]
+    findings: tuple[TrustStoreRolloutFinding, ...]
+
+    @property
+    def complete(self) -> bool:
+        """Return whether authenticated acknowledgements satisfy the rollout policy."""
         return not self.findings
 
 

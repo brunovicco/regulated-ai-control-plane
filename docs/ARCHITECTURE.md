@@ -255,6 +255,28 @@ exact public trust-store bytes + stable identity/sequence + prior checkpoint
 
 See [ADR-0028](adr/0028-trust-store-lineage-checkpoints.md).
 
+## Phase 6n components
+
+- `adapters/trust_store_acknowledgements.py`: strict rollout-policy parsing, lifecycle-aware
+  acknowledgement authority and signed target-receipt verification.
+- `application/verify_trust_store_rollout.py`: exact checkpoint binding, target coverage and quorum
+  evaluation.
+- `scripts/verify_trust_store_rollout.py`: deterministic offline rollout-evidence command.
+- `docs/TRUST_STORE_ROLLOUT.md`: operator workflow and deployment boundary.
+
+```text
+verified Phase 6m checkpoint + rollout policy + signed target receipts
+    -> receipt signature/lifecycle/target authorization + exact checkpoint binding
+    -> required-target coverage + acknowledgement quorum
+    -> complete metadata-only rollout report or fail closed
+```
+
+The receipt proves that an authorized target identity accepted the checkpoint metadata. It does not
+prove that a running process loaded the store or that external delivery succeeded. Those effects
+remain deployment-owned.
+
+See [ADR-0029](adr/0029-signed-trust-store-rollout-acknowledgements.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim
