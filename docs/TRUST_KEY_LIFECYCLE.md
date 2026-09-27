@@ -34,7 +34,8 @@ reports or trust stores.
    organization incident/reassessment process.
 
 Revocation metadata is not a remote revocation service. Verification is only as current as the
-local trust-store copy, so distribution monitoring and rollback protection remain required.
+local trust-store copy. Phase 6m checkpoints can detect stale/rolled-back copies when deployment
+supplies a trusted digest, minimum sequence or predecessor; distribution monitoring remains required.
 
 ## Verification clocks
 

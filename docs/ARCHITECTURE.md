@@ -239,6 +239,22 @@ authenticated base + candidate catalog + metadata-only per-tool review
 
 See [ADR-0027](adr/0027-detailed-tool-definition-review-gate.md).
 
+## Phase 6m components
+
+- `adapters/trust_store_lineage.py`: strict public-store parsing, signed canonical checkpoints and
+  anchored lineage verification.
+- `scripts/manage_trust_store_lineage.py`: offline create/verify operator commands.
+- `adapters/release_custody.py`: allowlists checkpoint retention with release evidence.
+- `docs/TRUST_STORE_LINEAGE.md`: rollback-floor and distribution-boundary runbook.
+
+```text
+exact public trust-store bytes + stable identity/sequence + prior checkpoint
+    -> Ed25519 distribution signature -> pinned public key + rollback-floor verification
+    -> accept current public authority metadata or fail closed as stale/forked
+```
+
+See [ADR-0028](adr/0028-trust-store-lineage-checkpoints.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim

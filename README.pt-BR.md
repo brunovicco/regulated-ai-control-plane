@@ -228,6 +228,14 @@ avançar a versão do schema da ferramenta. A atestação de um catálogo modifi
 resultado detalhado aprovado antes de completar a evidência de release. O gate não acessa a rede,
 valida a implementação referenciada nem executa ferramentas.
 
+A Fase 6m cria checkpoints monotônicos de linhagem para os bytes exatos dos trust stores públicos.
+Sucessores vinculam o checkpoint anterior e rejeitam mudança de identidade, saltos de sequência,
+tempo não crescente e conteúdo inalterado. Cada checkpoint é assinado com Ed25519, e a verificação
+exige uma chave pública de distribuição fixada mais digest, sequência mínima ou
+predecessor fixado pelo deployment, impedindo que um pacote recém-distribuído defina o próprio piso
+antirrollback. Isso não distribui chaves, fornece tempo confiável nem protege um anchor substituído
+junto com o pacote.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;

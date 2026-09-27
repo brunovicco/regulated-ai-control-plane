@@ -50,6 +50,13 @@ from regulated_ai.adapters.tool_review_files import (
     load_tool_catalog_draft,
     load_tool_catalog_review,
 )
+from regulated_ai.adapters.trust_store_lineage import (
+    TrustStoreCheckpointIdentity,
+    TrustStoreKind,
+    TrustStoreLineageError,
+    create_trust_store_checkpoint,
+    verify_trust_store_checkpoint,
+)
 from regulated_ai.adapters.yaml_files import (
     ConfigurationBoundaryError,
     FilePolicyRepository,
@@ -91,9 +98,13 @@ __all__ = [
     "SqliteToolActionRepository",
     "StructuredEvaluationObserver",
     "ToolReviewBoundaryError",
+    "TrustStoreCheckpointIdentity",
+    "TrustStoreKind",
+    "TrustStoreLineageError",
     "UnsupportedSchemaVersionError",
     "VerifiedControlPack",
     "create_release_custody",
+    "create_trust_store_checkpoint",
     "load_policy_draft",
     "load_policy_regulatory_review",
     "load_provider_capability_draft",
@@ -106,4 +117,5 @@ __all__ = [
     "load_tool_catalog_review",
     "verify_control_pack",
     "verify_release_custody",
+    "verify_trust_store_checkpoint",
 ]

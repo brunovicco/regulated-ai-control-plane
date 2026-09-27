@@ -219,6 +219,13 @@ type and an approving conclusion; schema changes must advance the tool schema ve
 catalog attestations must bind the passing detailed result before release evidence is complete. The
 gate is network-silent and does not validate or execute the referenced implementation.
 
+Phase 6m creates monotonic lineage checkpoints for exact public trust-store bytes. Successors bind
+the prior checkpoint and reject identity changes, sequence gaps, non-increasing time and unchanged
+content. Each checkpoint is Ed25519-signed, and verification requires a pinned distribution public
+key plus a deployment-pinned digest, minimum sequence or exact predecessor,
+so a newly distributed package cannot establish its own rollback floor. This does not distribute
+keys, provide trusted time or protect an anchor that is replaced with the package.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;
