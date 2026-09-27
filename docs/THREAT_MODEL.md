@@ -323,6 +323,28 @@ Residual risks:
 - a compromised or dishonest timestamp authority can assert false time;
 - acquisition availability, immutable retention and long-term archival renewal remain external.
 
+### OCI evidence distribution changes or adds artifacts
+
+Threat:
+a transported package changes a layer, rewrites its kind/name/reference metadata, omits required
+content, adds untracked blobs or carries private-key material into a registry.
+
+Mitigations:
+- Phase 6r binds one normalized package reference and explicit UTC time through canonical OCI index,
+  manifest and config documents;
+- every allowlisted JSON/YAML layer is SHA-256 content-addressed with exact media type, size, kind and
+  safe basename binding;
+- verification walks the complete blob inventory and rejects missing, changed, symlinked,
+  unsupported-algorithm or untracked entries;
+- bounded inputs and common PEM private-key markers fail closed before creation and after transport.
+
+Residual risks:
+- marker matching is not general secret detection and an operator can still package wrongly
+  classified metadata;
+- the local layout is unsigned; registry compromise, tag movement and transport substitution require
+  digest pinning and an organization-approved OCI signing/verification control;
+- registry ACLs, authentication, availability, retention, replication and deletion remain external.
+
 ### Release evidence is lost, altered or archived with secrets
 
 Threat:

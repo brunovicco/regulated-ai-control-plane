@@ -1,5 +1,28 @@
 # Implementation plan
 
+## Phase 6r — provider-neutral OCI evidence artifacts
+
+### Goal
+
+Package metadata-only release evidence as a deterministic, content-addressed OCI image layout that
+can be transported by approved OCI tooling without selecting or contacting a registry.
+
+### Work
+
+1. Build an OCI image-layout directory with canonical index, manifest, config and SHA-256 blobs.
+2. Bind a normalized package reference, explicit UTC creation time and allowlisted artifact kinds.
+3. Preserve artifact names/types only as bounded OCI annotations and config metadata.
+4. Verify every descriptor, digest, size, layer/config binding and the exact tracked blob inventory.
+5. Reject unsafe names, symlinks, private-key markers, untracked files and overwrite attempts.
+6. Add create/verify CLI coverage, operating guidance and ADR-0033.
+
+### Decisions and assumptions
+
+- The layout uses OCI image manifest/index media types and a RegulaAI evidence artifact type.
+- Creation and verification are local, deterministic and network-silent.
+- Registry push/pull, authentication, authorization, signing, retention and availability remain
+  deployment-owned concerns.
+
 ## Phase 6q — offline RFC 3161 timestamp verification
 
 ### Goal

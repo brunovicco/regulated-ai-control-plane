@@ -115,6 +115,10 @@ Complete this document before processing personal or regulated data.
   policy OID, serial number and UTC generation time. They exclude artifact bytes, certificate
   subjects, credentials, private keys, people and customer data. Original DER inputs and CA bundles
   remain controlled evidence outside the report.
+- Phase 6r layouts contain the allowlisted metadata artifact bytes being distributed plus bounded
+  kind, filename, package-reference, UTC time, media-type, size and digest metadata. They reject
+  common private-key markers but are not general secret scanners. Do not package prompts, responses,
+  source content, credentials, personal data or production payloads.
 - Incident-response owner:
 
 ## Prohibited logging
