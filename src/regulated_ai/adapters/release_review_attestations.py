@@ -97,10 +97,7 @@ class _ReviewAttestationModel(_StrictModel):
         ):
             raise ValueError("release review attestation time must be timezone-aware UTC")
         has_review = self.review_id is not None and self.review_digest is not None
-        detailed_review_required = (
-            self.change_type is ControlPackChangeType.MODIFIED
-            and self.artifact_kind is not ReleaseReviewArtifactKind.TOOL_CATALOG
-        )
+        detailed_review_required = self.change_type is ControlPackChangeType.MODIFIED
         if detailed_review_required and not has_review:
             raise ValueError("modified entity attestation requires a detailed review binding")
         if not detailed_review_required and (

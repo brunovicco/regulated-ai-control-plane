@@ -213,6 +213,12 @@ bundle, authorized promotion report, attestations and public trust snapshots. It
 PEM material, never overwrites an archive and detects changed or untracked files. The package is
 tamper-evident local retention, not immutable storage, trusted timestamping or backup.
 
+Phase 6l adds a digest-bound detailed gate for every changed trusted-tool definition. Each change
+requires an accountable non-personal owner role, HTTPS implementation references, the exact change
+type and an approving conclusion; schema changes must advance the tool schema version. Modified
+catalog attestations must bind the passing detailed result before release evidence is complete. The
+gate is network-silent and does not validate or execute the referenced implementation.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;

@@ -57,6 +57,10 @@ from regulated_ai.application.review_provider_capability_update import (
     ProviderCapabilityUpdateReviewError,
     ReviewProviderCapabilityUpdate,
 )
+from regulated_ai.application.review_tool_catalog_update import (
+    ReviewToolCatalogUpdate,
+    ToolCatalogUpdateReviewError,
+)
 
 __all__ = [
     "ActionApprovalFailedError",
@@ -88,11 +92,13 @@ __all__ = [
     "ReplayControlPackScenarios",
     "ReviewPolicyUpdate",
     "ReviewProviderCapabilityUpdate",
+    "ReviewToolCatalogUpdate",
     "ToolActionConflictError",
     "ToolActionExecutionFailedError",
     "ToolActionNotFoundError",
     "ToolActionPersistenceError",
     "ToolAuthorizationError",
+    "ToolCatalogUpdateReviewError",
     "ToolResultRejectedError",
     "TransformationFailedError",
     "normalize_evaluation_context",

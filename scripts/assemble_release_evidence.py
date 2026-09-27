@@ -26,6 +26,10 @@ from regulated_ai.adapters.signed_packs import (
     VerifiedControlPack,
     verify_control_pack,
 )
+from regulated_ai.adapters.tool_review_files import (
+    ToolReviewBoundaryError,
+    load_tool_catalog_review,
+)
 from regulated_ai.adapters.yaml_files import (
     ConfigurationBoundaryError,
     load_capability_bytes,
@@ -43,6 +47,8 @@ from regulated_ai.application import (
     ReplayControlPackScenarios,
     ReviewPolicyUpdate,
     ReviewProviderCapabilityUpdate,
+    ReviewToolCatalogUpdate,
+    ToolCatalogUpdateReviewError,
 )
 from regulated_ai.domain import (
     ControlPackChange,
@@ -64,6 +70,8 @@ from regulated_ai.domain import (
     ReleaseReviewEvidence,
     ScenarioReplayOutcome,
     ScenarioReplayResult,
+    ToolCatalogDraft,
+    ToolCatalogUpdateReviewReport,
     VerifiedReleaseReviewAttestation,
 )
 
@@ -91,6 +99,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="append",
         default=[],
     )
+    parser.add_argument("--tool-catalog-review-record", type=Path)
     parser.add_argument("--review-trust-store", type=Path)
     parser.add_argument(
         "--review-attestation",
@@ -122,6 +131,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             candidate_provider_drafts,
             tuple(args.provider_review_record),
         )
+        tool_report = _tool_review_report(
+            base,
+            _tool_draft(candidate_pack),
+            args.tool_catalog_review_record,
+        )
         attestations: tuple[VerifiedReleaseReviewAttestation, ...] = ()
         if args.review_attestation:
             if args.review_trust_store is None:
@@ -136,6 +150,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             candidate=candidate,
             policy_reports=policy_reports,
             provider_reports=provider_reports,
+            tool_report=tool_report,
             attestations=attestations,
         )
         report = AssembleControlPackReleaseEvidence().execute(
@@ -167,6 +182,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         ReleaseEvidenceError,
         ScenarioSuiteError,
         SignedPackError,
+        ToolCatalogUpdateReviewError,
+        ToolReviewBoundaryError,
     ) as exc:
         print(f"Control-pack release evidence failed: {exc}", file=sys.stderr)
         return 1
@@ -216,6 +233,12 @@ def _provider_drafts(pack: VerifiedControlPack) -> dict[str, ProviderCapabilityD
             raise ReleaseEvidenceError("Candidate provider targets must be unique")
         drafts[identifier] = ProviderCapabilityDraft(record, _content_digest(item.content))
     return drafts
+
+
+def _tool_draft(pack: VerifiedControlPack) -> ToolCatalogDraft:
+    item = pack.tool_files[0]
+    catalog_version, tools = load_tool_catalog_bytes(item.content, item.path)
+    return ToolCatalogDraft(catalog_version, tools, _content_digest(item.content))
 
 
 def _release_artifacts(
@@ -285,12 +308,24 @@ def _provider_review_reports(
     return reports
 
 
+def _tool_review_report(
+    base: ControlPackRelease,
+    draft: ToolCatalogDraft,
+    path: Path | None,
+) -> ToolCatalogUpdateReviewReport | None:
+    if path is None:
+        return None
+    review = load_tool_catalog_review(path)
+    return ReviewToolCatalogUpdate().execute(base, draft, review)
+
+
 def _authenticated_review_evidence(
     *,
     base: ControlPackRelease,
     candidate: ControlPackRelease,
     policy_reports: dict[str, PolicyUpdateRegulatoryReviewReport],
     provider_reports: dict[str, ProviderCapabilityUpdateReport],
+    tool_report: ToolCatalogUpdateReviewReport | None,
     attestations: tuple[VerifiedReleaseReviewAttestation, ...],
 ) -> tuple[ReleaseReviewEvidence, ...]:
     evidence = []
@@ -312,11 +347,8 @@ def _authenticated_review_evidence(
         approved = attestation.conclusion is ReleaseReviewConclusion.APPROVE
         review_id = attestation.attestation_id
         review_digest = attestation.attestation_digest
-        if (
-            attestation.change_type is ControlPackChangeType.MODIFIED
-            and attestation.kind is not ReleaseReviewArtifactKind.TOOL_CATALOG
-        ):
-            report = _detailed_report(attestation, policy_reports, provider_reports)
+        if attestation.change_type is ControlPackChangeType.MODIFIED:
+            report = _detailed_report(attestation, policy_reports, provider_reports, tool_report)
             if (
                 attestation.review_id != report["review_id"]
                 or attestation.review_digest != report["review_digest"]
@@ -358,6 +390,7 @@ def _detailed_report(
     attestation: VerifiedReleaseReviewAttestation,
     policy_reports: dict[str, PolicyUpdateRegulatoryReviewReport],
     provider_reports: dict[str, ProviderCapabilityUpdateReport],
+    tool_report: ToolCatalogUpdateReviewReport | None,
 ) -> dict[str, object]:
     if attestation.kind is ReleaseReviewArtifactKind.POLICY_SET:
         report = policy_reports.get(attestation.subject_id)
@@ -372,17 +405,29 @@ def _detailed_report(
             "content_digest": report.candidate_policy_digest,
             "approved": report.approved,
         }
-    provider_report = provider_reports.get(attestation.subject_id)
-    if provider_report is None:
+    if attestation.kind is ReleaseReviewArtifactKind.PROVIDER_TARGET:
+        provider_report = provider_reports.get(attestation.subject_id)
+        if provider_report is None:
+            raise ReleaseEvidenceError(
+                "Modified provider attestation requires its detailed review record"
+            )
+        return {
+            "review_id": provider_report.review_id,
+            "review_digest": provider_report.review_digest,
+            "reviewer_role": provider_report.reviewer_role,
+            "content_digest": provider_report.candidate_record_digest,
+            "approved": provider_report.approved,
+        }
+    if tool_report is None:
         raise ReleaseEvidenceError(
-            "Modified provider attestation requires its detailed review record"
+            "Modified tool-catalog attestation requires its detailed review record"
         )
     return {
-        "review_id": provider_report.review_id,
-        "review_digest": provider_report.review_digest,
-        "reviewer_role": provider_report.reviewer_role,
-        "content_digest": provider_report.candidate_record_digest,
-        "approved": provider_report.approved,
+        "review_id": tool_report.review_id,
+        "review_digest": tool_report.review_digest,
+        "reviewer_role": tool_report.reviewer_role,
+        "content_digest": tool_report.candidate_catalog_digest,
+        "approved": tool_report.approved,
     }
 
 

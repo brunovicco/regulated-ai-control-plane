@@ -66,7 +66,7 @@ def test_modified_attestation_requires_detailed_review_binding(tmp_path: Path) -
         verify_release_review_attestations((attestation,), trust_store)
 
 
-def test_modified_tool_catalog_attestation_uses_whole_artifact_binding(tmp_path: Path) -> None:
+def test_modified_tool_catalog_attestation_requires_detailed_review_binding(tmp_path: Path) -> None:
     private_key = Ed25519PrivateKey.generate()
     trust_store = _write_trust_store(
         tmp_path / "trust.yaml",
@@ -79,11 +79,12 @@ def test_modified_tool_catalog_attestation_uses_whole_artifact_binding(tmp_path:
         private_key,
         change_type="MODIFIED",
         artifact_kind="TOOL_CATALOG",
+        detailed_review=True,
     )
 
     verified = verify_release_review_attestations((attestation,), trust_store)
 
-    assert verified[0].review_id is None
+    assert verified[0].review_id == "detailed-review"
 
 
 def test_rejects_review_key_outside_active_lifecycle(tmp_path: Path) -> None:
@@ -141,8 +142,9 @@ def _write_attestation(
     *,
     change_type: str = "ADDED",
     artifact_kind: str = "POLICY_SET",
+    detailed_review: bool = False,
 ) -> Path:
-    document = {
+    document: dict[str, object] = {
         "schema_version": "1",
         "attestation_id": f"test-{change_type.lower()}",
         "artifact_kind": artifact_kind,
@@ -156,11 +158,16 @@ def _write_attestation(
         "attested_at": "2026-09-26T15:00:00+00:00",
         "signing_key_id": "policy-review-key",
     }
+    review_id = "detailed-review" if detailed_review else None
+    review_digest = f"sha256:{'d' * 64}" if detailed_review else None
+    if detailed_review:
+        document["review_id"] = review_id
+        document["review_digest"] = review_digest
     encoded = json.dumps(
         {
             **document,
-            "review_digest": None,
-            "review_id": None,
+            "review_digest": review_digest,
+            "review_id": review_id,
         },
         sort_keys=True,
         separators=(",", ":"),
