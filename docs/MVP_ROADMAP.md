@@ -177,6 +177,7 @@ future distribution systems. Phase 6n adds signed consumer acknowledgement cover
 Phase 6o adds fresh signed target assertions for the exact loaded trust-store digest.
 Phase 6p adds offline verification for provider-neutral signed external time-authority receipts.
 Phase 6q adds offline RFC 3161 verification with exact request, artifact and PKIX trust binding.
+Phase 6r adds deterministic OCI image-layout packaging and offline content-addressed verification.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -193,6 +194,7 @@ Explore:
 - signed runtime trust-state attestations; **implemented in Phase 6o**
 - provider-neutral signed time-authority receipt verification; **implemented in Phase 6p**
 - standards-based RFC 3161 timestamp verification; **implemented in Phase 6q**
+- provider-neutral OCI evidence artifacts; **implemented in Phase 6r**
 - enterprise integrations;
 - additional sectors.
 
@@ -290,6 +292,13 @@ Implemented in Phase 6q:
 - OpenSSL CMS signature, timestamping EKU and PKIX-chain verification at generation time;
 - explicit evaluation time, optional minimum generation time and metadata-only report;
 - no acquisition, provider selection, online revocation or long-term evidence-renewal claim.
+
+Implemented in Phase 6r:
+- canonical OCI index, evidence manifest/config and SHA-256 artifact layers;
+- normalized package reference, explicit UTC time and allowlisted artifact-kind binding;
+- complete descriptor, digest, size, metadata and tracked-blob inventory verification;
+- bounded JSON/YAML inputs with safe names, no symlinks and private-key marker rejection;
+- no registry access, credentials, transport policy, signing, retention or availability claim.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;

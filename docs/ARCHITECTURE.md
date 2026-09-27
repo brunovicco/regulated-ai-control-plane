@@ -336,6 +336,25 @@ deployment-supplied CA bundle. No network, timestamp acquisition or online revoc
 
 See [ADR-0032](adr/0032-offline-rfc3161-timestamp-verification.md).
 
+## Phase 6r components
+
+- `adapters/oci_evidence.py`: deterministic OCI image-layout creation, reference resolution and
+  complete descriptor/blob verification.
+- `scripts/manage_oci_evidence.py`: local create/verify command with metadata-only identity output.
+- `docs/OCI_EVIDENCE.md`: transport, registry and signing boundary runbook.
+
+```text
+allowlisted metadata artifacts + normalized reference + explicit UTC time
+    -> canonical OCI index + evidence manifest/config + SHA-256 layers
+    -> complete descriptor/digest/inventory verification
+    -> portable local layout identity or fail closed
+```
+
+The adapter produces and consumes a local OCI layout only. It has no registry client, credentials or
+network path and does not treat transport availability or registry ACLs as evidence integrity.
+
+See [ADR-0033](adr/0033-provider-neutral-oci-evidence-artifacts.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim

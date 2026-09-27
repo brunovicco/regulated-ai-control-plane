@@ -256,6 +256,11 @@ originais. Ela vincula o imprint exato do artefato, nonce e política permitida,
 verificação da assinatura CMS, EKU de timestamp e cadeia PKIX no instante declarado. Aquisição,
 seleção de provedor, revogação online e renovação de evidência de longo prazo permanecem externas.
 
+A Fase 6r empacota evidências permitidas e somente com metadados em um OCI image layout
+determinístico. Index, manifesto e configuração canônicos vinculam a referência normalizada a
+layers SHA-256 content-addressed; a verificação offline rejeita conteúdo alterado, ausente ou não
+rastreado. Transporte, controle de acesso, assinatura e retenção no registry continuam externos.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
