@@ -153,8 +153,10 @@ def test_cli_verifies_current_and_stale_runtime_state(
         trust_store_digest=checkpoint.trust_store_digest,
         observed_at="2026-09-27T14:50:00+00:00",
     )
+    attestation_directory = tmp_path / "attestations"
+    attestation_directory.mkdir()
     current_a = _write_attestation(
-        tmp_path / "state-a.yaml",
+        attestation_directory / "state-a.yaml",
         key_a,
         key_id="node-a-key",
         target_id="node-a",
@@ -164,7 +166,7 @@ def test_cli_verifies_current_and_stale_runtime_state(
         observed_at="2026-09-27T14:58:00+00:00",
     )
     current_b = _write_attestation(
-        tmp_path / "state-b.yaml",
+        attestation_directory / "state-b.yaml",
         key_b,
         key_id="node-b-key",
         target_id="node-b",
@@ -216,3 +218,9 @@ def test_cli_verifies_current_and_stale_runtime_state(
     current = json.loads(capsys.readouterr().out)
     assert current["status"] == "RUNTIME_TRUST_STATE_CURRENT"
     assert current["report_digest"].startswith("sha256:")
+
+    assert (
+        runtime_state_main([*arguments, "--attestation-directory", str(attestation_directory)]) == 0
+    )
+    directory_result = json.loads(capsys.readouterr().out)
+    assert directory_result == current

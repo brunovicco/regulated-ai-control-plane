@@ -355,6 +355,28 @@ network path and does not treat transport availability or registry ACLs as evide
 
 See [ADR-0033](adr/0033-provider-neutral-oci-evidence-artifacts.md).
 
+## Phase 6s components
+
+- `Dockerfile`: non-root production API entrypoint with access logs disabled.
+- `deploy/kubernetes`: restricted single-replica service, storage, service, policies and offline
+  runtime-state verification CronJob.
+- `deploy/openshift`: overlay that lets the platform restricted SCC allocate runtime identities.
+- `scripts/verify_runtime_trust_state.py`: sorted directory discovery and current-UTC scheduler mode
+  in addition to the reproducible explicit-time mode.
+- `docs/KUBERNETES_DEPLOYMENT.md`: authority injection, rendering and rollout boundary.
+
+```text
+verified image digest + external signed pack/trust/secrets + persistent state
+    -> restricted single-replica API with default-deny egress
+mounted checkpoint/policy/attestations + explicit current UTC
+    -> network-silent CronJob -> metadata-only current/blocked report
+```
+
+The manifests are a reference and are never applied by repository tooling. They do not provision
+clusters, registries, identity providers, secrets, storage classes or external alert delivery.
+
+See [ADR-0034](adr/0034-kubernetes-openshift-deployment-reference.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim

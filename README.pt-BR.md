@@ -261,6 +261,11 @@ determinístico. Index, manifesto e configuração canônicos vinculam a referê
 layers SHA-256 content-addressed; a verificação offline rejeita conteúdo alterado, ausente ou não
 rastreado. Transporte, controle de acesso, assinatura e retenção no registry continuam externos.
 
+A Fase 6s adiciona uma referência Kustomize não aplicada para Kubernetes/OpenShift, cobrindo o
+serviço e a verificação periódica do estado de trust do runtime. A imagem é substituída por digest,
+a autoridade vem de PVC/ConfigMap/Secret externos, os containers são restritos e non-root, e o
+egress é negado por padrão. A referência com SQLite permanece intencionalmente em uma réplica.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;

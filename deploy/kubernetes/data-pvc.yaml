@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: regulaai-data
+  labels:
+    app.kubernetes.io/name: regulaai-control-plane
+    app.kubernetes.io/part-of: regulaai
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

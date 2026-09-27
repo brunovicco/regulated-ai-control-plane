@@ -1,5 +1,32 @@
 # Implementation plan
 
+## Phase 6s — Kubernetes and OpenShift deployment reference
+
+### Goal
+
+Provide a security-restricted, digest-pinned deployment reference for the control plane and periodic
+offline runtime trust-state verification without applying resources or selecting a cluster provider.
+
+### Work
+
+1. Run the packaged FastAPI service with a real non-root container entrypoint.
+2. Define a Kustomize base with one SQLite-safe replica, persistent state and signed-pack mounts.
+3. Reference runtime secrets and trust material without committing their values.
+4. Add restricted pod/container contexts, bounded resources, health probes and no service-account
+   token.
+5. Deny egress by default and limit service ingress to explicitly labeled clients.
+6. Add a bounded CronJob that discovers mounted attestations and emits metadata-only runtime-state
+   verification reports.
+7. Add an OpenShift overlay that delegates runtime UID/GID ranges to the restricted SCC.
+8. Add manifest contract tests, deployment guidance and ADR-0034.
+
+### Decisions and assumptions
+
+- Image name/digest, PVC population, ConfigMaps and Secrets must be supplied by deployment controls.
+- The default remains network-silent mock mode; gateway egress requires a separately reviewed
+  overlay.
+- SQLite requires one replica with `Recreate`; horizontal availability needs a persistence redesign.
+
 ## Phase 6r — provider-neutral OCI evidence artifacts
 
 ### Goal

@@ -119,6 +119,10 @@ Complete this document before processing personal or regulated data.
   kind, filename, package-reference, UTC time, media-type, size and digest metadata. They reject
   common private-key markers but are not general secret scanners. Do not package prompts, responses,
   source content, credentials, personal data or production payloads.
+- Phase 6s manifests contain only non-personal workload/resource names, paths and configuration
+  references. Secret values are never present. The verifier CronJob writes metadata-only trust-state
+  reports to container stdout; cluster log retention and access must exclude personal/runtime
+  payloads and follow organization policy.
 - Incident-response owner:
 
 ## Prohibited logging
