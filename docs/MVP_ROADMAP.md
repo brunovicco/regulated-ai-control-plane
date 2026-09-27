@@ -179,6 +179,7 @@ Phase 6p adds offline verification for provider-neutral signed external time-aut
 Phase 6q adds offline RFC 3161 verification with exact request, artifact and PKIX trust binding.
 Phase 6r adds deterministic OCI image-layout packaging and offline content-addressed verification.
 Phase 6s adds restricted Kubernetes/OpenShift service and runtime-state verifier references.
+Phase 6t adds metadata-only CloudEvents and opt-in OTLP trace export.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -197,6 +198,7 @@ Explore:
 - standards-based RFC 3161 timestamp verification; **implemented in Phase 6q**
 - provider-neutral OCI evidence artifacts; **implemented in Phase 6r**
 - Kubernetes/OpenShift deployment reference; **implemented in Phase 6s**
+- CloudEvents and OTLP observability contract; **implemented in Phase 6t**
 - enterprise integrations;
 - additional sectors.
 
@@ -309,6 +311,15 @@ Implemented in Phase 6s:
 - default-deny egress, labeled-client ingress and network-silent verifier policy;
 - periodic mounted-attestation discovery and offline runtime trust-state verification;
 - OpenShift restricted-SCC overlay with no cluster mutation or provider-specific operator.
+
+Implemented in Phase 6t:
+- CloudEvents 1.0 envelopes for stable allowlisted lifecycle events and bounded metadata;
+- deterministic structured JSON encoding with generated event id and explicit UTC time;
+- safe CloudEvent-to-span mapping over opt-in OTLP HTTP/protobuf export;
+- structured logging before runtime composition and bounded flush/shutdown on API exit;
+- no exporter without an endpoint, no baggage/content fields and no business failure on telemetry
+  failure;
+- no broker delivery, collector provisioning, retention or audit-ledger claim.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;

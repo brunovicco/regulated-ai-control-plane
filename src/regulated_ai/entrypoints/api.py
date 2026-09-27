@@ -1,13 +1,14 @@
 """FastAPI transport and composition root for evaluation and enforcement."""
 
 import os
+import re
 import secrets
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Protocol, cast
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -15,6 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from regulated_ai.adapters import (
+    ControlEventTracer,
     ControlPackIdentity,
     DeterministicDataClassifier,
     FilePolicyRepository,
@@ -76,11 +78,28 @@ from regulated_ai.domain import (
     ToolRequest,
     TransformationReceipt,
 )
+from regulated_ai.entrypoints.logging import configure_logging
 from regulated_ai.entrypoints.operator_dashboard import (
     dashboard_headers,
     operator_dashboard_css,
     render_operator_dashboard,
 )
+
+_RUNTIME_LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+
+
+class _TelemetryLifecycle(Protocol):
+    def initialize(self) -> ControlEventTracer:
+        """Return a safe tracer."""
+        ...
+
+    def force_flush(self, *, timeout_seconds: float = 5.0) -> bool:
+        """Flush pending telemetry within a bound."""
+        ...
+
+    def shutdown(self, *, timeout_seconds: float = 5.0) -> bool:
+        """Shut down telemetry within a bound."""
+        ...
 
 
 class _TransportModel(BaseModel):
@@ -172,6 +191,7 @@ class Runtime:
     operator_timeline: GetOperatorTimeline
     tool_execution: ToolExecutionPort
     mock_tool_execution: MockToolExecutionAdapter
+    telemetry: _TelemetryLifecycle | None = None
 
 
 def build_runtime(
@@ -212,7 +232,12 @@ def build_runtime(
     enforcement = SqliteEnforcementRepository(database_path)
     actions = SqliteToolActionRepository(database_path)
     lifecycle_events = SqliteOperatorLifecycleEventRepository(database_path)
-    observer = StructuredEvaluationObserver()
+    service_version = _runtime_label("REGULAAI_SERVICE_VERSION", "0.1.0")
+    environment = _runtime_label("REGULAAI_ENVIRONMENT", "local")
+    telemetry = _build_telemetry_lifecycle(service_version=service_version, environment=environment)
+    observer = StructuredEvaluationObserver(
+        tracer=None if telemetry is None else telemetry.initialize()
+    )
     evaluator = EvaluateAiOperation(
         policies=policies,
         capabilities=capabilities,
@@ -294,6 +319,7 @@ def build_runtime(
         operator_timeline=operator_timeline,
         tool_execution=mock_tool_execution,
         mock_tool_execution=mock_tool_execution,
+        telemetry=telemetry,
     )
 
 
@@ -362,13 +388,61 @@ def _integer_environment(name: str, default: int) -> int:
         raise ValueError(f"{name} must be an integer") from exc
 
 
+def _runtime_label(name: str, default: str) -> str:
+    value = os.environ.get(name, default).strip()
+    if _RUNTIME_LABEL.fullmatch(value) is None:
+        raise ValueError(f"{name} must be a bounded identifier")
+    return value
+
+
+def _build_telemetry_lifecycle(
+    *, service_version: str, environment: str
+) -> _TelemetryLifecycle | None:
+    disabled = os.environ.get("OTEL_SDK_DISABLED", "false").strip().lower() in {
+        "true",
+        "1",
+        "yes",
+        "on",
+    }
+    endpoint = os.environ.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") or os.environ.get(
+        "OTEL_EXPORTER_OTLP_ENDPOINT"
+    )
+    if disabled or endpoint is None or not endpoint.strip():
+        return None
+    try:
+        from regulated_ai.adapters.observability import TelemetryLifecycle
+    except ImportError as exc:
+        raise ValueError(
+            "OTLP endpoint configured but the observability extra is not installed"
+        ) from exc
+    return cast(
+        _TelemetryLifecycle,
+        TelemetryLifecycle(
+            service_name="regulaai-control-plane",
+            service_version=service_version,
+            environment=environment,
+        ),
+    )
+
+
 def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAPI:
     """Create an API whose control-plane data is validated before serving traffic."""
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-        application.state.runtime = runtime_factory()
-        yield
+        configure_logging(
+            service="regulaai-control-plane",
+            environment=_runtime_label("REGULAAI_ENVIRONMENT", "local"),
+            version=_runtime_label("REGULAAI_SERVICE_VERSION", "0.1.0"),
+        )
+        runtime = runtime_factory()
+        application.state.runtime = runtime
+        try:
+            yield
+        finally:
+            if runtime.telemetry is not None:
+                runtime.telemetry.force_flush(timeout_seconds=2.0)
+                runtime.telemetry.shutdown(timeout_seconds=2.0)
 
     application = FastAPI(title="RegulaAI", version="0.1.0", lifespan=lifespan)
 

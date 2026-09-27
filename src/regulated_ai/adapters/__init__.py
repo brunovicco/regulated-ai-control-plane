@@ -6,7 +6,11 @@ from regulated_ai.adapters.action_approval import (
 )
 from regulated_ai.adapters.approval import ApprovalAssertionError, HmacApprovalAdapter
 from regulated_ai.adapters.classifier import DeterministicDataClassifier
-from regulated_ai.adapters.evaluation_observability import StructuredEvaluationObserver
+from regulated_ai.adapters.evaluation_observability import (
+    ControlEventTracer,
+    StructuredEvaluationObserver,
+    encode_cloudevent,
+)
 from regulated_ai.adapters.evidence_sqlite import (
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
@@ -99,6 +103,7 @@ __all__ = [
     "ActionApprovalAssertionError",
     "ApprovalAssertionError",
     "ConfigurationBoundaryError",
+    "ControlEventTracer",
     "ControlPackIdentity",
     "DeterministicDataClassifier",
     "FilePolicyRepository",
@@ -142,6 +147,7 @@ __all__ = [
     "create_oci_evidence_layout",
     "create_release_custody",
     "create_trust_store_checkpoint",
+    "encode_cloudevent",
     "load_policy_draft",
     "load_policy_regulatory_review",
     "load_provider_capability_draft",

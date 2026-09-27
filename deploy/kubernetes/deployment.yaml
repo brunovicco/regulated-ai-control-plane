@@ -37,6 +37,13 @@ spec:
               containerPort: 8000
               protocol: TCP
           env:
+            - name: REGULAAI_ENVIRONMENT
+              value: production
+            - name: REGULAAI_SERVICE_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: regulaai-deployment-metadata
+                  key: service-version
             - name: REGULAAI_EVIDENCE_DB
               value: /var/lib/regulaai/evidence.sqlite3
             - name: REGULAAI_CONTROL_PACK_MANIFEST

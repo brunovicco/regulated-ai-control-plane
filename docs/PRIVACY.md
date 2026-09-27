@@ -123,6 +123,11 @@ Complete this document before processing personal or regulated data.
   references. Secret values are never present. The verifier CronJob writes metadata-only trust-state
   reports to container stdout; cluster log retention and access must exclude personal/runtime
   payloads and follow organization policy.
+- Phase 6t CloudEvents contain generated event id, stable source/type, UTC time and a bounded
+  allowlist of control identifiers/outcomes. OTLP spans contain only the event identity/type/source,
+  operation and bounded outcome. Prompts, responses, data values, tool arguments/results, URLs,
+  credentials, people, exception messages/stacks and baggage are excluded. Collector/log access,
+  residency, retention and deletion require an approved deployment privacy assessment.
 - Incident-response owner:
 
 ## Prohibited logging

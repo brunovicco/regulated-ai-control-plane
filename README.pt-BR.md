@@ -266,6 +266,11 @@ serviço e a verificação periódica do estado de trust do runtime. A imagem é
 a autoridade vem de PVC/ConfigMap/Secret externos, os containers são restritos e non-root, e o
 egress é negado por padrão. A referência com SQLite permanece intencionalmente em uma réplica.
 
+A Fase 6t emite metadados permitidos do ciclo de controle como envelopes estruturados CloudEvents
+1.0 e, quando configurado explicitamente, os correlaciona com spans OTLP limitados. Conteúdo de
+prompt/resposta/ferramenta, credenciais, atributos arbitrários e baggage são excluídos. Sem endpoint,
+nenhum exporter ou caminho de rede é criado; falhas de observabilidade não alteram decisões.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
