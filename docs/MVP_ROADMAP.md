@@ -167,8 +167,9 @@ replay for observed decision and evidence changes. Phase 6d adds a digest-bound 
 for updates to existing provider capability targets. Phase 6e adds a digest-bound regulatory review
 gate for updates to existing policy sets. Phase 6f composes verified static, replay and exact-byte
 review evidence into one deterministic release bundle. Phase 6g authenticates a role-bound Ed25519
-promotion quorum for that exact bundle. Automated source ingestion, key lifecycle automation,
-onboarding/removal governance and enterprise distribution remain pending.
+promotion quorum for that exact bundle. Phase 6h authenticates release reviewers and governs whole
+policy/provider onboarding and removal by exact digest. Automated source ingestion, key lifecycle
+automation and enterprise distribution remain pending.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -237,6 +238,14 @@ Implemented in Phase 6g:
   handling;
 - deterministic metadata-only authorization report and digest;
 - no control-pack signing, repository mutation, publication, promotion, distribution or deployment.
+
+Implemented in Phase 6h:
+- separate Ed25519 reviewer trust store with role, artifact-kind and change-type authority;
+- exact base/candidate pack and reviewed-content binding for every attestation;
+- mandatory signed binding to the detailed Phase 6d/6e result for modified entities;
+- whole-entity onboarding/removal review bound to added candidate or removed base bytes;
+- bundle schema version 2 with metadata-only reviewer and signature identities/digests;
+- no source retrieval, legal interpretation, promotion, distribution or deployment authority.
 
 ## Defer
 

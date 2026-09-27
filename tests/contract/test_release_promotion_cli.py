@@ -175,7 +175,7 @@ def _arguments(
 
 def _write_bundle(path: Path) -> Path:
     core: dict[str, object] = {
-        "schema_version": "1",
+        "schema_version": "2",
         "status": "EVIDENCE_COMPLETE",
         "base_pack": {
             "id": "test-pack",

@@ -1,5 +1,37 @@
 # Implementation plan
 
+## Phase 6h — signed review and lifecycle governance
+
+### Goal
+
+Authenticate the reviewer role behind every release-entity review and govern additions and removals
+without weakening the detailed Phase 6d/6e update gates or the separate Phase 6g promotion quorum.
+
+### Work
+
+1. Define strict Ed25519 review attestations bound to the exact base/candidate packs, entity kind,
+   stable subject id, change type, reviewed content digest, role and conclusion.
+2. Use a separate public-key trust store that authorizes each key by role, artifact kind and change
+   type; reject unauthorized dimensions, duplicate ids/targets and invalid signatures.
+3. Require modified entities to bind the exact detailed Phase 6d/6e review id and digest; a signed
+   approval cannot override a blocked detailed review.
+4. Allow additions and removals only through authenticated whole-entity lifecycle attestations bound
+   to candidate bytes for additions and approved-base bytes for removals.
+5. Emit bundle schema version 2 with metadata-only reviewer/key/attestation identities and digests;
+   preserve compatibility in the Phase 6g bundle verifier.
+6. Add unit/contract tests, documentation and ADR-0023.
+
+### Decisions and assumptions
+
+- One authorized reviewer key authenticates one technical/regulatory or lifecycle review. Distinct
+  organizational impact-acceptance quorum remains the Phase 6g promotion boundary.
+- Update attestations supplement, never replace, the detailed provider-source and policy-mapping
+  gates. Additions/removals sign the exact whole-entity digest because no same-entity lineage exists.
+- Reviewer roles and key ids are bounded non-personal identifiers. Private keys remain external.
+- Trust-store custody, revocation and rotation remain deployment/organization responsibilities.
+- Authenticated review means attributable approval of exact metadata, not legal correctness,
+  provider truth, compliance, safety, promotion or deployment authority.
+
 ## Phase 6g — signed promotion attestations and quorum
 
 ### Goal

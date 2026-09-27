@@ -312,10 +312,37 @@ Mitigations:
 
 Residual risks:
 - the bundle digest is not a signature or external timestamp;
-- reviewers and promotion actors are not authenticated and no quorum is enforced;
+- Phase 6h reviewer keys and Phase 6g promotion keys remain only as trustworthy as their separate
+  trust stores, custody and role assignments;
 - an incomplete scenario suite can miss behavior changes even when evidence is complete;
 - compromised signing keys/trust stores or malicious human assertions remain outside the guarantee;
 - external systems may ignore exit codes or misrepresent the documented evidence scope.
+
+### Release review identity is forged or lifecycle changes bypass review
+
+Threat:
+an attacker invents a reviewer role, swaps a detailed review result, signs a different entity,
+removes an approved entity without review or introduces a new policy/provider outside the existing
+update-only lineage.
+
+Mitigations:
+- review attestations are Ed25519-verified against a separate public-key trust store;
+- each trusted key is constrained by reviewer role, policy/provider artifact kind and
+  added/modified/removed change type;
+- signatures bind both pack payload digests, stable subject id, exact reviewed content digest,
+  change type, conclusion and UTC attestation time;
+- modified entities must bind the exact Phase 6d/6e review id/digest and cannot sign an approval
+  over a blocked detailed review;
+- additions bind candidate bytes and removals bind approved-base bytes;
+- duplicate attestation ids and duplicate entity targets fail closed; raw signatures are replaced
+  by digests in bundle output.
+
+Residual risks:
+- compromised reviewer keys or trust-store role assignments can produce malicious approvals;
+- lifecycle review signs a whole entity and does not independently prove every regulatory mapping
+  or provider source is correct;
+- revocation, rotation, hardware custody and external timestamping remain outside this phase;
+- Phase 6g promotion signers must still accept the complete evidence and intended impact.
 
 ### Promotion approval is forged, replayed or counted twice
 

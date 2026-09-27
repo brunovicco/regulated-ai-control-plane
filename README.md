@@ -123,6 +123,7 @@ Context
   -> Digest-bound policy regulatory review before separate pack signing
   -> Verified static/replay/review evidence bundle for external promotion decisions
   -> Signed role-bound promotion quorum for the exact complete evidence bundle
+  -> Signed reviewer authority for updates, onboarding and removal
 ```
 
 The service exposes `POST /v1/evaluations`, `GET /v1/evidence/{evidence_id}`,
@@ -187,6 +188,13 @@ complete Phase 6f bundle, candidate pack digest and canonical promotion-policy d
 active at an explicit UTC evaluation time. `PROMOTION_AUTHORIZED` is a signed-quorum handoff result
 only; the workflow never signs the pack, mutates a repository, promotes, distributes or deploys a
 release, or asserts safety or compliance.
+
+Phase 6h authenticates release-review roles through a separate Ed25519 public-key trust store that
+limits each key by artifact kind and change type. Modified entities must still pass the detailed
+Phase 6d/6e review and the signature binds that exact review digest. Whole policy/provider additions
+and removals are governed by signed whole-entity digests from the candidate or approved base. This
+establishes reviewer attribution and lifecycle coverage, not legal correctness, provider truth,
+promotion authority or deployment permission.
 
 Not implemented in the first slice:
 

@@ -46,7 +46,7 @@ class _ReleaseIdentityModel(_StrictModel):
 
 
 class _ReleaseEvidenceBundleModel(_StrictModel):
-    schema_version: Literal["1"]
+    schema_version: Literal["1", "2"]
     status: Literal["EVIDENCE_COMPLETE", "EVIDENCE_INCOMPLETE"]
     base_pack: _ReleaseIdentityModel
     candidate_pack: _ReleaseIdentityModel

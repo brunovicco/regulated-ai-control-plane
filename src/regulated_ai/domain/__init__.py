@@ -76,6 +76,7 @@ from regulated_ai.domain.models import (
     ReleaseEvidenceFinding,
     ReleaseEvidenceFindingCode,
     ReleaseReviewArtifactKind,
+    ReleaseReviewConclusion,
     ReleaseReviewEvidence,
     ScenarioReplayOutcome,
     ScenarioReplayResult,
@@ -93,6 +94,7 @@ from regulated_ai.domain.models import (
     ToolResultHandling,
     TransformationReceipt,
     VerifiedPromotionAttestation,
+    VerifiedReleaseReviewAttestation,
     strongest_outcome,
 )
 
@@ -172,6 +174,7 @@ __all__ = [
     "ReleaseEvidenceFinding",
     "ReleaseEvidenceFindingCode",
     "ReleaseReviewArtifactKind",
+    "ReleaseReviewConclusion",
     "ReleaseReviewEvidence",
     "ScenarioReplayOutcome",
     "ScenarioReplayResult",
@@ -189,5 +192,6 @@ __all__ = [
     "ToolResultHandling",
     "TransformationReceipt",
     "VerifiedPromotionAttestation",
+    "VerifiedReleaseReviewAttestation",
     "strongest_outcome",
 ]

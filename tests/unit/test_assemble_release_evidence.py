@@ -10,6 +10,7 @@ from regulated_ai.application import (
 )
 from regulated_ai.domain import (
     CapabilityState,
+    ControlPackChangeType,
     ControlPackRelease,
     ControlPackReleaseEvidenceReport,
     ControlPackReleaseIdentity,
@@ -128,23 +129,35 @@ def _review(
     kind: ReleaseReviewArtifactKind,
     *,
     approved: bool = True,
-    candidate_digest: str | None = None,
+    reviewed_digest: str | None = None,
+    subject_id: str | None = None,
+    change_type: ControlPackChangeType = ControlPackChangeType.MODIFIED,
 ) -> ReleaseReviewEvidence:
-    subject_id = (
+    resolved_subject_id = subject_id or (
         "test-policy"
         if kind is ReleaseReviewArtifactKind.POLICY_SET
         else "test-provider.test-service.test-region"
     )
-    digest = candidate_digest or (
+    digest = reviewed_digest or (
         "sha256:policy" if kind is ReleaseReviewArtifactKind.POLICY_SET else "sha256:provider"
     )
     return ReleaseReviewEvidence(
         kind=kind,
-        subject_id=subject_id,
+        subject_id=resolved_subject_id,
+        change_type=change_type,
         base_pack_payload_digest="sha256:base",
-        candidate_content_digest=digest,
+        candidate_pack_payload_digest="sha256:candidate",
+        reviewed_content_digest=digest,
         review_id=f"review-{kind.value.lower()}",
         review_digest=f"sha256:review-{kind.value.lower()}",
+        reviewer_role="test-reviewer",
+        attested_at=datetime(2026, 9, 26, tzinfo=UTC),
+        attestation_id=(
+            f"attestation-{kind.value.lower()}-{change_type.value.lower()}-{resolved_subject_id}"
+        ),
+        signing_key_id="review-key",
+        attestation_digest=f"sha256:attestation-{kind.value.lower()}",
+        signature_digest=f"sha256:signature-{kind.value.lower()}",
         approved=approved,
     )
 
@@ -154,6 +167,7 @@ def _execute(
     candidate: ControlPackRelease,
     *,
     artifacts: tuple[ReleaseCandidateArtifact, ...] | None = None,
+    base_artifacts: tuple[ReleaseCandidateArtifact, ...] | None = None,
     reviews: tuple[ReleaseReviewEvidence, ...] = (),
 ) -> ControlPackReleaseEvidenceReport:
     return AssembleControlPackReleaseEvidence().execute(
@@ -163,6 +177,7 @@ def _execute(
         _replay(base.identity, candidate.identity),
         artifacts or _artifacts(),
         reviews,
+        base_artifacts or _artifacts(),
     )
 
 
@@ -237,7 +252,7 @@ def test_blocked_reviews_remain_visible_and_incomplete() -> None:
     }
 
 
-def test_added_and_removed_entities_are_explicitly_unsupported() -> None:
+def test_added_and_removed_entities_require_lifecycle_review() -> None:
     base = _release(_identity("1", "sha256:base"))
     candidate = _release(
         _identity("2", "sha256:candidate"),
@@ -255,11 +270,49 @@ def test_added_and_removed_entities_are_explicitly_unsupported() -> None:
     )
 
     assert {item.code for item in report.findings} == {
-        ReleaseEvidenceFindingCode.POLICY_SET_ADDITION_UNSUPPORTED,
-        ReleaseEvidenceFindingCode.POLICY_SET_REMOVAL_UNSUPPORTED,
-        ReleaseEvidenceFindingCode.PROVIDER_TARGET_ADDITION_UNSUPPORTED,
-        ReleaseEvidenceFindingCode.PROVIDER_TARGET_REMOVAL_UNSUPPORTED,
+        ReleaseEvidenceFindingCode.POLICY_LIFECYCLE_REVIEW_MISSING,
+        ReleaseEvidenceFindingCode.PROVIDER_LIFECYCLE_REVIEW_MISSING,
     }
+
+
+def test_authenticated_lifecycle_reviews_cover_additions_and_removals() -> None:
+    base = _release(_identity("1", "sha256:base"))
+    candidate = _release(
+        _identity("2", "sha256:candidate"),
+        policy=_policy(policy_id="new-policy"),
+        provider=_provider(provider="new-provider"),
+    )
+    candidate_artifacts = _artifacts(
+        policy_id="new-policy",
+        provider_id="new-provider.test-service.test-region",
+    )
+    reviews = (
+        _review(
+            ReleaseReviewArtifactKind.POLICY_SET,
+            subject_id="new-policy",
+            change_type=ControlPackChangeType.ADDED,
+        ),
+        _review(
+            ReleaseReviewArtifactKind.PROVIDER_TARGET,
+            subject_id="new-provider.test-service.test-region",
+            change_type=ControlPackChangeType.ADDED,
+        ),
+        _review(
+            ReleaseReviewArtifactKind.POLICY_SET,
+            subject_id="test-policy",
+            change_type=ControlPackChangeType.REMOVED,
+        ),
+        _review(
+            ReleaseReviewArtifactKind.PROVIDER_TARGET,
+            subject_id="test-provider.test-service.test-region",
+            change_type=ControlPackChangeType.REMOVED,
+        ),
+    )
+
+    report = _execute(base, candidate, artifacts=candidate_artifacts, reviews=reviews)
+
+    assert report.complete is True
+    assert report.findings == ()
 
 
 def test_mismatched_artifacts_and_reviews_are_rejected() -> None:
@@ -271,14 +324,14 @@ def test_mismatched_artifacts_and_reviews_are_rejected() -> None:
 
     with pytest.raises(ReleaseEvidenceError, match="artifact digests"):
         _execute(base, candidate, artifacts=(_artifacts()[0],))
-    with pytest.raises(ReleaseEvidenceError, match="candidate content"):
+    with pytest.raises(ReleaseEvidenceError, match="reviewed content"):
         _execute(
             base,
             candidate,
             reviews=(
                 _review(
                     ReleaseReviewArtifactKind.POLICY_SET,
-                    candidate_digest="sha256:other",
+                    reviewed_digest="sha256:other",
                 ),
             ),
         )
@@ -309,6 +362,7 @@ def test_analysis_and_review_lineage_mismatches_are_rejected() -> None:
             _replay(base.identity, candidate.identity),
             _artifacts(),
             (),
+            _artifacts(),
         )
     with pytest.raises(ReleaseEvidenceError, match="Scenario replay"):
         assembler.execute(
@@ -318,6 +372,7 @@ def test_analysis_and_review_lineage_mismatches_are_rejected() -> None:
             _replay(base.identity, base.identity),
             _artifacts(),
             (),
+            _artifacts(),
         )
     with pytest.raises(ReleaseEvidenceError, match="changed release lineage"):
         _execute(

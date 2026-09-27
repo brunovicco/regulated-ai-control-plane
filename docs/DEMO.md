@@ -313,13 +313,22 @@ and no required reviews. The output includes a deterministic `bundle_digest` ove
 metadata payload.
 
 For a changed signed candidate, repeat `--provider-review-record PATH` and
-`--policy-review-record PATH` for every applicable Phase 6d/6e review. The composer re-runs those
-reviews against the exact candidate files authenticated by its manifest. Missing/blocked reviews or
-whole-entity additions/removals return `EVIDENCE_INCOMPLETE` and exit code `2`; invalid signatures,
-schemas, digests or lineage return `1`.
+`--policy-review-record PATH` for every applicable Phase 6d/6e review, then provide the Phase 6h
+review trust store and one signed attestation per changed entity:
 
-Completeness does not approve observed impact, authenticate reviewers, access a private key, sign,
-promote or deploy a release. Those remain separate organization-owned decisions.
+```bash
+  --review-trust-store /path/to/review-trust-store.yaml \
+  --review-attestation /path/to/review-attestation.yaml
+```
+
+The composer re-runs detailed update reviews against exact candidate files and requires their id and
+digest inside the signed attestation. Additions bind candidate entity bytes; removals bind the
+approved-base entity bytes. Missing or rejected authenticated reviews return `EVIDENCE_INCOMPLETE`
+and exit code `2`; invalid signatures, unauthorized key roles/change types, schemas, digests or
+lineage return `1`. Bundle schema version 2 includes only attestation/signature metadata and digests.
+
+Completeness authenticates bounded reviewer roles but does not approve observed impact, access a
+private key, sign, promote or deploy a release. Those remain separate organization-owned decisions.
 
 ## Verify a signed promotion quorum
 
