@@ -19,6 +19,12 @@ from regulated_ai.adapters.gateway_execution import (
 )
 from regulated_ai.adapters.mock_execution import MockInferenceExecutionAdapter
 from regulated_ai.adapters.mock_tool_execution import MockToolExecutionAdapter
+from regulated_ai.adapters.oci_evidence import (
+    OciEvidenceError,
+    OciEvidenceIdentity,
+    create_oci_evidence_layout,
+    verify_oci_evidence_layout,
+)
 from regulated_ai.adapters.policy_review_files import (
     PolicyReviewBoundaryError,
     load_policy_draft,
@@ -106,6 +112,8 @@ __all__ = [
     "MalformedYamlError",
     "MockInferenceExecutionAdapter",
     "MockToolExecutionAdapter",
+    "OciEvidenceError",
+    "OciEvidenceIdentity",
     "PolicyReviewBoundaryError",
     "ProviderReviewBoundaryError",
     "ReleaseCustodyArtifactKind",
@@ -131,6 +139,7 @@ __all__ = [
     "TrustedTimestampIdentity",
     "UnsupportedSchemaVersionError",
     "VerifiedControlPack",
+    "create_oci_evidence_layout",
     "create_release_custody",
     "create_trust_store_checkpoint",
     "load_policy_draft",
@@ -146,6 +155,7 @@ __all__ = [
     "load_tool_catalog_review",
     "load_trust_store_rollout_policy",
     "verify_control_pack",
+    "verify_oci_evidence_layout",
     "verify_release_custody",
     "verify_rfc3161_timestamp",
     "verify_runtime_trust_state_attestations",

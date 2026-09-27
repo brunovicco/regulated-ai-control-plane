@@ -244,6 +244,11 @@ It binds the exact artifact imprint, nonce and allowlisted policy, then delegate
 timestamping EKU and PKIX-chain verification at the asserted time to OpenSSL. Timestamp acquisition,
 provider selection, online revocation and long-term evidence renewal remain deployment concerns.
 
+Phase 6r packages allowlisted metadata evidence in a deterministic OCI image layout. Canonical
+index, manifest and config documents bind normalized package references and content-addressed
+SHA-256 layers, while offline verification rejects changed, missing or untracked content. Registry
+transport, access control, artifact signing and retention remain external deployment controls.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;
