@@ -240,10 +240,18 @@ def test_packaged_runtime_records_are_loadable(tmp_path: Path) -> None:
     runtime = build_runtime(evidence_path=tmp_path / "packaged-evidence.sqlite3")
 
     assert runtime.control_pack.pack_id == "br-financial-runtime"
-    assert runtime.control_pack.pack_version == "2026-09-25.1"
-    assert runtime.control_pack.signing_key_id == "regulaai-demo-2026-09"
+    assert runtime.control_pack.pack_version == "2026-09-26.2"
+    assert runtime.control_pack.signing_key_id == "regulaai-demo-2026-09-tools"
     assert runtime.capabilities.registry_version == "2026-09-22.1"
     assert {item.target.provider for item in runtime.capabilities.list()} == {"aws", "openai"}
+
+
+def test_runtime_rejects_unsigned_tool_catalog_override(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="part of the signed control pack"):
+        build_runtime(
+            tool_catalog_path=tmp_path / "unsigned-tools.yaml",
+            evidence_path=tmp_path / "evidence.sqlite3",
+        )
 
 
 def test_runtime_rejects_tampered_configured_control_pack(

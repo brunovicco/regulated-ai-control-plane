@@ -168,8 +168,9 @@ for updates to existing provider capability targets. Phase 6e adds a digest-boun
 gate for updates to existing policy sets. Phase 6f composes verified static, replay and exact-byte
 review evidence into one deterministic release bundle. Phase 6g authenticates a role-bound Ed25519
 promotion quorum for that exact bundle. Phase 6h authenticates release reviewers and governs whole
-policy/provider onboarding and removal by exact digest. Automated source ingestion, key lifecycle
-automation and enterprise distribution remain pending.
+policy/provider onboarding and removal by exact digest. Phase 6i moves the trusted tool catalog into
+the signed release, diff, replay and review-evidence boundary. Automated source ingestion, detailed
+tool-definition review, key lifecycle automation and enterprise distribution remain pending.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -177,6 +178,7 @@ Explore:
 - regulatory review workflow; **implemented in Phase 6e for existing policy sets**
 - diff impact analysis; **implemented in Phase 6b**
 - curated scenario replay; **implemented in Phase 6c**
+- signed tool catalog and replay; **implemented in Phase 6i**
 - enterprise integrations;
 - additional sectors.
 
@@ -196,13 +198,21 @@ Implemented in Phase 6b:
 - version-reuse and signing-key-change signals;
 - deterministic metadata-only JSON and optional CI failure on decision impact.
 
-Implemented in Phase 6c:
-- strict bounded scenario suites with no raw values or tools;
+Implemented in Phase 6c and extended in Phase 6i:
+- strict bounded scenario suites with no raw values or tool arguments;
 - exact suite digest and fixed timezone-aware freshness clock;
 - same-context evaluation of an approved base and verified candidate;
 - observed decision/obligation and evidence-impact classification;
 - per-scenario fail-closed outcomes and deterministic metadata-only JSON;
 - optional CI failure when curated replay observes decision impact.
+
+Implemented in Phase 6i:
+- exactly one tool catalog included in the canonical signed-pack composition;
+- exact verified catalog bytes used by runtime, diff, replay and release evidence;
+- conservative semantic impact for tool lifecycle, risk and schema changes;
+- schema-v2 metadata-only tool scenarios without arguments or execution;
+- signed whole-catalog review required for changed release evidence;
+- fail-closed rejection of independent runtime catalog overrides.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;

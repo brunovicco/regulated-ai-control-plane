@@ -70,7 +70,8 @@ metadata for later binding, not proof that an action was safe or executed.
 
 ## Operational impact
 
-Startup now requires a valid packaged or explicitly supplied tool catalog. Catalog changes require
+Startup now requires a valid tool catalog. ADR-0024 later moved it into the signed control-pack
+boundary and removed the independent override. Catalog changes require
 a new version and change evaluation digests, so previously issued approvals do not transfer across
 schema/risk updates. Gateway tool aliases are deterministic but are not public catalog identifiers.
 

@@ -12,8 +12,8 @@ uv sync --frozen --all-groups --extra observability
 uv run uvicorn regulated_ai.entrypoints.api:app --host 127.0.0.1 --port 8000
 ```
 
-The service verifies its signed policy/provider control pack, then validates the packaged records
-and trusted tool catalog before accepting traffic. `/v1/providers` reports the verified pack id,
+The service verifies its signed policy/provider/tool-catalog control pack, then validates the exact
+authenticated records before accepting traffic. `/v1/providers` reports the verified pack id,
 version, signing-key id and canonical payload digest. Evidence is written to
 `var/regulaai-evidence.sqlite3` by default. Set
 `REGULAAI_EVIDENCE_DB` to another local path when needed.

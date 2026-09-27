@@ -227,9 +227,9 @@ a regression corpus includes raw customer content, evaluates freshness at an imp
 or an unchanged finite replay is presented as proof that a candidate is safe or compliant.
 
 Mitigations:
-- the strict suite schema has no value, prompt, tool or free-form content field;
-- only bounded field identifiers, classification labels, normalized context and boolean
-  organization assertions are accepted;
+- the strict suite schema has no value, prompt, tool arguments, output or free-form content field;
+- only bounded field identifiers, classification labels, normalized context, boolean organization
+  assertions and schema-v2 tool names/claimed risk classes are accepted;
 - a mandatory timezone-aware timestamp fixes freshness evaluation across both releases;
 - both packs pass the same trust store and share one pack id before replay;
 - the exact suite bytes are bound to the report with SHA-256;
@@ -242,7 +242,30 @@ Residual risks:
 - field names, labels and control identifiers remain organization metadata requiring retention and
   access controls;
 - the suite itself is separately governed and is not authenticated by the control-pack signature;
-- tool behavior is not covered until trusted tool catalogs join the release boundary.
+- scenario replay covers catalog authorization metadata but does not execute tools or prove their
+  downstream behavior.
+
+### Tool catalog bypasses the signed release
+
+Threat:
+the runtime, diff or replay loads a separately mutable catalog after verifying policy/provider
+files, allowing tool authority or schemas to diverge from reviewed release evidence.
+
+Mitigations:
+- every signed pack contains exactly one catalog with its path and SHA-256 digest in the canonical
+  Ed25519 payload;
+- parsers receive the exact verified bytes and never reopen the catalog path;
+- runtime startup rejects an independent catalog override;
+- semantic diff marks definition lifecycle, risk-class and schema changes as decision impact;
+- scenario replay resolves tool names independently against both catalogs without arguments or
+  execution;
+- changed catalogs require an authenticated whole-file review bound to the exact signed bytes.
+
+Residual risks:
+- signature validity and review approval do not prove tool implementation behavior or ownership;
+- a compromised release/reviewer key can approve malicious definitions;
+- whole-catalog review is less granular than a future per-definition review workflow;
+- action execution still depends on the separate Phase 4c exact-argument authority boundary.
 
 ### Provider capability freshness is asserted without bounded source review
 

@@ -1,7 +1,7 @@
-schema_version: "1"
+schema_version: "2"
 suite:
   id: "br-financial-control-pack-regression"
-  version: "1.0.0"
+  version: "2.0.0"
   evaluated_at: "2026-09-25T12:00:00Z"
 
 scenarios:
@@ -24,6 +24,9 @@ scenarios:
     organization_assertions:
       eligible_organization_required: true
       endpoint_or_feature_must_be_zdr_eligible: true
+    tools:
+      - name: "cards.read"
+        claimed_risk_class: "read_only"
 
   - id: "aws-high-assurance-secret"
     policy_set_id: "br-financial-demo"

@@ -9,6 +9,7 @@ from regulated_ai.application import (
     ReleaseEvidenceError,
 )
 from regulated_ai.domain import (
+    AuthorizedTool,
     CapabilityState,
     ControlPackChangeType,
     ControlPackRelease,
@@ -27,6 +28,21 @@ from regulated_ai.domain import (
     ReleaseReviewArtifactKind,
     ReleaseReviewEvidence,
 )
+
+
+def _tool(*, risk_class: str = "read_only") -> AuthorizedTool:
+    return AuthorizedTool(
+        "cards.read",
+        "Read synthetic status.",
+        risk_class,
+        "1",
+        "{}",
+        "sha256:input",
+        "{}",
+        "sha256:output",
+        f"sha256:{risk_class}",
+        "tools@1",
+    )
 
 
 def _identity(version: str, digest: str) -> ControlPackReleaseIdentity:
@@ -88,8 +104,15 @@ def _release(
     *,
     policy: PolicySet | None = None,
     provider: ProviderCapabilityRecord | None = None,
+    tool: AuthorizedTool | None = None,
 ) -> ControlPackRelease:
-    return ControlPackRelease(identity, (policy or _policy(),), (provider or _provider(),))
+    return ControlPackRelease(
+        identity,
+        (policy or _policy(),),
+        (provider or _provider(),),
+        "tools@1" if tool is not None else None,
+        () if tool is None else (tool,),
+    )
 
 
 def _replay(
@@ -110,8 +133,9 @@ def _replay(
 def _artifacts(
     policy_id: str = "test-policy",
     provider_id: str = "test-provider.test-service.test-region",
+    include_tools: bool = False,
 ) -> tuple[ReleaseCandidateArtifact, ...]:
-    return (
+    artifacts = (
         ReleaseCandidateArtifact(
             ReleaseReviewArtifactKind.POLICY_SET,
             policy_id,
@@ -123,6 +147,16 @@ def _artifacts(
             "sha256:provider",
         ),
     )
+    if include_tools:
+        return (
+            *artifacts,
+            ReleaseCandidateArtifact(
+                ReleaseReviewArtifactKind.TOOL_CATALOG,
+                "trusted-tool-catalog",
+                "sha256:tools",
+            ),
+        )
+    return artifacts
 
 
 def _review(
@@ -133,14 +167,18 @@ def _review(
     subject_id: str | None = None,
     change_type: ControlPackChangeType = ControlPackChangeType.MODIFIED,
 ) -> ReleaseReviewEvidence:
-    resolved_subject_id = subject_id or (
-        "test-policy"
-        if kind is ReleaseReviewArtifactKind.POLICY_SET
-        else "test-provider.test-service.test-region"
-    )
-    digest = reviewed_digest or (
-        "sha256:policy" if kind is ReleaseReviewArtifactKind.POLICY_SET else "sha256:provider"
-    )
+    default_subjects = {
+        ReleaseReviewArtifactKind.POLICY_SET: "test-policy",
+        ReleaseReviewArtifactKind.PROVIDER_TARGET: "test-provider.test-service.test-region",
+        ReleaseReviewArtifactKind.TOOL_CATALOG: "trusted-tool-catalog",
+    }
+    default_digests = {
+        ReleaseReviewArtifactKind.POLICY_SET: "sha256:policy",
+        ReleaseReviewArtifactKind.PROVIDER_TARGET: "sha256:provider",
+        ReleaseReviewArtifactKind.TOOL_CATALOG: "sha256:tools",
+    }
+    resolved_subject_id = subject_id or default_subjects[kind]
+    digest = reviewed_digest or default_digests[kind]
     return ReleaseReviewEvidence(
         kind=kind,
         subject_id=resolved_subject_id,
@@ -211,6 +249,32 @@ def test_changed_policy_and_provider_require_review_evidence() -> None:
         ReleaseEvidenceFindingCode.POLICY_REVIEW_MISSING,
         ReleaseEvidenceFindingCode.PROVIDER_REVIEW_MISSING,
     }
+
+
+def test_changed_tool_catalog_requires_exact_authenticated_review() -> None:
+    base = _release(_identity("1", "sha256:base"), tool=_tool())
+    candidate = _release(
+        _identity("2", "sha256:candidate"),
+        tool=_tool(risk_class="high_impact_state_change"),
+    )
+    artifacts = _artifacts(include_tools=True)
+
+    incomplete = _execute(
+        base,
+        candidate,
+        artifacts=artifacts,
+        base_artifacts=artifacts,
+    )
+    complete = _execute(
+        base,
+        candidate,
+        artifacts=artifacts,
+        base_artifacts=artifacts,
+        reviews=(_review(ReleaseReviewArtifactKind.TOOL_CATALOG),),
+    )
+
+    assert incomplete.findings[0].code is ReleaseEvidenceFindingCode.TOOL_CATALOG_REVIEW_MISSING
+    assert complete.complete is True
 
 
 def test_passing_exact_reviews_complete_changed_release_evidence() -> None:

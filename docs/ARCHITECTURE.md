@@ -167,6 +167,25 @@ An approval bound to the evaluation digest does not authorize model-generated ar
 therefore validates exact arguments and requires new authority bound to the action digest. See
 [ADR-0008](adr/0008-trusted-tool-catalog-and-proposal-boundary.md).
 
+## Phase 6i components
+
+- `adapters/signed_packs.py`: requires exactly one tool catalog and authenticates its exact bytes.
+- `entrypoints/api.py`: constructs the runtime catalog only from verified control-pack bytes.
+- `application/analyze_control_pack_diff.py`: reports catalog and definition impact.
+- `application/replay_control_pack_scenarios.py`: resolves metadata-only tool requests independently
+  against base and candidate catalogs without execution.
+- `application/assemble_release_evidence.py`: binds the catalog artifact and authenticated review.
+
+The signed release boundary is now:
+
+```text
+manifest signature -> policy bytes + provider bytes + tool-catalog bytes
+                   -> parse trusted records -> diff/replay/review evidence
+                   -> runtime evaluation (never tool execution authority)
+```
+
+See [ADR-0024](adr/0024-signed-tool-catalog-release-boundary.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim
@@ -287,7 +306,7 @@ The dashboard does not introduce listing, search or administrative mutations. Se
 
 - `adapters/signed_packs.py`: strict manifest/trust-store parsing, path and digest validation, and
   Ed25519 verification.
-- `entrypoints/api.py`: verifies the packaged release before constructing policy/provider
+- `entrypoints/api.py`: verifies the packaged release before constructing policy/provider/tool
   repositories and exposes its metadata through `/v1/providers`.
 - `scripts/sign_control_pack.py`: offline release helper that refreshes digests, signs with an
   external private key and verifies the result before atomic replacement.

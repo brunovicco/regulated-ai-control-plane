@@ -5,6 +5,7 @@ import pytest
 
 from regulated_ai.application import AnalyzeControlPackDiff, ControlPackDiffError
 from regulated_ai.domain import (
+    AuthorizedTool,
     CapabilityRequirement,
     CapabilityState,
     ControlPackChangeKind,
@@ -20,6 +21,21 @@ from regulated_ai.domain import (
     ProviderCapabilityRecord,
     ProviderTarget,
 )
+
+
+def _tool(*, risk_class: str = "read_only") -> AuthorizedTool:
+    return AuthorizedTool(
+        name="cards.read",
+        description="Read synthetic status.",
+        risk_class=risk_class,
+        schema_version="1",
+        input_schema_json="{}",
+        input_schema_digest="sha256:input",
+        output_schema_json="{}",
+        output_schema_digest="sha256:output",
+        definition_digest=f"sha256:{risk_class}",
+        catalog_version="tools@1",
+    )
 
 
 def _rule() -> PolicyRule:
@@ -85,6 +101,7 @@ def _release(
     record: ProviderCapabilityRecord | None = None,
     signing_key_id: str = "key-a",
     pack_version: str = "1.0.0",
+    tool: AuthorizedTool | None = None,
 ) -> ControlPackRelease:
     return ControlPackRelease(
         identity=ControlPackReleaseIdentity(
@@ -95,6 +112,8 @@ def _release(
         ),
         policy_sets=(policy or _policy(),),
         provider_records=(record or _record(),),
+        tool_catalog_version="tools@1" if tool is not None else None,
+        tools=() if tool is None else (tool,),
     )
 
 
@@ -154,6 +173,19 @@ def test_release_metadata_can_change_without_semantic_changes() -> None:
     assert report.highest_impact is None
     assert report.version_reused is False
     assert report.signing_key_changed is True
+
+
+def test_tool_risk_change_is_decision_impact() -> None:
+    report = AnalyzeControlPackDiff().execute(
+        _release(tool=_tool()),
+        _release(digest="sha256:candidate", tool=_tool(risk_class="high_impact_state_change")),
+    )
+
+    change = next(
+        item for item in report.changes if item.kind is ControlPackChangeKind.TOOL_DEFINITION
+    )
+    assert change.impact is ControlPackImpact.DECISION
+    assert change.changed_fields == ("risk_class",)
 
 
 def test_capability_state_change_names_dependent_policy_rules() -> None:

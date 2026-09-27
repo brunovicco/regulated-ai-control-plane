@@ -1,5 +1,36 @@
 # Implementation plan
 
+## Phase 6i — signed tool-catalog release boundary
+
+### Goal
+
+Make the trusted tool catalog part of the same authenticated release, semantic diff, scenario
+replay and review-evidence boundary as policies and provider capabilities.
+
+### Work
+
+1. Require exactly one tool catalog in every signed control-pack manifest and expose only its exact
+   digest-verified bytes to configuration parsing.
+2. Remove the runtime's independent tool-catalog path and fail closed when callers attempt to
+   bypass the signed pack.
+3. Compare catalog versions and tool definitions by stable name, conservatively classifying
+   additions, removals, risk classes and schema changes as decision impact.
+4. Extend metadata-only scenario schema version 2 with bounded tool names and optional claimed risk
+   classes; replay resolves those requests against each release without executing tools.
+5. Require a signed whole-catalog review attestation when a candidate changes the catalog and bind
+   release evidence to the exact catalog bytes.
+6. Add regression tests, documentation and ADR-0024.
+
+### Decisions and assumptions
+
+- A signed catalog authorizes definitions for policy evaluation; it does not authorize a proposed
+  call, exact arguments, downstream execution or result disclosure.
+- Tool-catalog review is whole-artifact review in this phase. A future detailed tool review gate may
+  add per-definition source and ownership evidence without weakening this digest binding.
+- Scenario suites remain separately governed and metadata-only. They carry no arguments, outputs,
+  prompts or customer content and never invoke the tool execution port.
+- Existing unsigned tool-catalog overrides are intentionally rejected at runtime.
+
 ## Phase 6h — signed review and lifecycle governance
 
 ### Goal
@@ -173,7 +204,8 @@ pack, then report observed decision and evidence changes alongside the Phase 6b 
 
 1. Verify both releases through one Phase 6a trust store and require the same pack id.
 2. Load a strict scenario suite that contains only normalized metadata, classifications and a fixed
-   evaluation timestamp; reject raw values and tool requests.
+   evaluation timestamp; reject raw values. Schema version 2 may include bounded tool names and
+   optional claimed risk classes resolved from each signed catalog.
 3. Resolve each scenario's logical policy-set id independently in both releases and run the existing
    deterministic evaluator with ephemeral evidence storage and no external execution.
 4. Compare decisions and exact obligation digests as decision impact; compare matched controls,
@@ -191,8 +223,7 @@ pack, then report observed decision and evidence changes alongside the Phase 6b 
 - The fixed timezone-aware evaluation timestamp makes freshness decisions reproducible.
 - Scenarios carry fields and classification labels but never raw values. The evaluator receives an
   empty ephemeral value and a pass-through classifier so no content is persisted or reported.
-- Tool scenarios are rejected until trusted tool catalogs participate in the same release and
-  comparison boundary.
+- Tool scenarios remain metadata-only and never carry arguments or execute tools.
 - Replay performs no network access, enforcement, approval, provider execution or promotion.
 
 ## Phase 6b — verified control-pack impact analysis

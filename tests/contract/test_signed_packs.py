@@ -10,23 +10,31 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from regulated_ai.adapters.signed_packs import SignedPackError, verify_control_pack
-from regulated_ai.adapters.yaml_files import FilePolicyRepository
+from regulated_ai.adapters.yaml_files import FilePolicyRepository, FileToolCatalogRepository
 
 
 def _write_signed_pack(root: Path) -> tuple[Path, Path]:
     policy_path = root / "policies" / "policy.yaml"
     capability_path = root / "provider-capabilities" / "provider.yaml"
+    tool_path = root / "tools" / "tools.yaml"
     policy_path.parent.mkdir()
     capability_path.parent.mkdir()
+    tool_path.parent.mkdir()
     policy_path.write_text('schema_version: "1"\nkind: "synthetic-policy"\n', encoding="utf-8")
     capability_path.write_text(
         'schema_version: "1"\nkind: "synthetic-capability"\n', encoding="utf-8"
     )
+    tool_path.write_text('schema_version: "1"\nkind: "synthetic-tools"\n', encoding="utf-8")
     files = [
         {
             "kind": "policy",
             "path": "policies/policy.yaml",
             "sha256": f"sha256:{hashlib.sha256(policy_path.read_bytes()).hexdigest()}",
+        },
+        {
+            "kind": "tool_catalog",
+            "path": "tools/tools.yaml",
+            "sha256": f"sha256:{hashlib.sha256(tool_path.read_bytes()).hexdigest()}",
         },
         {
             "kind": "provider_capability",
@@ -43,7 +51,13 @@ def _write_signed_pack(root: Path) -> tuple[Path, Path]:
         "signing": signing,
     }
     payload = json.dumps(
-        unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        {
+            **unsigned,
+            "files": sorted(files, key=lambda item: (item["kind"], item["path"])),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
     ).encode()
     private_key = Ed25519PrivateKey.generate()
     signature = base64.b64encode(private_key.sign(payload)).decode()
@@ -96,6 +110,7 @@ def test_signed_pack_returns_only_verified_paths_and_release_identity(tmp_path: 
     assert tuple(item.path for item in pack.capability_files) == (
         "provider-capabilities/provider.yaml",
     )
+    assert tuple(item.path for item in pack.tool_files) == ("tools/tools.yaml",)
     assert b"synthetic-policy" in pack.policy_files[0].content
 
 
@@ -116,6 +131,16 @@ def test_signed_pack_rejects_signature_tampering(tmp_path: Path) -> None:
     manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(SignedPackError, match="signature is invalid"):
+        verify_control_pack(manifest_path, trust_store_path)
+
+
+def test_signed_pack_requires_exactly_one_tool_catalog(tmp_path: Path) -> None:
+    manifest_path, trust_store_path = _write_signed_pack(tmp_path)
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"] = [item for item in manifest["files"] if item["kind"] != "tool_catalog"]
+    manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(SignedPackError, match="schema validation"):
         verify_control_pack(manifest_path, trust_store_path)
 
 
@@ -173,10 +198,16 @@ def test_verified_bytes_are_parsed_without_reopening_changed_file(tmp_path: Path
         copied / "trust" / "control-pack-signing-keys.yaml",
     )
     policy_path = copied / pack.policy_files[0].path
+    tool_path = copied / pack.tool_files[0].path
     policy_path.write_text("tampered after verification", encoding="utf-8")
+    tool_path.write_text("tampered after verification", encoding="utf-8")
 
     repository = FilePolicyRepository.from_bytes(
         tuple((item.path, item.content) for item in pack.policy_files)
     )
+    tool_repository = FileToolCatalogRepository.from_bytes(
+        pack.tool_files[0].content, pack.tool_files[0].path
+    )
 
     assert repository.get("br-financial-demo@1.0.0") is not None
+    assert tool_repository.get("cards.read") is not None

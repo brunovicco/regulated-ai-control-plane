@@ -9,6 +9,7 @@ from regulated_ai.adapters.yaml_files import (
     UnsupportedSchemaVersionError,
     load_capability_file,
     load_policy_file,
+    load_tool_catalog_bytes,
     load_tool_catalog_file,
 )
 from regulated_ai.domain import ProviderTarget
@@ -36,6 +37,16 @@ def test_example_files_load_with_versions_and_sources() -> None:
     assert tools.catalog_version == "br-financial-tools@1.1.0"
     assert tools.get("cards.unblock") is not None
     assert tools.get("cards.unblock").risk_class == "high_impact_state_change"  # type: ignore[union-attr]
+
+
+def test_authenticated_tool_catalog_bytes_are_parsed_without_reopening_path() -> None:
+    root = Path(__file__).resolve().parents[2]
+    path = root / "examples/tools/br-financial-tools.yaml"
+
+    version, tools = load_tool_catalog_bytes(path.read_bytes(), path.name)
+
+    assert version == "br-financial-tools@1.1.0"
+    assert tuple(item.name for item in tools) == ("cards.read", "cards.unblock")
 
 
 def test_malformed_yaml_is_rejected_at_boundary(tmp_path: Path) -> None:

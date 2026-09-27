@@ -36,6 +36,7 @@ class AnalyzeControlPackDiff:
         changes = [
             *_policy_changes(base.policy_sets, candidate.policy_sets),
             *_provider_changes(base.provider_records, candidate.provider_records, policies),
+            *_tool_changes(base, candidate),
         ]
         ordered = tuple(
             sorted(
@@ -189,6 +190,65 @@ def _provider_changes(
         changes.extend(
             _one_provider_target_changes(base[identifier], candidate[identifier], policies)
         )
+    return tuple(changes)
+
+
+def _tool_changes(
+    base_release: ControlPackRelease, candidate_release: ControlPackRelease
+) -> tuple[ControlPackChange, ...]:
+    changes: list[ControlPackChange] = []
+    if base_release.tool_catalog_version != candidate_release.tool_catalog_version:
+        changes.append(
+            _change(
+                ControlPackChangeKind.TOOL_CATALOG,
+                ControlPackChangeType.MODIFIED,
+                "trusted-tool-catalog",
+                ControlPackImpact.EVIDENCE,
+                ("catalog_version",),
+            )
+        )
+    base = _unique_index(base_release.tools, lambda item: item.name, "tool definition")
+    candidate = _unique_index(candidate_release.tools, lambda item: item.name, "tool definition")
+    for identifier in sorted(base.keys() - candidate.keys()):
+        changes.append(
+            _change(
+                ControlPackChangeKind.TOOL_DEFINITION,
+                ControlPackChangeType.REMOVED,
+                identifier,
+                ControlPackImpact.DECISION,
+            )
+        )
+    for identifier in sorted(candidate.keys() - base.keys()):
+        changes.append(
+            _change(
+                ControlPackChangeKind.TOOL_DEFINITION,
+                ControlPackChangeType.ADDED,
+                identifier,
+                ControlPackImpact.DECISION,
+            )
+        )
+    for identifier in sorted(base.keys() & candidate.keys()):
+        fields = _changed_fields(
+            base[identifier],
+            candidate[identifier],
+            (
+                "description",
+                "risk_class",
+                "schema_version",
+                "input_schema_digest",
+                "output_schema_digest",
+            ),
+        )
+        if fields:
+            changes.append(
+                _change(
+                    ControlPackChangeKind.TOOL_DEFINITION,
+                    ControlPackChangeType.MODIFIED,
+                    identifier,
+                    ControlPackImpact.DECISION,
+                    fields,
+                )
+            )
     return tuple(changes)
 
 

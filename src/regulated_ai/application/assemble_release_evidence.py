@@ -65,6 +65,10 @@ class AssembleControlPackReleaseEvidence:
                 for identifier in base_providers
             ),
         }
+        if base.tool_catalog_version is not None:
+            expected_base_artifacts.add(
+                (ReleaseReviewArtifactKind.TOOL_CATALOG, "trusted-tool-catalog")
+            )
         expected_candidate_artifacts = {
             *(
                 (ReleaseReviewArtifactKind.POLICY_SET, identifier)
@@ -75,6 +79,10 @@ class AssembleControlPackReleaseEvidence:
                 for identifier in candidate_providers
             ),
         }
+        if candidate.tool_catalog_version is not None:
+            expected_candidate_artifacts.add(
+                (ReleaseReviewArtifactKind.TOOL_CATALOG, "trusted-tool-catalog")
+            )
         base_artifact_index = _evidence_index(
             base_artifacts,
             lambda item: (item.kind, item.subject_id),
@@ -101,6 +109,13 @@ class AssembleControlPackReleaseEvidence:
             ReleaseReviewArtifactKind.POLICY_SET,
             changes,
         )
+        if (base.tool_catalog_version, base.tools) != (
+            candidate.tool_catalog_version,
+            candidate.tools,
+        ):
+            changes[(ReleaseReviewArtifactKind.TOOL_CATALOG, "trusted-tool-catalog")] = (
+                ControlPackChangeType.MODIFIED
+            )
         _collect_changes(
             base_providers,
             candidate_providers,
@@ -188,6 +203,12 @@ def _review_finding(
         (ReleaseReviewArtifactKind.PROVIDER_TARGET, True): (
             ReleaseEvidenceFindingCode.PROVIDER_REVIEW_BLOCKED
         ),
+        (ReleaseReviewArtifactKind.TOOL_CATALOG, False): (
+            ReleaseEvidenceFindingCode.TOOL_CATALOG_REVIEW_MISSING
+        ),
+        (ReleaseReviewArtifactKind.TOOL_CATALOG, True): (
+            ReleaseEvidenceFindingCode.TOOL_CATALOG_REVIEW_BLOCKED
+        ),
     }
     lifecycle_codes = {
         (ReleaseReviewArtifactKind.POLICY_SET, False): (
@@ -201,6 +222,12 @@ def _review_finding(
         ),
         (ReleaseReviewArtifactKind.PROVIDER_TARGET, True): (
             ReleaseEvidenceFindingCode.PROVIDER_LIFECYCLE_REVIEW_BLOCKED
+        ),
+        (ReleaseReviewArtifactKind.TOOL_CATALOG, False): (
+            ReleaseEvidenceFindingCode.TOOL_CATALOG_REVIEW_MISSING
+        ),
+        (ReleaseReviewArtifactKind.TOOL_CATALOG, True): (
+            ReleaseEvidenceFindingCode.TOOL_CATALOG_REVIEW_BLOCKED
         ),
     }
     selected = update_codes if change_type is ControlPackChangeType.MODIFIED else lifecycle_codes

@@ -202,9 +202,10 @@ def build_runtime(
     capabilities = FileProviderCapabilityRepository.from_bytes(
         tuple((item.path, item.content) for item in control_pack.capability_files)
     )
-    tools = FileToolCatalogRepository(
-        tool_catalog_path or Path(str(resource_root.joinpath("tools/br-financial-tools.yaml")))
-    )
+    if tool_catalog_path is not None:
+        raise ValueError("Tool catalog is part of the signed control pack")
+    tool_file = control_pack.tool_files[0]
+    tools = FileToolCatalogRepository.from_bytes(tool_file.content, tool_file.path)
     configured_path = os.environ.get("REGULAAI_EVIDENCE_DB")
     database_path = evidence_path or Path(configured_path or "var/regulaai-evidence.sqlite3")
     repository = SqliteEvidenceRepository(database_path)
