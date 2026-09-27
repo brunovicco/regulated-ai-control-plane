@@ -175,6 +175,7 @@ automated key distribution, external timestamping and enterprise distribution re
 Phase 6m provides provider-neutral trust-store lineage and rollback-floor verification for those
 future distribution systems. Phase 6n adds signed consumer acknowledgement coverage and quorum.
 Phase 6o adds fresh signed target assertions for the exact loaded trust-store digest.
+Phase 6p adds offline verification for provider-neutral signed external time-authority receipts.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -189,6 +190,7 @@ Explore:
 - trust-store lineage checkpoints; **implemented in Phase 6m**
 - signed trust-store rollout acknowledgements; **implemented in Phase 6n**
 - signed runtime trust-state attestations; **implemented in Phase 6o**
+- provider-neutral signed time-authority receipt verification; **implemented in Phase 6p**
 - enterprise integrations;
 - additional sectors.
 
@@ -272,6 +274,13 @@ Implemented in Phase 6o:
 - duplicate target/key/attestation, pre-checkpoint, future and mismatched assertion rejection;
 - deterministic metadata-only current/blocked report and custody artifact kinds;
 - no runtime probe, process contact, mutation or continuous-enforcement claim.
+
+Implemented in Phase 6p:
+- exact artifact-byte digest and explicit allowlisted subject-kind binding;
+- lifecycle-aware Ed25519 time-authority keys and authority identity binding;
+- explicit evaluation time, future-receipt rejection and optional caller-pinned issue-time floor;
+- deterministic metadata-only verification report and custody artifact kind;
+- no receipt acquisition, provider selection, RFC 3161 compatibility or immutable-storage claim.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;

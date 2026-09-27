@@ -107,6 +107,10 @@ Complete this document before processing personal or regulated data.
   observation/evaluation times and cryptographic digests/signatures. They exclude hostnames,
   network addresses, process payloads, operators, private keys and customer data. Target ids remain
   organization metadata requiring normal access controls.
+- Phase 6p receipts and reports contain bounded artifact-kind/authority/key/receipt ids, UTC time
+  and cryptographic digests/signatures. They exclude artifact content, credentials, private keys,
+  people and customer data. Authority ids remain organization metadata requiring normal access
+  controls.
 - Incident-response owner:
 
 ## Prohibited logging

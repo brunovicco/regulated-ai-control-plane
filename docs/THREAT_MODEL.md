@@ -283,6 +283,26 @@ Residual risks:
 - the verifier authenticates supplied assertions but does not independently probe processes or
   prove continuous enforcement.
 
+### Local artifact time is mistaken for an independent trusted timestamp
+
+Threat:
+an operator relies on mutable filesystem/archive time, reuses a receipt for different bytes or lets
+an untrusted package establish its own freshness floor.
+
+Mitigations:
+- Phase 6p binds an allowlisted artifact kind and exact SHA-256 bytes to a signed external-authority
+  UTC assertion;
+- authority identity and lifecycle-aware Ed25519 key authorization are explicit;
+- expected subject kind, evaluation time and optional minimum issue time are caller-selected;
+- changed bytes, wrong authority/kind, inactive keys, invalid signatures and future or below-floor
+  receipts fail closed;
+- reports emit ids, times and digests rather than artifact content or signature bytes.
+
+Residual risks:
+- a compromised authority key or dishonest authority can assert false time;
+- the custom provider-neutral format is not RFC 3161 and has no implicit interoperability;
+- receipt acquisition, authority availability, immutable retention and transparency remain external.
+
 ### Release evidence is lost, altered or archived with secrets
 
 Threat:

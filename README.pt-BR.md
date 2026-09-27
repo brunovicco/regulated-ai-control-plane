@@ -246,6 +246,11 @@ vinculado ao checkpoint. Targets obrigatórios, quórum e idade máxima falham d
 instante UTC explícito. A evidência continua offline: não implementa probes nem comprova enforcement
 contínuo.
 
+A Fase 6p verifica recibos provider-neutral assinados por autoridade de tempo para bytes exatos de
+artefatos de release/trust. Ela exige tipo explícito, ciclo de vida da autoridade/chave e limites de
+tempo fixados pelo chamador, sem alegar compatibilidade RFC 3161, adquirir recibos ou selecionar um
+provedor.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
