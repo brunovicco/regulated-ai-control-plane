@@ -1,11 +1,12 @@
-# API contract — Phases 1 through 4d
+# Runtime API contract
 
-The exact wire schema may be refined during implementation, but behavior and privacy boundaries
-must remain stable.
+The API exposes deterministic evaluation, enforcement, tool authority, reconciliation and
+metadata-only inspection. Schemas may evolve before the stable release, but privacy and authority
+boundaries are compatibility requirements.
 
 ## POST /v1/evaluations
 
-Evaluates an AI operation. Does not invoke a provider in Phase 1.
+Evaluates an AI operation without invoking a provider.
 
 ### Example request
 
@@ -162,7 +163,7 @@ runtime calls the network-silent mock. Explicit gateway mode sends the sanitized
 `governed-llm-gateway`; tool-bearing plans include only definitions resolved from the trusted
 catalog.
 
-The Phase 4a assertion is issued by an external organization-owned workflow and has the form
+The decision-approval assertion is issued by an external organization-owned workflow and has the form
 `ra1.<base64url-canonical-json>.<base64url-hmac-sha256>`. Its exact fields are `schema_version=1`,
 `approval_id`, pseudonymous `actor_id`, `decision_digest`, `issued_at` and `expires_at`. Unix
 timestamps are seconds. The configured verifier rejects malformed, future, expired, over-lifetime,
@@ -205,7 +206,7 @@ credentials, provider response bodies or provider request IDs.
 
 When the gateway proposes a tool call, `tool_proposals` contains only `call_id`, trusted tool name,
 schema version/digest, an arguments digest and `execution_authorized: false`. Raw arguments are
-neither returned nor persisted. A proposal is not an executed action, and Phase 4a approval does
+neither returned nor persisted. A proposal is not an executed action, and decision approval does
 not authorize its model-generated arguments.
 
 ## POST /v1/enforcements/{enforcement_id}/tool-actions
@@ -213,7 +214,7 @@ not authorize its model-generated arguments.
 Resubmit one proposal's exact arguments with a downstream `workload_identity` and ephemeral
 `idempotency_key`. RegulaAI validates the closed trusted schema and stored proposal digest, then
 returns metadata-only `WAITING_APPROVAL` state and an `action_digest`. Every tool effect requires a
-separate action approval in Phase 4c.
+separate action approval before execution.
 
 Resend the identical request with an externally issued `approval_assertion` using
 `ra2.<base64url-canonical-json>.<base64url-hmac-sha256>`. Its payload contains
@@ -371,7 +372,7 @@ tool-action stages are returned. When more exist, `actions_truncated` is true an
 `ACTION_LIST_TRUNCATED` appears in `attention_codes`. The endpoint never returns prompts, data
 values, tool arguments, approval assertions or raw/safe tool results, and it cannot mutate state.
 
-`lifecycle_events` contains transitions recorded atomically after Phase 5b tracking was enabled.
+`lifecycle_events` contains append-only transitions recorded atomically with current state.
 Legacy records receive a `MIGRATION_BASELINE`, which makes `history_complete` false rather than
 inventing earlier transitions. At most 256 events are returned; a longer sequence sets
 `events_truncated=true`, adds `EVENT_LIST_TRUNCATED`, and also makes `history_complete=false`.
