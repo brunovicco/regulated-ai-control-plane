@@ -1,9 +1,9 @@
-# Phase 1 through 4b local demo
+# Guided local demo
 
 The demo evaluates and locally enforces a synthetic Brazilian financial-services operation. It
 performs no provider or network call and needs no cloud credentials.
 
-The opt-in Phase 3a gateway path is not exercised by the default demo or automated tests.
+The opt-in governed-gateway path is not exercised by the default demo or automated tests.
 
 ## Start the service
 
@@ -101,7 +101,7 @@ curl --request POST http://127.0.0.1:8000/v1/evaluations \
 
 The expected top-level outcome is `REQUIRE_APPROVAL`. The response also contains `TOKENIZE`,
 `REQUIRE_HUMAN_APPROVAL`, `REQUIRE_PROVIDER_CAPABILITY` and `REQUIRE_EVIDENCE` obligations. An
-obligation is an execution plan: Phase 1 does not claim the transformation was already performed.
+obligation is an execution plan; evaluation alone does not claim that a transformation occurred.
 
 Use the returned `evidence_id` with:
 
@@ -148,7 +148,7 @@ before execution. A repeated request that observes `DISPATCHED` does not issue a
 
 To resume the high-impact example, configure a dedicated `REGULAAI_APPROVAL_HMAC_KEY` of at least
 32 bytes before startup. Read `output_digest` from the evaluation evidence referenced by the
-waiting response, then have the organization-owned approval workflow issue the strict Phase 4a
+waiting response, then have the organization-owned approval workflow issue the strict decision
 assertion documented in `API_CONTRACT.md`. Resend the same enforcement request with:
 
 ```json
@@ -164,7 +164,7 @@ metadata receipt. RegulaAI intentionally provides no endpoint or CLI for creatin
 ## Optional governed gateway execution
 
 Set `REGULAAI_EXECUTION_MODE=gateway` and provide every gateway variable documented in
-`.env.example` before process startup. Phase 4b forwards only definitions resolved from the trusted
+`.env.example` before process startup. The gateway forwards only definitions resolved from the trusted
 catalog. The configured gateway workload must be reviewed to authorize only
 deployments compatible with `REGULAAI_GATEWAY_ALLOWED_TARGET` and
 `REGULAAI_GATEWAY_EXPECTED_PROVIDER`.
@@ -187,7 +187,7 @@ proposal arguments, workload identity and idempotency key to
 domain-separated `ra2` assertion documented in `API_CONTRACT.md`; resend the identical request with
 that assertion to reach the network-silent mock tool boundary.
 
-To exercise the Phase 7b sandbox boundary instead, configure every
+To exercise the read-only sandbox boundary instead, configure every
 `REGULAAI_READ_ONLY_TOOL_*` variable from `.env.example` and set
 `REGULAAI_TOOL_EXECUTION_MODE=read_only_http` before startup. The same proposal, resubmission and
 `ra2` approval flow applies, but only `cards.read` with the configured workload identity may cross
@@ -222,21 +222,21 @@ attention codes such as `ENFORCEMENT_APPROVAL_REQUIRED`,
 `TOOL_ACTION_RECONCILIATION_REQUIRED` or `TOOL_RESULT_REJECTED`. It is bounded, read-only and
 metadata-only; it is not a complete transition history and cannot approve or retry work.
 
-Phase 5b also returns `lifecycle_events`. New state transitions are appended transactionally;
+The response also returns `lifecycle_events`. New state transitions are appended transactionally;
 records that existed before tracking show `source: MIGRATION_BASELINE` and
 `history_complete: false`. This is a local append-only operational history, not a signed audit
 ledger.
 
-Phase 5c adds the matched policy/control/capability identifiers, decision and enforcement reasons,
+The control context includes matched policy/control/capability identifiers, decision and enforcement reasons,
 authorized tools, provider target, transformation receipts and previous evidence digest. Approval
 context excludes actor identity, assertions and authority-bearing content.
 
-Phase 5d adds `provider_capability_snapshots` to evidence and the operator timeline. Each new
+`provider_capability_snapshots` preserve the provider facts used by the decision and timeline. Each new
 decision captures the provider target, capability state/conditions, registry/record versions,
 verification date and reviewed source URLs. `provider_context_complete` is false for legacy
 evidence whose source metadata was never captured.
 
-Phase 5e renders the same timeline in a browser without JavaScript or global discovery:
+The operator dashboard renders the same timeline without JavaScript or global discovery:
 
 ```text
 http://127.0.0.1:8000/operator?enforcement_id=enf_REPLACE_WITH_RETURNED_ID
@@ -248,7 +248,7 @@ work and does not display approval actor identity or request/tool content.
 
 ## Compare verified releases with curated scenario replay
 
-Run the packaged release against itself to exercise the Phase 6c replay contract without creating
+Run the packaged release against itself to exercise the scenario-replay contract without creating
 a candidate:
 
 ```bash
@@ -271,7 +271,7 @@ same trusted release boundary.
 
 ## Review a provider capability draft before signing
 
-Run the Phase 6d review gate against the authenticated packaged base and the synthetic-safe
+Run the provider-capability review gate against the authenticated packaged base and the synthetic-safe
 freshness-review example:
 
 ```bash
@@ -293,7 +293,7 @@ process still decides whether an authorized private key may sign a complete pack
 
 ## Review a policy draft before signing
 
-Run the Phase 6e regulatory review gate against the authenticated packaged base and the
+Run the policy regulatory-review gate against the authenticated packaged base and the
 synthetic-safe policy-mapping example:
 
 ```bash
@@ -316,7 +316,7 @@ legal correctness or compliance and does not authorize the separate signer or pr
 
 ## Assemble verified release evidence
 
-Run Phase 6f with the packaged release as both base and candidate to exercise deterministic
+Run the release-evidence assembler with the packaged release as both base and candidate to exercise deterministic
 composition without creating a candidate:
 
 ```bash
@@ -332,9 +332,9 @@ and no required reviews. The output includes a deterministic `bundle_digest` ove
 metadata payload.
 
 For a changed signed candidate, repeat `--provider-review-record PATH` and
-`--policy-review-record PATH` for every applicable Phase 6d/6e review. When the catalog changes,
-also provide the Phase 6l record with `--tool-catalog-review-record PATH`. Then provide the Phase 6h
-review trust store and one signed attestation per changed entity:
+`--policy-review-record PATH` for every applicable provider or policy review. When the catalog
+changes, also provide the detailed record with `--tool-catalog-review-record PATH`. Then provide
+the signed review trust store and one signed attestation per changed entity:
 
 ```bash
   --review-trust-store /path/to/review-trust-store.yaml \
@@ -352,7 +352,7 @@ private key, sign, promote or deploy a release. Those remain separate organizati
 
 ## Verify a signed promotion quorum
 
-After archiving an `EVIDENCE_COMPLETE` Phase 6f JSON bundle, evaluate externally produced Ed25519
+After archiving an `EVIDENCE_COMPLETE` JSON bundle, evaluate externally produced Ed25519
 attestations against the organization's public-key trust store and quorum policy:
 
 ```bash
