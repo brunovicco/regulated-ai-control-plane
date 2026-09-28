@@ -1,5 +1,29 @@
 # Implementation plan
 
+## Phase 7b — bound read-only enterprise sandbox connector
+
+### Goal
+
+Cross one organization-controlled enterprise read boundary without creating a generic HTTP tool or
+weakening the existing action approval, idempotency and result-minimization contracts.
+
+### Work
+
+1. Implement a `ToolExecutionPort` adapter fixed to signed-catalog `cards.read` and `read_only`.
+2. Bind one configured workload identity, HTTPS/loopback endpoint and secret bearer credential.
+3. Send one canonical POST after action approval and atomic execution claim; perform no retry.
+4. Disable redirects and environment proxies; bound timeout and request/response bytes.
+5. Validate exact action/execution response binding and reject duplicate/extra envelope fields.
+6. Feed untrusted output into the existing closed output-schema and minimization boundary.
+7. Add fake-transport tests, configuration tests, runbook, threat/privacy updates and ADR-0037.
+
+### Decisions and assumptions
+
+- Mock remains the default and the live adapter is sandbox-only.
+- All tool actions, including read-only, retain separate `ra2` approval in this phase.
+- Endpoint/DNS/certificate/egress control remains deployment-owned and must be allowlisted.
+- Ambiguous transport outcomes are never retried and require later reconciliation operations.
+
 ## Phase 7a — fixed-synthetic live composition pilot
 
 ### Goal

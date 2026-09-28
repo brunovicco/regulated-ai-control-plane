@@ -19,6 +19,7 @@ from regulated_ai.adapters import (
     HmacTokenizationAdapter,
     MockInferenceExecutionAdapter,
     MockToolExecutionAdapter,
+    ReadOnlyHttpToolExecutionAdapter,
     SignedPackError,
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
@@ -308,6 +309,31 @@ def test_runtime_gateway_mode_fails_closed_on_partial_configuration(
         build_runtime(evidence_path=tmp_path / "gateway-evidence.sqlite3")
 
 
+def test_runtime_read_only_tool_mode_requires_complete_explicit_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_TOOL_EXECUTION_MODE", "read_only_http")
+    monkeypatch.setenv(
+        "REGULAAI_READ_ONLY_TOOL_URL", "https://cards-sandbox.example.test/v1/card-status"
+    )
+    monkeypatch.setenv("REGULAAI_READ_ONLY_TOOL_API_KEY", "synthetic-sandbox-credential")
+    monkeypatch.setenv("REGULAAI_READ_ONLY_TOOL_WORKLOAD_IDENTITY", "workload.cards-sandbox")
+
+    runtime = build_runtime(evidence_path=tmp_path / "tool-evidence.sqlite3")
+
+    assert isinstance(runtime.tool_execution, ReadOnlyHttpToolExecutionAdapter)
+    assert runtime.mock_tool_execution is None
+
+
+def test_runtime_read_only_tool_mode_fails_closed_on_partial_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_TOOL_EXECUTION_MODE", "read_only_http")
+
+    with pytest.raises(ValueError, match="REGULAAI_READ_ONLY_TOOL_URL"):
+        build_runtime(evidence_path=tmp_path / "tool-evidence.sqlite3")
+
+
 def test_runtime_approval_verifier_rejects_short_key(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -537,6 +563,7 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
     assert action_assertion not in operator_dashboard.text
     assert operator_stylesheet.status_code == 200
     assert operator_stylesheet.headers["x-content-type-options"] == "nosniff"
+    assert runtime.mock_tool_execution is not None
     assert runtime.mock_tool_execution.call_count == 1
     database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
     for raw_value in (*arguments.values(), idempotency_key, action_assertion):
@@ -629,6 +656,7 @@ def test_action_api_rejects_untrusted_result_without_persisting_it(tmp_path: Pat
     assert operator_timeline.json()["stages"][-1]["status"] == "RESULT_REJECTED"
     assert operator_timeline.json()["history_complete"] is True
     assert operator_timeline.json()["lifecycle_events"][-1]["status"] == "RESULT_REJECTED"
+    assert runtime.mock_tool_execution is not None
     assert runtime.mock_tool_execution.call_count == 1
     database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
     for raw_result in rejected_output.values():

@@ -220,9 +220,12 @@ Resend the identical request with an externally issued `approval_assertion` usin
 `schema_version=2`, `subject_type=tool_action`, `approval_id`, pseudonymous `actor_id`,
 `action_digest`, `issued_at` and `expires_at`. `ra1` decision approvals are rejected.
 
-After an atomic `DISPATCHED` claim, authority is consumed once and the network-silent mock tool
-port executes. Success is accepted only when the untrusted output exactly matches the trusted,
-action-bound closed output schema. Per-field catalog rules return a closed enum, replace a value
+After an atomic `DISPATCHED` claim, authority is consumed once and the configured tool port
+executes. The default remains the network-silent mock. Opt-in `read_only_http` mode is fixed to
+`cards.read`, the configured workload identity and a deployment-controlled sandbox endpoint; it
+does not enable `cards.unblock` or caller-selected HTTP. Success is accepted only when the untrusted
+output exactly matches the trusted, action-bound closed output schema. Per-field catalog rules
+return a closed enum, replace a value
 with `***MASKED***`, or drop the field. Personal/financial values cannot be returned directly and
 authentication secrets are always dropped.
 
@@ -247,6 +250,10 @@ The immediate successful response includes the minimized result and metadata:
 execution failure becomes terminal `RECONCILIATION_REQUIRED`. Invalid, extra, missing, mistyped,
 oversized or disallowed result content becomes terminal `RESULT_REJECTED` with HTTP 502. Neither
 state is automatically retried because the downstream effect may already have occurred.
+
+The live read-only connector uses the same API request and immediate-response contract. Its
+downstream HTTP envelope is documented in `READ_ONLY_ENTERPRISE_CONNECTOR.md`; credentials,
+arguments and raw output are not added to this public metadata contract.
 
 ## GET /v1/tool-actions/{action_id}
 

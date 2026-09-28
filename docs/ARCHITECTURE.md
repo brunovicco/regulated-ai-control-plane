@@ -31,6 +31,11 @@ synthetic request enters the normal enforcement use case, is tokenized locally, 
 configured governed-gateway boundary and produces a metadata-only report after operator-timeline
 validation. The pilot is not a second prompt API and enables no tool execution.
 
+Phase 7b replaces the mock tool port only when explicitly configured. The live adapter is fixed to
+`cards.read`, `read_only`, one workload identity and one deployment endpoint. It executes after the
+existing action claim and approval consumption, then returns untrusted output to the unchanged
+closed-schema validation/minimization use case.
+
 ## Layers
 
 ```text
@@ -422,6 +427,25 @@ fixed synthetic request
 The pilot makes one attempt, accepts no provider or tool selection and never changes the default
 network-silent runtime. See
 [ADR-0036](adr/0036-fixed-synthetic-live-composition-pilot.md).
+
+## Phase 7b components
+
+- `adapters/read_only_tool_execution.py`: exact tool/workload binding, bounded HTTP transport and
+  closed response envelope.
+- `entrypoints/api.py`: startup selection between the default mock and live read-only adapter.
+- `application/execute_tool_action.py`: header-safe idempotency validation before persistence and
+  approval consumption.
+
+```text
+approved cards.read action + exact arguments/idempotency/workload
+    -> atomic DISPATCHED claim + consumed ra2 authority
+    -> one bounded sandbox POST (no redirects, proxy, retry or fallback)
+    -> exact action/execution envelope binding
+    -> existing closed output schema -> return/mask/drop -> metadata-only persistence
+```
+
+Transport ambiguity remains `RECONCILIATION_REQUIRED`; invalid content remains `RESULT_REJECTED`.
+See [ADR-0037](adr/0037-bound-read-only-enterprise-sandbox-connector.md).
 
 ## Phase 4c components
 

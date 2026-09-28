@@ -46,7 +46,10 @@ Complete this document before processing personal or regulated data.
   ephemeral. Phase 4d validates output fields against trusted classifications and applies
   `RETURN`, `MASK` or `DROP` before the immediate response. RegulaAI persists only trusted
   identities, statuses, approval metadata, schema/result digests, classifications and exposed
-  field names. Execution still uses only a network-silent mock tool adapter.
+  field names. Execution uses the network-silent mock by default. Opt-in Phase 7b sends only the
+  exact approved `cards.read` arguments, action id, configured workload identity and ephemeral
+  idempotency header to an organization-controlled sandbox. Its bearer credential and raw response
+  remain ephemeral and excluded from logs, responses and persistence.
 - The Phase 5a operator timeline requires one exact enforcement ID and composes only metadata
   already allowlisted in evidence/enforcement/action records. It does not list activity globally or
   recover payloads. Deployments must protect this operator surface with their existing access and
@@ -134,6 +137,11 @@ Complete this document before processing personal or regulated data.
   prompt content, transformed values, model output, credentials and tool data. The dedicated
   non-production evidence database remains organization metadata subject to retention and access
   controls.
+- Phase 7b sends a pre-tokenized account reference to one configured enterprise sandbox only after
+  separate action approval. The connector persists existing execution/result digests,
+  classifications and exposed-field names, never the bearer credential, idempotency key, arguments
+  or raw/safe output. The sandbox becomes an external processing boundary requiring approved
+  purpose, access, retention, residency, deletion and incident-response controls.
 - Incident-response owner:
 
 ## Prohibited logging

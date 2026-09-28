@@ -34,6 +34,7 @@ from regulated_ai.domain import (
 )
 
 _SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}\Z")
+_SAFE_IDEMPOTENCY_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,255}\Z")
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
@@ -419,8 +420,7 @@ def _validate_identifiers(
         _SAFE_ID.fullmatch(enforcement_id) is None
         or _SAFE_ID.fullmatch(call_id) is None
         or _SAFE_ID.fullmatch(workload_identity) is None
-        or not idempotency_key
-        or len(idempotency_key.encode()) > 256
+        or _SAFE_IDEMPOTENCY_KEY.fullmatch(idempotency_key) is None
     ):
         raise InvalidToolActionError("Tool action identifiers are invalid")
 

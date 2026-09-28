@@ -40,6 +40,10 @@ from regulated_ai.adapters.provider_review_files import (
     load_provider_capability_draft,
     load_provider_capability_review,
 )
+from regulated_ai.adapters.read_only_tool_execution import (
+    ReadOnlyHttpToolExecutionAdapter,
+    ReadOnlyHttpToolExecutionConfig,
+)
 from regulated_ai.adapters.release_custody import (
     ReleaseCustodyArtifactKind,
     ReleaseCustodyError,
@@ -121,6 +125,8 @@ __all__ = [
     "OciEvidenceIdentity",
     "PolicyReviewBoundaryError",
     "ProviderReviewBoundaryError",
+    "ReadOnlyHttpToolExecutionAdapter",
+    "ReadOnlyHttpToolExecutionConfig",
     "ReleaseCustodyArtifactKind",
     "ReleaseCustodyError",
     "ReleaseCustodyIdentity",

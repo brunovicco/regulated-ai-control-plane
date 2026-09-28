@@ -141,9 +141,10 @@ real provider inference unless gateway mode is explicitly configured. Gateway mo
 timeouts, performs no local retry, discards model output and accepts only tool definitions resolved
 from the versioned organization catalog. Returned tool calls remain unauthorized proposals until
 their exact arguments are resubmitted, validated and approved using separate action authority.
-Phase 4d validates untrusted mock results against closed catalog schemas, masks or drops classified
+Phase 4d validates untrusted tool results against closed catalog schemas, masks or drops classified
 fields and returns the minimized result only on the immediate successful response. Raw and safe
-result content are not persisted or recoverable on replay. Tool execution remains network-silent.
+result content are not persisted or recoverable on replay. Tool execution remains network-silent by
+default; Phase 7b can opt into the single bound read-only sandbox connector.
 Approval assertions are issued
 outside the service, bound to the decision digest, accepted only ephemerally and consumed once
 before execution.
@@ -267,11 +268,17 @@ gateway/provider call, validates the operator timeline and emits a metadata-only
 no arbitrary prompt, provider, tool or credential arguments and does not return model output. See
 [the live composition pilot runbook](docs/LIVE_COMPOSITION_PILOT.md).
 
+Phase 7b adds the first opt-in enterprise sandbox connector. It is fixed to the signed-catalog
+`cards.read` read-only tool, one configured workload identity and one HTTPS/loopback endpoint. The
+connector makes no retry, accepts no caller-selected URL or headers and sends its untrusted result
+through the existing closed schema and masking/drop rules. Mock tool execution remains the default.
+See [the read-only connector runbook](docs/READ_ONLY_ENTERPRISE_CONNECTOR.md).
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;
 - completion-returning API behavior;
-- live enterprise-system tool adapters and returning tool results to a model;
+- state-changing enterprise-system adapters and returning tool results to a model;
 - LLM-based policy judging;
 - global operator discovery and administrative dashboard actions;
 - SaaS multi-tenancy;
@@ -422,6 +429,7 @@ Start with:
 - [Verification-key lifecycle](docs/TRUST_KEY_LIFECYCLE.md)
 - [Release artifact custody](docs/RELEASE_CUSTODY.md)
 - [Live composition pilot](docs/LIVE_COMPOSITION_PILOT.md)
+- [Read-only enterprise connector](docs/READ_ONLY_ENTERPRISE_CONNECTOR.md)
 - [MVP roadmap](docs/MVP_ROADMAP.md)
 - [Primary sources](SOURCES.md)
 
