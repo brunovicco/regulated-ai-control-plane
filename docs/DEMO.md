@@ -173,6 +173,11 @@ Gateway mode sends the sanitized text payload to the configured service and may 
 cost. Model output is discarded. A returned tool call is exposed only as metadata and an arguments
 digest with `execution_authorized: false`.
 
+For a bounded live proof, use `scripts/run_live_composition_pilot.py` instead of adapting this demo
+with real data. The pilot accepts no content or tool arguments, requires gateway mode and validates
+the complete metadata-only operator timeline. See `LIVE_COMPOSITION_PILOT.md` for prerequisites,
+execution and acceptance criteria.
+
 ## Action-specific approval proof
 
 Configure a distinct `REGULAAI_ACTION_APPROVAL_HMAC_KEY` of at least 32 bytes. Submit the exact

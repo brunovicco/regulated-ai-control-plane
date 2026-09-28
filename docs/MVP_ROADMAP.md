@@ -56,8 +56,8 @@ Still allow a mock provider.
 ## Phase 3 — Provider execution adapters
 
 Status: Phase 3a implemented as an opt-in `governed-llm-gateway` adapter. Phase 4b adds trusted tool
-definitions and proposal-only results. Mock execution remains the default; live composition proof
-and tool side-effect execution remain pending.
+definitions and proposal-only results. Phase 7a adds a fixed-synthetic live composition pilot.
+Mock execution remains the default; live tool side-effect execution remains pending.
 
 Goal:
 execute a sanitized request without duplicating gateway responsibilities.
@@ -363,6 +363,27 @@ Implemented in Phase 6h:
 - whole-entity onboarding/removal review bound to added candidate or removed base bytes;
 - bundle schema version 2 with metadata-only reviewer and signature identities/digests;
 - no source retrieval, legal interpretation, promotion, distribution or deployment authority.
+
+## Phase 7 — Pilot integrations
+
+Status: Phase 7a implements a fixed-synthetic, opt-in proof through one reviewed non-production
+gateway/provider workload. It composes deterministic evaluation, local tokenization, provider
+execution, metadata-only evidence and operator-timeline validation without accepting arbitrary
+content or enabling tool effects.
+
+Implemented in Phase 7a:
+- explicit gateway-mode requirement and one reviewed OpenAI capability target;
+- fixed synthetic values with mandatory local identifier tokenization;
+- no prompt, tool, provider or credential input surface;
+- terminal provider and complete operator-timeline assertions;
+- deterministic metadata-only JSON report and digest;
+- network-silent fake-boundary regression tests and an operator runbook.
+
+Next:
+- one reviewed read-only enterprise connector in a sandbox;
+- explicit reconciliation operations for ambiguous execution state;
+- production persistence before multi-replica rollout;
+- state-changing integration only after connector identity, idempotency and recovery review.
 
 ## Defer
 

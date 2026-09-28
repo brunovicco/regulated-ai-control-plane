@@ -271,6 +271,13 @@ A Fase 6t emite metadados permitidos do ciclo de controle como envelopes estrutu
 prompt/resposta/ferramenta, credenciais, atributos arbitrários e baggage são excluídos. Sem endpoint,
 nenhum exporter ou caminho de rede é criado; falhas de observabilidade não alteram decisões.
 
+A Fase 7a adiciona um piloto opt-in de composição real para uma requisição financeira sintética e
+fixa. Ele reutiliza todo o fluxo de enforcement, comprova tokenização local antes de uma chamada a
+um workload não produtivo revisado do gateway/provider, valida a timeline operacional e emite um
+relatório somente com metadados. O comando não aceita prompt, provider, ferramenta ou credencial
+arbitrários e não retorna output do modelo. Consulte o
+[runbook do piloto de composição real](docs/LIVE_COMPOSITION_PILOT.md).
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
@@ -439,6 +446,7 @@ Comece por:
 - [Estratégia de evals](docs/EVAL_STRATEGY.md)
 - [Ciclo de vida das chaves de verificação](docs/TRUST_KEY_LIFECYCLE.md)
 - [Custódia dos artefatos de release](docs/RELEASE_CUSTODY.md)
+- [Piloto de composição real](docs/LIVE_COMPOSITION_PILOT.md)
 - [Roadmap](docs/MVP_ROADMAP.md)
 - [Fontes primárias](SOURCES.md)
 

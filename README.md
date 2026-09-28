@@ -37,7 +37,9 @@ Enterprise Application/Agent
    OpenAI      Bedrock  Future
 ```
 
-The first implementation phase intentionally stops **before live model inference**. The goal is to prove the deterministic decision, enforcement and evidence contracts before adding provider SDKs or model routing.
+The default runtime intentionally stops **before live model inference**. An explicit non-production
+pilot can prove one fixed-synthetic call through the governed gateway after the deterministic
+decision, enforcement and evidence contracts are configured.
 
 ## Why this project exists
 
@@ -259,6 +261,12 @@ when explicitly configured, correlates them with bounded OTLP spans. Prompt/resp
 credentials, arbitrary attributes and baggage are excluded. With no endpoint, no exporter or
 network path is created; observability failure never changes a policy result.
 
+Phase 7a adds an opt-in live composition pilot for one fixed synthetic financial-services request.
+It reuses the complete enforcement path, proves local tokenization before a reviewed non-production
+gateway/provider call, validates the operator timeline and emits a metadata-only report. It accepts
+no arbitrary prompt, provider, tool or credential arguments and does not return model output. See
+[the live composition pilot runbook](docs/LIVE_COMPOSITION_PILOT.md).
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;
@@ -413,6 +421,7 @@ Start with:
 - [Evaluation strategy](docs/EVAL_STRATEGY.md)
 - [Verification-key lifecycle](docs/TRUST_KEY_LIFECYCLE.md)
 - [Release artifact custody](docs/RELEASE_CUSTODY.md)
+- [Live composition pilot](docs/LIVE_COMPOSITION_PILOT.md)
 - [MVP roadmap](docs/MVP_ROADMAP.md)
 - [Primary sources](SOURCES.md)
 
