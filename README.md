@@ -16,6 +16,25 @@ metadata-only evidence—without asking a model to decide its own permissions.
 The initial product focus is Brazilian financial services, including privacy, international data
 transfer, provider capability and agent-authority concerns.
 
+## Product tour
+
+![RegulaAI operator dashboard: exact-ID lookup followed by a completed synthetic enforcement](docs/assets/operator-tour.gif)
+
+The tour shows a real local execution with fixed synthetic data and the network-silent mock
+provider. RegulaAI tokenizes the identifier before execution, reaches
+`ALLOW_WITH_TRANSFORMATION` / `EXECUTED`, and exposes only metadata, control context and digests in
+the operator timeline.
+
+<details>
+<summary>Static screenshots</summary>
+
+<p align="center">
+  <img src="docs/assets/operator-lookup.png" alt="RegulaAI operator dashboard exact-ID lookup" width="49%">
+  <img src="docs/assets/operator-execution.png" alt="RegulaAI completed synthetic enforcement summary" width="49%">
+</p>
+
+</details>
+
 ## Why RegulaAI
 
 Enterprise AI needs more than model access. A production request may need to answer:

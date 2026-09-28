@@ -16,6 +16,24 @@ apenas com metadados—sem pedir que um modelo decida as próprias permissões.
 O foco inicial são instituições financeiras brasileiras, incluindo privacidade, transferência
 internacional de dados, capacidades de providers e autoridade de agentes.
 
+## Tour do produto
+
+![Painel do operador RegulaAI: consulta por ID exato seguida de um enforcement sintético concluído](docs/assets/operator-tour.gif)
+
+O tour mostra uma execução local real com dados sintéticos fixos e provider mock sem rede. RegulaAI
+tokeniza o identificador antes da execução, chega a `ALLOW_WITH_TRANSFORMATION` / `EXECUTED` e
+expõe na timeline apenas metadados, contexto de controles e digests.
+
+<details>
+<summary>Capturas estáticas</summary>
+
+<p align="center">
+  <img src="docs/assets/operator-lookup.png" alt="Consulta por ID exato no painel do operador RegulaAI" width="49%">
+  <img src="docs/assets/operator-execution.png" alt="Resumo de enforcement sintético concluído no RegulaAI" width="49%">
+</p>
+
+</details>
+
 ## Por que RegulaAI
 
 IA corporativa exige mais do que acesso a modelos. Uma requisição pode precisar responder:
