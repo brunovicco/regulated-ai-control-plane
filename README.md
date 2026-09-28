@@ -254,6 +254,11 @@ and periodic runtime trust-state verifier. It pins the image through the Kustomi
 mounts authority from external PVC/ConfigMap/Secret objects, uses restricted non-root contexts and
 denies egress by default. The SQLite reference intentionally remains a single replica.
 
+Phase 6t emits allowlisted control lifecycle metadata as CloudEvents 1.0 structured envelopes and,
+when explicitly configured, correlates them with bounded OTLP spans. Prompt/response/tool content,
+credentials, arbitrary attributes and baggage are excluded. With no endpoint, no exporter or
+network path is created; observability failure never changes a policy result.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;

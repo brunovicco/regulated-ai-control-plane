@@ -377,6 +377,29 @@ clusters, registries, identity providers, secrets, storage classes or external a
 
 See [ADR-0034](adr/0034-kubernetes-openshift-deployment-reference.md).
 
+## Phase 6t components
+
+- `adapters/evaluation_observability.py`: allowlisted CloudEvents 1.0 envelope and safe span mapping.
+- `adapters/observability.py`: opt-in OTLP HTTP tracing, bounded attributes, W3C trace context and
+  lifecycle isolation.
+- `entrypoints/api.py`: structured-log configuration before composition plus bounded telemetry
+  flush/shutdown.
+- `docs/CLOUDEVENTS_OTLP.md`: event schema, configuration and collector boundary.
+
+```text
+allowlisted lifecycle event + bounded identifier metadata
+    -> CloudEvent 1.0 structured envelope -> JSON structured log
+    -> bounded control.lifecycle span -> optional OTLP HTTP exporter
+unknown/content-bearing fields -> dropped
+sink/exporter unavailable -> business decision unchanged
+```
+
+No broker client is included. An OTLP endpoint activates exporter construction only when the
+observability extra is installed; the deployment image includes that extra but configures no
+endpoint or egress by default.
+
+See [ADR-0035](adr/0035-metadata-only-cloudevents-and-otlp.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim

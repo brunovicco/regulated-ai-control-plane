@@ -1,5 +1,19 @@
 # LLM observability policy
 
+## Control lifecycle CloudEvents
+
+Phase 6t wraps allowlisted evaluation, enforcement and tool-action lifecycle metadata in a
+CloudEvents 1.0 structured envelope. Structured logs use event name `control.lifecycle` and place
+the exact envelope under `cloudevent`. The envelope has `specversion`, generated `id`, fixed `source`,
+stable `type`, UTC `time`, JSON content type and an allowlisted `data` mapping. It is portable event
+data, not proof of delivery or an audit ledger.
+
+When OTLP is enabled, the same lifecycle event creates a `control.lifecycle` span with only
+`cloudevents.event_id`, `cloudevents.event_source`, `cloudevents.event_spec_version`,
+`cloudevents.event_type`, `app.operation` and an optional bounded `app.outcome`. Sink/exporter
+failure is suppressed so observability cannot change policy decisions. Monitor collector delivery
+independently.
+
 ## Vendor-neutral application tracing
 
 The service profile also provides a separate OpenTelemetry trace foundation in
@@ -38,6 +52,8 @@ W3C `traceparent`/`tracestate`; baggage is intentionally not propagated. Structu
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | one endpoint | Base OTLP HTTP endpoint |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | one endpoint | Trace-specific OTLP HTTP endpoint; takes precedence in the exporter |
 | `OTEL_RESOURCE_ATTRIBUTES` | no | Only the three approved resource keys are accepted |
+| `REGULAAI_ENVIRONMENT` | no | Bounded deployment environment label; defaults to `local` |
+| `REGULAAI_SERVICE_VERSION` | no | Bounded service version label; defaults to `0.1.0` |
 
 Tests use in-memory exporters and invalid placeholder endpoint names; they never require a
 collector, network access, credentials, or an external service.

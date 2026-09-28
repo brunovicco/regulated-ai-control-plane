@@ -1,5 +1,31 @@
 # Implementation plan
 
+## Phase 6t — metadata-only CloudEvents and OTLP export
+
+### Goal
+
+Represent control lifecycle events as portable CloudEvents 1.0 and correlate them with opt-in OTLP
+traces without allowing observability availability or payloads to influence policy decisions.
+
+### Work
+
+1. Convert only allowlisted lifecycle names and bounded metadata into CloudEvents structured JSON.
+2. Emit stable source/type, generated event id and timezone-aware UTC time without request content.
+3. Map CloudEvent context plus operation/outcome to a bounded OpenTelemetry span surface.
+4. Initialize optional OTLP tracing only when an endpoint is explicitly configured.
+5. Configure structured logging before runtime composition and bound flush/shutdown at API exit.
+6. Isolate sink/exporter setup, emit, flush and shutdown failures from business outcomes.
+7. Package the observability extra in the deployment image while retaining network-silent defaults.
+8. Add tests, operating guidance and ADR-0035.
+
+### Decisions and assumptions
+
+- CloudEvents are written as a nested structured-log envelope; external broker delivery is not
+  implemented.
+- OTLP uses the existing HTTP/protobuf trace exporter and never propagates baggage.
+- Endpoint identity, TLS/auth, retention, sampling, collector tenancy and network egress are
+  deployment-owned controls.
+
 ## Phase 6s — Kubernetes and OpenShift deployment reference
 
 ### Goal
