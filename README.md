@@ -274,6 +274,11 @@ connector makes no retry, accepts no caller-selected URL or headers and sends it
 through the existing closed schema and masking/drop rules. Mock tool execution remains the default.
 See [the read-only connector runbook](docs/READ_ONLY_ENTERPRISE_CONNECTOR.md).
 
+Phase 7c adds separately authenticated terminal reconciliation for ambiguous tool outcomes. A
+short-lived `rr1` assertion bound to the exact action may record only confirmed execution or
+confirmed non-execution. The reconciliation path cannot call the tool, restore output or schedule
+a retry. See [the reconciliation runbook](docs/TOOL_ACTION_RECONCILIATION.md).
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;
@@ -430,6 +435,7 @@ Start with:
 - [Release artifact custody](docs/RELEASE_CUSTODY.md)
 - [Live composition pilot](docs/LIVE_COMPOSITION_PILOT.md)
 - [Read-only enterprise connector](docs/READ_ONLY_ENTERPRISE_CONNECTOR.md)
+- [Tool-action reconciliation](docs/TOOL_ACTION_RECONCILIATION.md)
 - [MVP roadmap](docs/MVP_ROADMAP.md)
 - [Primary sources](SOURCES.md)
 

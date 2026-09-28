@@ -45,6 +45,13 @@ from regulated_ai.application.get_operator_timeline import (
     OperatorTimelineIntegrityError,
     OperatorTimelineNotFoundError,
 )
+from regulated_ai.application.reconcile_tool_action import (
+    ReconcileToolAction,
+    ToolActionReconciliationAuthorizationError,
+    ToolActionReconciliationConflictError,
+    ToolActionReconciliationNotFoundError,
+    ToolActionReconciliationPersistenceError,
+)
 from regulated_ai.application.replay_control_pack_scenarios import (
     ControlPackScenarioReplayError,
     ReplayControlPackScenarios,
@@ -95,6 +102,7 @@ __all__ = [
     "PolicyUpdateRegulatoryReviewError",
     "ProviderCapabilityUpdateReviewError",
     "ProviderRegistryError",
+    "ReconcileToolAction",
     "ReleaseEvidenceError",
     "ReleasePromotionError",
     "ReplayControlPackScenarios",
@@ -106,6 +114,10 @@ __all__ = [
     "ToolActionExecutionFailedError",
     "ToolActionNotFoundError",
     "ToolActionPersistenceError",
+    "ToolActionReconciliationAuthorizationError",
+    "ToolActionReconciliationConflictError",
+    "ToolActionReconciliationNotFoundError",
+    "ToolActionReconciliationPersistenceError",
     "ToolAuthorizationError",
     "ToolCatalogUpdateReviewError",
     "ToolResultRejectedError",

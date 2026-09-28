@@ -1,5 +1,29 @@
 # Implementation plan
 
+## Phase 7c — authenticated terminal tool-action reconciliation
+
+### Goal
+
+Resolve a verified ambiguous downstream outcome without automatically or manually re-executing the
+original tool action.
+
+### Work
+
+1. Add a domain-separated `rr1` assertion with a dedicated key and exact action-digest binding.
+2. Accept only closed `EXECUTED` or `NOT_EXECUTED` outcomes with strict execution-ID semantics.
+3. Consume authority into a metadata-only, exact-replay-idempotent ledger.
+4. Advance only `RECONCILIATION_REQUIRED` to one irreversible reconciled terminal status.
+5. Expose one exact-action API operation with no dependency on `ToolExecutionPort`.
+6. Persist the receipt and append lifecycle history without arguments, output, notes or URLs.
+7. Add adapter, use-case, persistence and API tests plus an operator runbook and ADR-0038.
+
+### Decisions and assumptions
+
+- Investigation and assertion issuance remain organization-owned external workflows.
+- `RECONCILED_EXECUTED` records confirmed effect only; it does not claim result validation.
+- `RECONCILED_NOT_EXECUTED` is terminal and does not automatically create a retry.
+- SQLite remains a single-instance reference; multi-replica production persistence is still pending.
+
 ## Phase 7b — bound read-only enterprise sandbox connector
 
 ### Goal

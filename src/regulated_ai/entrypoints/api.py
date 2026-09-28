@@ -27,6 +27,7 @@ from regulated_ai.adapters import (
     HmacActionApprovalAdapter,
     HmacApprovalAdapter,
     HmacTokenizationAdapter,
+    HmacToolActionReconciliationAdapter,
     MockInferenceExecutionAdapter,
     MockToolExecutionAdapter,
     ReadOnlyHttpToolExecutionAdapter,
@@ -46,6 +47,7 @@ from regulated_ai.application import (
     GetOperatorTimeline,
     OperatorTimelineIntegrityError,
     OperatorTimelineNotFoundError,
+    ReconcileToolAction,
 )
 from regulated_ai.application.ports import (
     EnforcementRepository,
@@ -74,6 +76,7 @@ from regulated_ai.domain import (
     ProviderTarget,
     Purpose,
     Sector,
+    ToolActionReconciliationReceipt,
     ToolActionRecord,
     ToolActionResult,
     ToolProposal,
@@ -175,6 +178,12 @@ class ToolActionRequest(_TransportModel):
     approval_assertion: SecretStr | None = Field(default=None, min_length=1, max_length=4096)
 
 
+class ToolActionReconciliationRequest(_TransportModel):
+    """Ephemeral authority for one terminal reconciliation operation."""
+
+    reconciliation_assertion: SecretStr = Field(min_length=1, max_length=4096)
+
+
 @dataclass(frozen=True, slots=True)
 class Runtime:
     """Initialized application services exposed to transport handlers."""
@@ -188,6 +197,7 @@ class Runtime:
     execution: InferenceExecutionPort
     mock_execution: MockInferenceExecutionAdapter | None
     action_executor: ExecuteToolAction
+    action_reconciler: ReconcileToolAction
     actions: ToolActionRepository
     lifecycle_events: OperatorLifecycleEventRepository
     operator_timeline: GetOperatorTimeline
@@ -290,6 +300,26 @@ def build_runtime(
             ),
         )
     )
+    configured_reconciliation_key = os.environ.get("REGULAAI_RECONCILIATION_HMAC_KEY")
+    configured_authority_keys = tuple(
+        key for key in (configured_approval_key, configured_action_approval_key) if key is not None
+    )
+    if (
+        configured_reconciliation_key is not None
+        and configured_reconciliation_key in configured_authority_keys
+    ):
+        raise ValueError("Reconciliation and approval HMAC keys must differ")
+    reconciliation_authority = (
+        None
+        if configured_reconciliation_key is None
+        else HmacToolActionReconciliationAdapter(
+            database_path,
+            configured_reconciliation_key.encode(),
+            max_lifetime_seconds=_integer_environment(
+                "REGULAAI_RECONCILIATION_MAX_LIFETIME_SECONDS", 3600
+            ),
+        )
+    )
     tool_execution, mock_tool_execution = _tool_execution_adapter_from_environment()
     action_executor = ExecuteToolAction(
         enforcement=enforcement,
@@ -298,6 +328,11 @@ def build_runtime(
         actions=actions,
         execution=tool_execution,
         approval=action_approval,
+        observer=observer,
+    )
+    action_reconciler = ReconcileToolAction(
+        actions=actions,
+        authority=reconciliation_authority,
         observer=observer,
     )
     operator_timeline = GetOperatorTimeline(
@@ -316,6 +351,7 @@ def build_runtime(
         execution=execution,
         mock_execution=mock_execution,
         action_executor=action_executor,
+        action_reconciler=action_reconciler,
         actions=actions,
         lifecycle_events=lifecycle_events,
         operator_timeline=operator_timeline,
@@ -494,6 +530,7 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
         elif exc.code in {
             "ACTION_APPROVAL_FAILED",
             "APPROVAL_FAILED",
+            "TOOL_ACTION_RECONCILIATION_AUTHORIZATION_FAILED",
             "TOOL_NOT_AUTHORIZED",
         }:
             status = 403
@@ -501,7 +538,10 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
             status = 404
         elif exc.code == "INVALID_TOOL_ACTION":
             status = 422
-        elif exc.code == "TOOL_ACTION_CONFLICT":
+        elif exc.code in {
+            "TOOL_ACTION_CONFLICT",
+            "TOOL_ACTION_RECONCILIATION_CONFLICT",
+        }:
             status = 409
         elif exc.code == "TOOL_RESULT_REJECTED":
             status = 502
@@ -604,6 +644,16 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
         if record is None:
             return _error_response(404, "TOOL_ACTION_NOT_FOUND", "Tool action was not found")
         return _tool_action_record_payload(record)
+
+    @application.post("/v1/tool-actions/{action_id}/reconciliation")
+    def reconcile_tool_action(
+        action_id: str, request: ToolActionReconciliationRequest
+    ) -> dict[str, object]:
+        result = _runtime(application).action_reconciler.execute(
+            action_id=action_id,
+            assertion=request.reconciliation_assertion.get_secret_value(),
+        )
+        return _tool_action_result_payload(result)
 
     @application.get("/v1/operator/enforcements/{enforcement_id}/timeline", response_model=None)
     def get_operator_timeline(enforcement_id: str) -> dict[str, object]:
@@ -865,6 +915,9 @@ def _tool_action_result_payload(result: ToolActionResult) -> dict[str, object]:
         "result_classifications": [item.value for item in result.result_classifications],
         "exposed_result_fields": list(result.exposed_result_fields),
         "safe_result": None if result.safe_output is None else dict(result.safe_output),
+        "reconciliation_receipt": _tool_action_reconciliation_receipt_payload(
+            result.reconciliation_receipt
+        ),
     }
 
 
@@ -884,6 +937,7 @@ def _tool_action_record_payload(record: ToolActionRecord) -> dict[str, object]:
         safe_output_digest=record.safe_output_digest,
         result_classifications=record.result_classifications,
         exposed_result_fields=record.exposed_result_fields,
+        reconciliation_receipt=record.reconciliation_receipt,
     )
     return {
         **_tool_action_result_payload(result),
@@ -998,6 +1052,24 @@ def _action_approval_receipt_payload(
         "actor_id": receipt.actor_id,
         "action_digest": receipt.action_digest,
         "action_id": receipt.action_id,
+        "issued_at": receipt.issued_at.isoformat(),
+        "expires_at": receipt.expires_at.isoformat(),
+        "consumed_at": receipt.consumed_at.isoformat(),
+    }
+
+
+def _tool_action_reconciliation_receipt_payload(
+    receipt: ToolActionReconciliationReceipt | None,
+) -> dict[str, object] | None:
+    if receipt is None:
+        return None
+    return {
+        "reconciliation_id": receipt.reconciliation_id,
+        "actor_id": receipt.actor_id,
+        "action_digest": receipt.action_digest,
+        "action_id": receipt.action_id,
+        "outcome": receipt.outcome.value,
+        "tool_execution_id": receipt.tool_execution_id,
         "issued_at": receipt.issued_at.isoformat(),
         "expires_at": receipt.expires_at.isoformat(),
         "consumed_at": receipt.consumed_at.isoformat(),

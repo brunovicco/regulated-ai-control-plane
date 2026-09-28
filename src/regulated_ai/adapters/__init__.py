@@ -44,6 +44,10 @@ from regulated_ai.adapters.read_only_tool_execution import (
     ReadOnlyHttpToolExecutionAdapter,
     ReadOnlyHttpToolExecutionConfig,
 )
+from regulated_ai.adapters.reconciliation import (
+    HmacToolActionReconciliationAdapter,
+    ToolActionReconciliationAssertionError,
+)
 from regulated_ai.adapters.release_custody import (
     ReleaseCustodyArtifactKind,
     ReleaseCustodyError,
@@ -118,6 +122,7 @@ __all__ = [
     "HmacActionApprovalAdapter",
     "HmacApprovalAdapter",
     "HmacTokenizationAdapter",
+    "HmacToolActionReconciliationAdapter",
     "MalformedYamlError",
     "MockInferenceExecutionAdapter",
     "MockToolExecutionAdapter",
@@ -141,6 +146,7 @@ __all__ = [
     "SqliteToolActionRepository",
     "StructuredEvaluationObserver",
     "TimestampSubjectKind",
+    "ToolActionReconciliationAssertionError",
     "ToolReviewBoundaryError",
     "TrustStoreAcknowledgementError",
     "TrustStoreCheckpointIdentity",

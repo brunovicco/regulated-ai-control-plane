@@ -259,8 +259,23 @@ arguments and raw output are not added to this public metadata contract.
 
 Returns action identity, trusted input/output schema, argument, action and result digests, workload
 identity, status, classifications, exposed field names and metadata-only approval/execution
-receipts. `safe_result` is always `null`; raw and minimized result values are never persisted or
-recoverable from this endpoint.
+receipts, including a reconciliation receipt when present. `safe_result` is always `null`; raw and
+minimized result values are never persisted or recoverable from this endpoint.
+
+## POST /v1/tool-actions/{action_id}/reconciliation
+
+Resolve only an action currently in `RECONCILIATION_REQUIRED`. The request contains one ephemeral
+`reconciliation_assertion` with the form
+`rr1.<base64url-canonical-json>.<base64url-hmac-sha256>`. Its strict payload contains
+`schema_version=1`, `subject_type=tool_action_reconciliation`, `reconciliation_id`, pseudonymous
+`actor_id`, exact `action_digest`, `outcome`, nullable `tool_execution_id`, `issued_at` and
+`expires_at`.
+
+`outcome=EXECUTED` requires a valid downstream execution identifier and produces
+`RECONCILED_EXECUTED`. `outcome=NOT_EXECUTED` requires a null identifier and produces
+`RECONCILED_NOT_EXECUTED`. Both are terminal. Exact replay is idempotent; another binding returns
+HTTP 409. Missing/invalid authority returns HTTP 403. The operation never invokes the tool port,
+restores output or schedules a retry. See `TOOL_ACTION_RECONCILIATION.md`.
 
 ## GET /v1/operator/enforcements/{enforcement_id}/timeline
 

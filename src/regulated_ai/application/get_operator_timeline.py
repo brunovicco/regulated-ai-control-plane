@@ -22,6 +22,7 @@ from regulated_ai.domain import (
     OperatorTimeline,
     OperatorTimelineStage,
     OperatorTimelineStageKind,
+    ToolActionReconciliationOutcome,
     ToolActionRecord,
     ToolActionStatus,
 )
@@ -111,6 +112,7 @@ class GetOperatorTimeline:
             action.enforcement_id != enforcement.enforcement_id
             or action.evaluation_id != enforcement.evaluation_id
             or not _action_approval_is_consistent(action)
+            or not _action_reconciliation_is_consistent(action)
             for action in actions
         ) or not _approval_is_consistent(enforcement.approval_receipt, enforcement, evidence):
             raise OperatorTimelineIntegrityError("Operator timeline metadata is inconsistent")
@@ -235,6 +237,27 @@ def _action_approval_is_consistent(action: ToolActionRecord) -> bool:
     return (
         receipt.action_id == action.action_id
         and receipt.action_digest == action.action_digest
+        and receipt.issued_at <= receipt.consumed_at <= receipt.expires_at
+    )
+
+
+def _action_reconciliation_is_consistent(action: ToolActionRecord) -> bool:
+    receipt = action.reconciliation_receipt
+    if receipt is None:
+        return action.status not in {
+            ToolActionStatus.RECONCILED_EXECUTED,
+            ToolActionStatus.RECONCILED_NOT_EXECUTED,
+        }
+    expected_status = (
+        ToolActionStatus.RECONCILED_EXECUTED
+        if receipt.outcome is ToolActionReconciliationOutcome.EXECUTED
+        else ToolActionStatus.RECONCILED_NOT_EXECUTED
+    )
+    return (
+        action.status is expected_status
+        and receipt.action_id == action.action_id
+        and receipt.action_digest == action.action_digest
+        and receipt.tool_execution_id == action.tool_execution_id
         and receipt.issued_at <= receipt.consumed_at <= receipt.expires_at
     )
 

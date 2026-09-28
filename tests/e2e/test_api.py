@@ -17,6 +17,7 @@ from regulated_ai.adapters import (
     HmacActionApprovalAdapter,
     HmacApprovalAdapter,
     HmacTokenizationAdapter,
+    HmacToolActionReconciliationAdapter,
     MockInferenceExecutionAdapter,
     MockToolExecutionAdapter,
     ReadOnlyHttpToolExecutionAdapter,
@@ -31,8 +32,9 @@ from regulated_ai.application import (
     EvaluateAiOperation,
     ExecuteToolAction,
     GetOperatorTimeline,
+    ReconcileToolAction,
 )
-from regulated_ai.domain import ToolProposal
+from regulated_ai.domain import ToolActionRecord, ToolActionStatus, ToolProposal
 from regulated_ai.entrypoints.api import (
     EvaluationRequest,
     Runtime,
@@ -41,10 +43,17 @@ from regulated_ai.entrypoints.api import (
     create_app,
 )
 
-from ..helpers import action_approval_assertion, approval_assertion, synthetic_cpf
+from ..helpers import (
+    NOW,
+    action_approval_assertion,
+    approval_assertion,
+    reconciliation_assertion,
+    synthetic_cpf,
+)
 
 APPROVAL_KEY = b"p" * 32
 ACTION_APPROVAL_KEY = b"r" * 32
+RECONCILIATION_KEY = b"s" * 32
 
 
 def _runtime(
@@ -97,6 +106,11 @@ def _runtime(
         approval=HmacActionApprovalAdapter(database_path, ACTION_APPROVAL_KEY),
         clock=lambda: datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
     )
+    action_reconciler = ReconcileToolAction(
+        actions=actions,
+        authority=HmacToolActionReconciliationAdapter(database_path, RECONCILIATION_KEY),
+        clock=lambda: NOW,
+    )
     return Runtime(
         control_pack=ControlPackIdentity(
             pack_id="synthetic-test-pack",
@@ -112,6 +126,7 @@ def _runtime(
         execution=mock,
         mock_execution=mock,
         action_executor=action_executor,
+        action_reconciler=action_reconciler,
         actions=actions,
         lifecycle_events=lifecycle_events,
         operator_timeline=GetOperatorTimeline(
@@ -354,6 +369,22 @@ def test_runtime_rejects_reusing_decision_key_for_action_approval(
         build_runtime(evidence_path=tmp_path / "approval-evidence.sqlite3")
 
 
+def test_runtime_reconciliation_key_is_dedicated_and_bounded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_RECONCILIATION_HMAC_KEY", "short")
+
+    with pytest.raises(ValueError, match="at least 32 bytes"):
+        build_runtime(evidence_path=tmp_path / "reconciliation-evidence.sqlite3")
+
+    shared_key = "shared-reconciliation-key-material-123456789"
+    monkeypatch.setenv("REGULAAI_RECONCILIATION_HMAC_KEY", shared_key)
+    monkeypatch.setenv("REGULAAI_ACTION_APPROVAL_HMAC_KEY", shared_key)
+
+    with pytest.raises(ValueError, match="must differ"):
+        build_runtime(evidence_path=tmp_path / "reconciliation-evidence.sqlite3")
+
+
 def test_enforcement_api_returns_only_metadata_after_mock_execution(tmp_path: Path) -> None:
     runtime = _runtime(tmp_path)
     app = create_app(lambda: runtime)
@@ -577,6 +608,52 @@ def test_action_api_requires_exact_post_inference_approval_and_keeps_payload_eph
     ):
         assert raw_result not in database
         assert raw_result not in completed_action.text
+
+
+def test_reconciliation_api_closes_ambiguity_without_tool_reexecution(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    record = runtime.actions.save(
+        ToolActionRecord(
+            action_id="act_reconciliation_api",
+            created_at=NOW,
+            enforcement_id="enf_reconciliation_api",
+            evaluation_id="eval_reconciliation_api",
+            call_id="call_reconciliation_api",
+            tool_name="cards.read",
+            tool_schema_version="1",
+            tool_schema_digest=f"sha256:{'1' * 64}",
+            arguments_digest=f"sha256:{'2' * 64}",
+            workload_identity="workload.cards-sandbox",
+            idempotency_key_digest=f"sha256:{'3' * 64}",
+            action_digest=f"sha256:{'4' * 64}",
+            status=ToolActionStatus.RECONCILIATION_REQUIRED,
+            output_schema_digest=f"sha256:{'5' * 64}",
+        )
+    )
+    assertion = reconciliation_assertion(RECONCILIATION_KEY, record.action_digest)
+    app = create_app(lambda: runtime)
+
+    with TestClient(app) as client:
+        reconciled = client.post(
+            f"/v1/tool-actions/{record.action_id}/reconciliation",
+            json={"reconciliation_assertion": assertion},
+        )
+        replayed = client.post(
+            f"/v1/tool-actions/{record.action_id}/reconciliation",
+            json={"reconciliation_assertion": assertion},
+        )
+        stored = client.get(f"/v1/tool-actions/{record.action_id}")
+
+    assert reconciled.status_code == 200
+    assert reconciled.json()["status"] == "RECONCILED_EXECUTED"
+    assert reconciled.json()["safe_result"] is None
+    assert reconciled.json()["reconciliation_receipt"]["outcome"] == "EXECUTED"
+    assert replayed.json() == reconciled.json()
+    assert stored.json()["reconciliation_receipt"] == reconciled.json()["reconciliation_receipt"]
+    assert runtime.mock_tool_execution is not None
+    assert runtime.mock_tool_execution.call_count == 0
+    database = (tmp_path / "evidence.sqlite3").read_bytes().decode(errors="ignore")
+    assert assertion not in database
 
 
 def test_operator_dashboard_handles_initial_and_missing_exact_id_states(tmp_path: Path) -> None:

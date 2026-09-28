@@ -286,6 +286,12 @@ chamador e envia o resultado não confiável para o schema fechado e as regras e
 mascaramento/remoção. O mock continua sendo o padrão. Consulte o
 [runbook do conector read-only](docs/READ_ONLY_ENTERPRISE_CONNECTOR.md).
 
+A Fase 7c adiciona reconciliação terminal com autenticação separada para resultados ambíguos de
+ferramentas. Uma asserção `rr1` de curta duração, vinculada à ação exata, pode registrar apenas
+execução confirmada ou não execução confirmada. O fluxo não pode chamar a ferramenta, recuperar
+output nem agendar retry. Consulte o
+[runbook de reconciliação](docs/TOOL_ACTION_RECONCILIATION.md).
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
@@ -456,6 +462,7 @@ Comece por:
 - [Custódia dos artefatos de release](docs/RELEASE_CUSTODY.md)
 - [Piloto de composição real](docs/LIVE_COMPOSITION_PILOT.md)
 - [Conector corporativo read-only](docs/READ_ONLY_ENTERPRISE_CONNECTOR.md)
+- [Reconciliação de ações de ferramentas](docs/TOOL_ACTION_RECONCILIATION.md)
 - [Roadmap](docs/MVP_ROADMAP.md)
 - [Fontes primárias](SOURCES.md)
 

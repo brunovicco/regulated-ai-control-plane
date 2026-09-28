@@ -66,6 +66,28 @@ Mitigations:
 - approval is consumed before the tool port and ambiguous failures are never retried automatically;
 - Phase 4c defaults to a network-silent mock; Phase 7b permits only the separately configured
   `cards.read` sandbox binding.
+- Phase 7c requires distinct `rr1` authority to declare an investigated outcome and has no tool-port
+  dependency.
+
+### Operator falsifies or replays reconciliation
+
+Threat:
+an unauthorized caller closes an ambiguous action, reuses execution approval as reconciliation,
+changes the outcome or causes a second tool execution.
+
+Mitigations:
+- `rr1` uses a dedicated key, prefix and strict canonical schema distinct from `ra1`/`ra2`;
+- the assertion binds exact action digest, pseudonymous actor, closed outcome, execution identifier
+  semantics, bounded lifetime and unique reconciliation id;
+- only `RECONCILIATION_REQUIRED` can transition, and reconciled states are terminal;
+- exact replay is idempotent while conflicting bindings fail closed;
+- the reconciliation use case has no `ToolExecutionPort` and cannot retry the action;
+- raw assertions, free-form notes, output and evidence URLs are neither accepted nor persisted.
+
+Residual risk:
+the HMAC verifier holds symmetric signing material, and the service does not provide organization
+identity or role enforcement. Deployments must isolate the dedicated key and protect the operator
+endpoint with their identity-aware perimeter. Issuers must not infer `NOT_EXECUTED` from a timeout.
 
 ### Tool result injects instructions or exfiltrates data
 
@@ -743,6 +765,8 @@ future asymmetric or OIDC adapter should remove signing capability from the enfo
   redirect, oversized body or malformed/duplicate/wrong-action response;
 - connector credential, exact arguments, idempotency key or raw output appears in logs, evidence or
   replay responses;
+- `ra1`/`ra2`, wrong-action, expired, malformed or conflicting `rr1` authority changes an action;
+- reconciliation triggers the tool adapter, invents result metadata or reopens a terminal action;
 - malformed, tampered, expired, future, wrong-digest or replayed approval assertion;
 - approval consumption fails after the execution claim;
 - decision approval is presented as action approval;

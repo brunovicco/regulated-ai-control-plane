@@ -204,6 +204,11 @@ result. Schema-invalid output becomes terminal `RESULT_REJECTED`; it is not retr
 downstream effect may already have occurred. State-changing enterprise-system connectors and model
 continuation remain disabled.
 
+If a tool call ends in `RECONCILIATION_REQUIRED`, do not resubmit the action. Follow
+`TOOL_ACTION_RECONCILIATION.md`: investigate the downstream audit trail, obtain a separately signed
+`rr1` assertion and call the exact action reconciliation endpoint. The terminal response contains
+metadata only and the reconciliation path never invokes the tool adapter.
+
 ## Inspect the operator timeline
 
 Use the exact enforcement identifier returned by the demo:

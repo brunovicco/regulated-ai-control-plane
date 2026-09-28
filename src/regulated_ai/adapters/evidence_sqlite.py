@@ -22,6 +22,8 @@ from regulated_ai.domain import (
     OperatorTimelineStageKind,
     ProviderCallMetadata,
     ProviderCapabilitySnapshot,
+    ToolActionReconciliationOutcome,
+    ToolActionReconciliationReceipt,
     ToolActionRecord,
     ToolActionStatus,
     ToolProposal,
@@ -145,6 +147,7 @@ CREATE TABLE IF NOT EXISTS tool_action (
     safe_output_digest TEXT,
     result_classifications TEXT NOT NULL DEFAULT '[]',
     exposed_result_fields TEXT NOT NULL DEFAULT '[]',
+    reconciliation_receipt TEXT,
     UNIQUE(enforcement_id, call_id)
 )
 """
@@ -154,8 +157,8 @@ INSERT INTO tool_action (
     tool_schema_version, tool_schema_digest, arguments_digest, workload_identity,
     idempotency_key_digest, action_digest, status, approval_receipt,
     tool_execution_id, output_digest, output_schema_digest, safe_output_digest,
-    result_classifications, exposed_result_fields
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    result_classifications, exposed_result_fields, reconciliation_receipt
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(action_id) DO UPDATE SET
     status=excluded.status,
     approval_receipt=excluded.approval_receipt,
@@ -163,7 +166,8 @@ ON CONFLICT(action_id) DO UPDATE SET
     output_digest=excluded.output_digest,
     safe_output_digest=excluded.safe_output_digest,
     result_classifications=excluded.result_classifications,
-    exposed_result_fields=excluded.exposed_result_fields
+    exposed_result_fields=excluded.exposed_result_fields,
+    reconciliation_receipt=excluded.reconciliation_receipt
 WHERE tool_action.enforcement_id=excluded.enforcement_id
   AND tool_action.evaluation_id=excluded.evaluation_id
   AND tool_action.call_id=excluded.call_id
@@ -176,11 +180,39 @@ WHERE tool_action.enforcement_id=excluded.enforcement_id
   AND tool_action.action_digest=excluded.action_digest
   AND tool_action.output_schema_digest IS excluded.output_schema_digest
   AND (
-      (tool_action.status='WAITING_APPROVAL' AND excluded.status IN ('WAITING_APPROVAL','PREPARED'))
+      (
+          tool_action.reconciliation_receipt IS excluded.reconciliation_receipt
+          AND (
+              (tool_action.status='WAITING_APPROVAL'
+               AND excluded.status IN ('WAITING_APPROVAL','PREPARED'))
+              OR (
+                  tool_action.status='DISPATCHED'
+                  AND excluded.status IN (
+                      'EXECUTED','APPROVAL_FAILED','RECONCILIATION_REQUIRED','RESULT_REJECTED'
+                  )
+              )
+          )
+      )
       OR (
-          tool_action.status='DISPATCHED'
-          AND excluded.status IN (
-              'EXECUTED','APPROVAL_FAILED','RECONCILIATION_REQUIRED','RESULT_REJECTED'
+          tool_action.status='RECONCILIATION_REQUIRED'
+          AND excluded.status IN ('RECONCILED_EXECUTED','RECONCILED_NOT_EXECUTED')
+          AND tool_action.reconciliation_receipt IS NULL
+          AND excluded.reconciliation_receipt IS NOT NULL
+          AND tool_action.approval_receipt IS excluded.approval_receipt
+          AND tool_action.output_digest IS excluded.output_digest
+          AND tool_action.safe_output_digest IS excluded.safe_output_digest
+          AND tool_action.result_classifications=excluded.result_classifications
+          AND tool_action.exposed_result_fields=excluded.exposed_result_fields
+          AND (
+              (
+                  excluded.status='RECONCILED_EXECUTED'
+                  AND tool_action.tool_execution_id IS NULL
+                  AND excluded.tool_execution_id IS NOT NULL
+              )
+              OR (
+                  excluded.status='RECONCILED_NOT_EXECUTED'
+                  AND tool_action.tool_execution_id IS excluded.tool_execution_id
+              )
           )
       )
   )
@@ -695,6 +727,8 @@ class SqliteToolActionRepository:
                     "ALTER TABLE tool_action ADD COLUMN "
                     "exposed_result_fields TEXT NOT NULL DEFAULT '[]'"
                 )
+            if "reconciliation_receipt" not in columns:
+                connection.execute("ALTER TABLE tool_action ADD COLUMN reconciliation_receipt TEXT")
             _initialize_tool_action_events(connection)
 
     def save(self, record: ToolActionRecord) -> ToolActionRecord:
@@ -720,6 +754,7 @@ class SqliteToolActionRepository:
             record.safe_output_digest,
             _json(tuple(item.value for item in record.result_classifications)),
             _json(record.exposed_result_fields),
+            _tool_action_reconciliation_receipt_json(record.reconciliation_receipt),
         )
         with self._connect() as connection:
             connection.execute(_TOOL_ACTION_UPSERT, values)
@@ -856,6 +891,7 @@ def _tool_action_record(row: tuple[object, ...]) -> ToolActionRecord:
             ToolResultClassification(item) for item in _string_tuple(row[18])
         ),
         exposed_result_fields=_string_tuple(row[19]),
+        reconciliation_receipt=_tool_action_reconciliation_receipt(row[20]),
     )
 
 
@@ -1102,6 +1138,70 @@ def _action_approval_receipt(value: object) -> ActionApprovalReceipt | None:
         actor_id=parsed["actor_id"],
         action_digest=parsed["action_digest"],
         action_id=parsed["action_id"],
+        issued_at=datetime.fromisoformat(parsed["issued_at"]),
+        expires_at=datetime.fromisoformat(parsed["expires_at"]),
+        consumed_at=datetime.fromisoformat(parsed["consumed_at"]),
+    )
+
+
+def _tool_action_reconciliation_receipt_json(
+    receipt: ToolActionReconciliationReceipt | None,
+) -> str | None:
+    if receipt is None:
+        return None
+    return json.dumps(
+        {
+            "action_digest": receipt.action_digest,
+            "action_id": receipt.action_id,
+            "actor_id": receipt.actor_id,
+            "consumed_at": receipt.consumed_at.isoformat(),
+            "expires_at": receipt.expires_at.isoformat(),
+            "issued_at": receipt.issued_at.isoformat(),
+            "outcome": receipt.outcome.value,
+            "reconciliation_id": receipt.reconciliation_id,
+            "tool_execution_id": receipt.tool_execution_id,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _tool_action_reconciliation_receipt(
+    value: object,
+) -> ToolActionReconciliationReceipt | None:
+    if value is None:
+        return None
+    parsed = json.loads(str(value))
+    string_fields = {
+        "action_digest",
+        "action_id",
+        "actor_id",
+        "consumed_at",
+        "expires_at",
+        "issued_at",
+        "outcome",
+        "reconciliation_id",
+    }
+    expected = {*string_fields, "tool_execution_id"}
+    if (
+        not isinstance(parsed, dict)
+        or set(parsed) != expected
+        or not all(isinstance(parsed[key], str) for key in string_fields)
+        or (
+            parsed["tool_execution_id"] is not None
+            and not isinstance(parsed["tool_execution_id"], str)
+        )
+    ):
+        raise ValueError("Stored tool-action reconciliation receipt is invalid")
+    from datetime import datetime
+
+    return ToolActionReconciliationReceipt(
+        reconciliation_id=parsed["reconciliation_id"],
+        actor_id=parsed["actor_id"],
+        action_digest=parsed["action_digest"],
+        action_id=parsed["action_id"],
+        outcome=ToolActionReconciliationOutcome(parsed["outcome"]),
+        tool_execution_id=parsed["tool_execution_id"],
         issued_at=datetime.fromisoformat(parsed["issued_at"]),
         expires_at=datetime.fromisoformat(parsed["expires_at"]),
         consumed_at=datetime.fromisoformat(parsed["consumed_at"]),

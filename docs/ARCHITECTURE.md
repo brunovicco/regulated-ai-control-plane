@@ -36,6 +36,11 @@ Phase 7b replaces the mock tool port only when explicitly configured. The live a
 existing action claim and approval consumption, then returns untrusted output to the unchanged
 closed-schema validation/minimization use case.
 
+Phase 7c adds a separate operator authority boundary after ambiguous tool execution. A signed
+`rr1` assertion can advance only `RECONCILIATION_REQUIRED` to one reconciled terminal state. The
+use case depends on action metadata and reconciliation authority, not on the tool port, so recovery
+cannot re-execute the action.
+
 ## Layers
 
 ```text
@@ -446,6 +451,22 @@ approved cards.read action + exact arguments/idempotency/workload
 
 Transport ambiguity remains `RECONCILIATION_REQUIRED`; invalid content remains `RESULT_REJECTED`.
 See [ADR-0037](adr/0037-bound-read-only-enterprise-sandbox-connector.md).
+
+## Phase 7c components
+
+- `adapters/reconciliation.py`: strict `rr1` verification and exact-binding consumption ledger.
+- `application/reconcile_tool_action.py`: authorized terminal transition without execution access.
+- `adapters/evidence_sqlite.py`: irreversible receipt persistence and lifecycle transition.
+- `entrypoints/api.py`: exact-action reconciliation endpoint and dedicated-key composition.
+
+```text
+external investigation -> signed rr1(action digest + closed outcome)
+    -> verify dedicated authority -> consume exact binding
+    -> RECONCILIATION_REQUIRED -> RECONCILED_EXECUTED | RECONCILED_NOT_EXECUTED
+    -> metadata receipt + lifecycle event (no tool call, result recovery or retry)
+```
+
+See [ADR-0038](adr/0038-authenticated-terminal-tool-reconciliation.md).
 
 ## Phase 4c components
 

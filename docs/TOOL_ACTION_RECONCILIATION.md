@@ -1,0 +1,89 @@
+# Tool-action reconciliation
+
+Phase 7c provides a terminal, authenticated operation for tool actions whose downstream outcome is
+ambiguous. It records an independently verified operator conclusion and never invokes the tool
+adapter again.
+
+## Authority contract
+
+The endpoint accepts only an externally issued canonical assertion:
+
+```text
+rr1.<base64url-canonical-json>.<base64url-hmac-sha256>
+```
+
+Its exact payload is:
+
+```json
+{
+  "action_digest": "sha256:...",
+  "actor_id": "operator-pseudonym",
+  "expires_at": 1790597100,
+  "issued_at": 1790596800,
+  "outcome": "EXECUTED",
+  "reconciliation_id": "reconciliation-...",
+  "schema_version": "1",
+  "subject_type": "tool_action_reconciliation",
+  "tool_execution_id": "sandbox-execution-..."
+}
+```
+
+`outcome` is exactly `EXECUTED` or `NOT_EXECUTED`. `EXECUTED` requires a bounded downstream
+execution identifier. `NOT_EXECUTED` requires `tool_execution_id: null`. Free-form notes, output,
+arguments, URLs and retry instructions are not accepted.
+
+Configure a secret of at least 32 bytes through `REGULAAI_RECONCILIATION_HMAC_KEY`. It must differ
+from the `ra1` decision and `ra2` action-approval keys. Issuance remains in an external,
+organization-controlled operator workflow. The service does not mint assertions.
+
+## Operation
+
+Call:
+
+```text
+POST /v1/tool-actions/{action_id}/reconciliation
+```
+
+with:
+
+```json
+{"reconciliation_assertion": "rr1...."}
+```
+
+The action must already be `RECONCILIATION_REQUIRED`, and the signed `action_digest` must match its
+immutable binding. A valid assertion advances it atomically to:
+
+- `RECONCILED_EXECUTED`; or
+- `RECONCILED_NOT_EXECUTED`.
+
+Both states are terminal. Exact replay of the same assertion returns the stored result; a different
+outcome or reconciliation identifier conflicts. The operation never reconstructs arguments,
+returns tool output, changes result digests or calls `ToolExecutionPort`.
+
+## Operator procedure
+
+1. Locate one exact action through its metadata-only action record or operator timeline.
+2. Verify the downstream sandbox audit trail using the stored action digest, idempotency digest,
+   workload identity and any organization-owned correlation evidence.
+3. Have the separate issuer sign exactly one closed outcome and, for `EXECUTED`, the confirmed
+   downstream execution identifier.
+4. Submit the assertion once and verify the terminal status and reconciliation receipt.
+5. Confirm the operator timeline no longer reports reconciliation attention.
+
+The issuer must not infer an outcome from a timeout alone. When downstream evidence is insufficient,
+leave the action in `RECONCILIATION_REQUIRED`.
+
+## Security and operations
+
+- protect the endpoint with the deployment's operator authentication and network controls in
+  addition to the signed assertion;
+- keep the HMAC key and raw assertion out of files, logs, traces, screenshots and evidence;
+- use pseudonymous bounded actor identifiers and short assertion lifetimes;
+- rotate the reconciliation key independently from approval keys;
+- preserve the SQLite database because it contains the consumption ledger and terminal receipt;
+- do not interpret `RECONCILED_EXECUTED` as validated output: no raw or safe result is recovered;
+- do not create an automatic retry from `RECONCILED_NOT_EXECUTED`; any future retry requires a new,
+  separately designed action contract.
+
+The local SQLite implementation is a single-instance reference. Multi-replica production rollout
+still requires a production persistence and transaction design.
