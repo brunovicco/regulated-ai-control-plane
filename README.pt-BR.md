@@ -256,6 +256,21 @@ originais. Ela vincula o imprint exato do artefato, nonce e política permitida,
 verificação da assinatura CMS, EKU de timestamp e cadeia PKIX no instante declarado. Aquisição,
 seleção de provedor, revogação online e renovação de evidência de longo prazo permanecem externas.
 
+A Fase 6r empacota evidências permitidas e somente com metadados em um OCI image layout
+determinístico. Index, manifesto e configuração canônicos vinculam a referência normalizada a
+layers SHA-256 content-addressed; a verificação offline rejeita conteúdo alterado, ausente ou não
+rastreado. Transporte, controle de acesso, assinatura e retenção no registry continuam externos.
+
+A Fase 6s adiciona uma referência Kustomize não aplicada para Kubernetes/OpenShift, cobrindo o
+serviço e a verificação periódica do estado de trust do runtime. A imagem é substituída por digest,
+a autoridade vem de PVC/ConfigMap/Secret externos, os containers são restritos e non-root, e o
+egress é negado por padrão. A referência com SQLite permanece intencionalmente em uma réplica.
+
+A Fase 6t emite metadados permitidos do ciclo de controle como envelopes estruturados CloudEvents
+1.0 e, quando configurado explicitamente, os correlaciona com spans OTLP limitados. Conteúdo de
+prompt/resposta/ferramenta, credenciais, atributos arbitrários e baggage são excluídos. Sem endpoint,
+nenhum exporter ou caminho de rede é criado; falhas de observabilidade não alteram decisões.
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;

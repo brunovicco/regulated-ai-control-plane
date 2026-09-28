@@ -244,6 +244,21 @@ It binds the exact artifact imprint, nonce and allowlisted policy, then delegate
 timestamping EKU and PKIX-chain verification at the asserted time to OpenSSL. Timestamp acquisition,
 provider selection, online revocation and long-term evidence renewal remain deployment concerns.
 
+Phase 6r packages allowlisted metadata evidence in a deterministic OCI image layout. Canonical
+index, manifest and config documents bind normalized package references and content-addressed
+SHA-256 layers, while offline verification rejects changed, missing or untracked content. Registry
+transport, access control, artifact signing and retention remain external deployment controls.
+
+Phase 6s adds a non-applied Kubernetes/OpenShift Kustomize reference for the control-plane service
+and periodic runtime trust-state verifier. It pins the image through the Kustomize digest field,
+mounts authority from external PVC/ConfigMap/Secret objects, uses restricted non-root contexts and
+denies egress by default. The SQLite reference intentionally remains a single replica.
+
+Phase 6t emits allowlisted control lifecycle metadata as CloudEvents 1.0 structured envelopes and,
+when explicitly configured, correlates them with bounded OTLP spans. Prompt/response/tool content,
+credentials, arbitrary attributes and baggage are excluded. With no endpoint, no exporter or
+network path is created; observability failure never changes a policy result.
+
 Not implemented in the first slice:
 
 - direct provider SDK adapters;

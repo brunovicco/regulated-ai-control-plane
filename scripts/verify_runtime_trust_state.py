@@ -38,7 +38,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--runtime-policy", type=Path, required=True)
     parser.add_argument("--attestation-trust-store", type=Path, required=True)
     parser.add_argument("--attestation", type=Path, action="append", default=[])
-    parser.add_argument("--evaluated-at", required=True)
+    parser.add_argument("--attestation-directory", type=Path, action="append", default=[])
+    evaluation_time = parser.add_mutually_exclusive_group(required=True)
+    evaluation_time.add_argument("--evaluated-at")
+    evaluation_time.add_argument("--evaluated-at-now", action="store_true")
     args = parser.parse_args(argv)
 
     try:
@@ -52,8 +55,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             expected_checkpoint_digest=args.expected_checkpoint_digest,
         )
         policy = load_runtime_trust_state_policy(args.runtime_policy)
+        attestation_paths = tuple(args.attestation) + tuple(
+            path
+            for directory in args.attestation_directory
+            for path in _attestation_paths(directory)
+        )
         attestations = verify_runtime_trust_state_attestations(
-            tuple(args.attestation), args.attestation_trust_store
+            attestation_paths, args.attestation_trust_store
         )
         report = VerifyRuntimeTrustState().execute(
             checkpoint_digest=checkpoint.checkpoint_digest,
@@ -64,7 +72,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             sequence=checkpoint.sequence,
             policy=policy,
             attestations=attestations,
-            evaluated_at=_parse_utc(args.evaluated_at),
+            evaluated_at=datetime.now(UTC)
+            if args.evaluated_at_now
+            else _parse_utc(args.evaluated_at),
         )
     except (
         RuntimeTrustStateError,
@@ -87,6 +97,18 @@ def _parse_utc(value: str) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
         raise ValueError("Runtime evaluation time must be timezone-aware UTC")
     return parsed
+
+
+def _attestation_paths(directory: Path) -> tuple[Path, ...]:
+    if directory.is_symlink() or not directory.is_dir():
+        raise ValueError("Runtime attestation directory is not allowed")
+    entries = tuple(sorted(directory.iterdir(), key=lambda item: item.name))
+    if any(
+        item.is_symlink() or not item.is_file() or item.suffix.lower() not in {".yaml", ".yml"}
+        for item in entries
+    ):
+        raise ValueError("Runtime attestation directory contains an invalid entry")
+    return entries
 
 
 def _report_payload(report: RuntimeTrustStateReport) -> dict[str, object]:

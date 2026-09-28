@@ -336,6 +336,70 @@ deployment-supplied CA bundle. No network, timestamp acquisition or online revoc
 
 See [ADR-0032](adr/0032-offline-rfc3161-timestamp-verification.md).
 
+## Phase 6r components
+
+- `adapters/oci_evidence.py`: deterministic OCI image-layout creation, reference resolution and
+  complete descriptor/blob verification.
+- `scripts/manage_oci_evidence.py`: local create/verify command with metadata-only identity output.
+- `docs/OCI_EVIDENCE.md`: transport, registry and signing boundary runbook.
+
+```text
+allowlisted metadata artifacts + normalized reference + explicit UTC time
+    -> canonical OCI index + evidence manifest/config + SHA-256 layers
+    -> complete descriptor/digest/inventory verification
+    -> portable local layout identity or fail closed
+```
+
+The adapter produces and consumes a local OCI layout only. It has no registry client, credentials or
+network path and does not treat transport availability or registry ACLs as evidence integrity.
+
+See [ADR-0033](adr/0033-provider-neutral-oci-evidence-artifacts.md).
+
+## Phase 6s components
+
+- `Dockerfile`: non-root production API entrypoint with access logs disabled.
+- `deploy/kubernetes`: restricted single-replica service, storage, service, policies and offline
+  runtime-state verification CronJob.
+- `deploy/openshift`: overlay that lets the platform restricted SCC allocate runtime identities.
+- `scripts/verify_runtime_trust_state.py`: sorted directory discovery and current-UTC scheduler mode
+  in addition to the reproducible explicit-time mode.
+- `docs/KUBERNETES_DEPLOYMENT.md`: authority injection, rendering and rollout boundary.
+
+```text
+verified image digest + external signed pack/trust/secrets + persistent state
+    -> restricted single-replica API with default-deny egress
+mounted checkpoint/policy/attestations + explicit current UTC
+    -> network-silent CronJob -> metadata-only current/blocked report
+```
+
+The manifests are a reference and are never applied by repository tooling. They do not provision
+clusters, registries, identity providers, secrets, storage classes or external alert delivery.
+
+See [ADR-0034](adr/0034-kubernetes-openshift-deployment-reference.md).
+
+## Phase 6t components
+
+- `adapters/evaluation_observability.py`: allowlisted CloudEvents 1.0 envelope and safe span mapping.
+- `adapters/observability.py`: opt-in OTLP HTTP tracing, bounded attributes, W3C trace context and
+  lifecycle isolation.
+- `entrypoints/api.py`: structured-log configuration before composition plus bounded telemetry
+  flush/shutdown.
+- `docs/CLOUDEVENTS_OTLP.md`: event schema, configuration and collector boundary.
+
+```text
+allowlisted lifecycle event + bounded identifier metadata
+    -> CloudEvent 1.0 structured envelope -> JSON structured log
+    -> bounded control.lifecycle span -> optional OTLP HTTP exporter
+unknown/content-bearing fields -> dropped
+sink/exporter unavailable -> business decision unchanged
+```
+
+No broker client is included. An OTLP endpoint activates exporter construction only when the
+observability extra is installed; the deployment image includes that extra but configures no
+endpoint or egress by default.
+
+See [ADR-0035](adr/0035-metadata-only-cloudevents-and-otlp.md).
+
 ## Phase 4c components
 
 - `application/execute_tool_action.py`: exact schema/digest validation, action binding, atomic claim

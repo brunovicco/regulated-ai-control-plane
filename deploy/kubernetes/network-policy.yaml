@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: regulaai-control-plane-default
+  labels:
+    app.kubernetes.io/name: regulaai-control-plane
+    app.kubernetes.io/part-of: regulaai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: regulaai-control-plane
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              regulaai.openai.com/client: "true"
+      ports:
+        - port: 8000
+          protocol: TCP
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: regulaai-runtime-trust-verifier-default
+  labels:
+    app.kubernetes.io/name: regulaai-runtime-trust-verifier
+    app.kubernetes.io/part-of: regulaai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: regulaai-runtime-trust-verifier
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []

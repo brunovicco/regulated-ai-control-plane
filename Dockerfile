@@ -16,16 +16,16 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project --no-dev
+    uv sync --frozen --no-install-project --no-dev --extra observability
 
 COPY . /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --extra observability
 
 FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91
 
-RUN groupadd --system app && useradd --system --gid app --no-create-home app
+RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
 
 WORKDIR /app
 
@@ -37,7 +37,6 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 USER app
 
-# Replace this framework-neutral placeholder with the project's entrypoint, for example:
-#   CMD ["uvicorn", "regulated_ai.entrypoints.http:app", "--host", "0.0.0.0", "--port", "8000"]
-#   CMD ["python", "-m", "regulated_ai"]
-CMD ["python", "-c", "import regulated_ai; print(regulated_ai.__doc__)"]
+EXPOSE 8000
+
+CMD ["uvicorn", "regulated_ai.entrypoints.api:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

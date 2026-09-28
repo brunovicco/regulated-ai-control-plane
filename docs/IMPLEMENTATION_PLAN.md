@@ -1,5 +1,81 @@
 # Implementation plan
 
+## Phase 6t — metadata-only CloudEvents and OTLP export
+
+### Goal
+
+Represent control lifecycle events as portable CloudEvents 1.0 and correlate them with opt-in OTLP
+traces without allowing observability availability or payloads to influence policy decisions.
+
+### Work
+
+1. Convert only allowlisted lifecycle names and bounded metadata into CloudEvents structured JSON.
+2. Emit stable source/type, generated event id and timezone-aware UTC time without request content.
+3. Map CloudEvent context plus operation/outcome to a bounded OpenTelemetry span surface.
+4. Initialize optional OTLP tracing only when an endpoint is explicitly configured.
+5. Configure structured logging before runtime composition and bound flush/shutdown at API exit.
+6. Isolate sink/exporter setup, emit, flush and shutdown failures from business outcomes.
+7. Package the observability extra in the deployment image while retaining network-silent defaults.
+8. Add tests, operating guidance and ADR-0035.
+
+### Decisions and assumptions
+
+- CloudEvents are written as a nested structured-log envelope; external broker delivery is not
+  implemented.
+- OTLP uses the existing HTTP/protobuf trace exporter and never propagates baggage.
+- Endpoint identity, TLS/auth, retention, sampling, collector tenancy and network egress are
+  deployment-owned controls.
+
+## Phase 6s — Kubernetes and OpenShift deployment reference
+
+### Goal
+
+Provide a security-restricted, digest-pinned deployment reference for the control plane and periodic
+offline runtime trust-state verification without applying resources or selecting a cluster provider.
+
+### Work
+
+1. Run the packaged FastAPI service with a real non-root container entrypoint.
+2. Define a Kustomize base with one SQLite-safe replica, persistent state and signed-pack mounts.
+3. Reference runtime secrets and trust material without committing their values.
+4. Add restricted pod/container contexts, bounded resources, health probes and no service-account
+   token.
+5. Deny egress by default and limit service ingress to explicitly labeled clients.
+6. Add a bounded CronJob that discovers mounted attestations and emits metadata-only runtime-state
+   verification reports.
+7. Add an OpenShift overlay that delegates runtime UID/GID ranges to the restricted SCC.
+8. Add manifest contract tests, deployment guidance and ADR-0034.
+
+### Decisions and assumptions
+
+- Image name/digest, PVC population, ConfigMaps and Secrets must be supplied by deployment controls.
+- The default remains network-silent mock mode; gateway egress requires a separately reviewed
+  overlay.
+- SQLite requires one replica with `Recreate`; horizontal availability needs a persistence redesign.
+
+## Phase 6r — provider-neutral OCI evidence artifacts
+
+### Goal
+
+Package metadata-only release evidence as a deterministic, content-addressed OCI image layout that
+can be transported by approved OCI tooling without selecting or contacting a registry.
+
+### Work
+
+1. Build an OCI image-layout directory with canonical index, manifest, config and SHA-256 blobs.
+2. Bind a normalized package reference, explicit UTC creation time and allowlisted artifact kinds.
+3. Preserve artifact names/types only as bounded OCI annotations and config metadata.
+4. Verify every descriptor, digest, size, layer/config binding and the exact tracked blob inventory.
+5. Reject unsafe names, symlinks, private-key markers, untracked files and overwrite attempts.
+6. Add create/verify CLI coverage, operating guidance and ADR-0033.
+
+### Decisions and assumptions
+
+- The layout uses OCI image manifest/index media types and a RegulaAI evidence artifact type.
+- Creation and verification are local, deterministic and network-silent.
+- Registry push/pull, authentication, authorization, signing, retention and availability remain
+  deployment-owned concerns.
+
 ## Phase 6q — offline RFC 3161 timestamp verification
 
 ### Goal

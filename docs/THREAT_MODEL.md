@@ -323,6 +323,79 @@ Residual risks:
 - a compromised or dishonest timestamp authority can assert false time;
 - acquisition availability, immutable retention and long-term archival renewal remain external.
 
+### OCI evidence distribution changes or adds artifacts
+
+Threat:
+a transported package changes a layer, rewrites its kind/name/reference metadata, omits required
+content, adds untracked blobs or carries private-key material into a registry.
+
+Mitigations:
+- Phase 6r binds one normalized package reference and explicit UTC time through canonical OCI index,
+  manifest and config documents;
+- every allowlisted JSON/YAML layer is SHA-256 content-addressed with exact media type, size, kind and
+  safe basename binding;
+- verification walks the complete blob inventory and rejects missing, changed, symlinked,
+  unsupported-algorithm or untracked entries;
+- bounded inputs and common PEM private-key markers fail closed before creation and after transport.
+
+Residual risks:
+- marker matching is not general secret detection and an operator can still package wrongly
+  classified metadata;
+- the local layout is unsigned; registry compromise, tag movement and transport substitution require
+  digest pinning and an organization-approved OCI signing/verification control;
+- registry ACLs, authentication, availability, retention, replication and deletion remain external.
+
+### Cluster deployment broadens authority or weakens evidence state
+
+Threat:
+a mutable image, injected service-account token, writable root filesystem, broad network access,
+embedded secret or multiple SQLite writers weakens the control boundary; stale runtime assertions
+may also be mistaken for a live probe.
+
+Mitigations:
+- Phase 6s requires image substitution by SHA-256 digest and references secrets/trust/pack volumes
+  without embedding their values;
+- service-account tokens are disabled, containers are non-root with read-only roots, dropped
+  capabilities, bounded resources and restricted seccomp profiles;
+- NetworkPolicies deny verifier traffic and control-plane egress while limiting ingress to labeled
+  clients;
+- the SQLite deployment is exactly one replica with `Recreate`, state PVC and health probes;
+- the CronJob reads a mounted checkpoint/policy/attestation set, verifies it offline and treats a
+  blocked result as a failed job rather than mutating workloads.
+
+Residual risks:
+- the example image digest is deliberately non-routable and deployment automation must replace and
+  independently verify it before apply;
+- PVC population, CSI permissions, Secret/ConfigMap integrity, admission, node security, backup,
+  alerting and cluster control-plane availability remain external;
+- signed assertions depend on target/signer integrity and are not independent continuous probes;
+- gateway mode requires reviewed egress/DNS/credential overlays and is unsafe with the default
+  network policy unchanged.
+
+### Observability exports sensitive content or controls availability
+
+Threat:
+an event/span includes prompt, response, credential, personal data, arbitrary URL or exception
+detail; forged baggage crosses trust boundaries; or collector failure blocks a policy decision.
+
+Mitigations:
+- Phase 6t accepts only stable lifecycle event names and a small bounded metadata allowlist;
+- CloudEvent source/type are fixed, event ids are generated, time must be timezone-aware UTC and
+  unsafe fields are dropped before serialization;
+- the safe tracer limits resource/span/link/event attributes, redacts unsafe names, omits status
+  descriptions and records only exception type;
+- W3C trace context propagates `traceparent`/`tracestate` but never baggage;
+- exporter construction is opt-in and emit/setup/flush/shutdown failures are isolated and bounded;
+- the deployment has no OTLP endpoint or egress by default.
+
+Residual risks:
+- allowed organization identifiers may still be sensitive operational metadata and need scoped
+  collector/log access;
+- a deployment can misconfigure OTLP TLS/auth, collector tenancy, sampling, routing or retention;
+- structured log transport can duplicate, reorder or drop CloudEvents and is not an audit ledger;
+- observability isolation means collector outage requires independent monitoring rather than
+  failing policy execution.
+
 ### Release evidence is lost, altered or archived with secrets
 
 Threat:

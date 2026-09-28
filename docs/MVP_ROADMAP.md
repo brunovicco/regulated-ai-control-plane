@@ -177,6 +177,9 @@ future distribution systems. Phase 6n adds signed consumer acknowledgement cover
 Phase 6o adds fresh signed target assertions for the exact loaded trust-store digest.
 Phase 6p adds offline verification for provider-neutral signed external time-authority receipts.
 Phase 6q adds offline RFC 3161 verification with exact request, artifact and PKIX trust binding.
+Phase 6r adds deterministic OCI image-layout packaging and offline content-addressed verification.
+Phase 6s adds restricted Kubernetes/OpenShift service and runtime-state verifier references.
+Phase 6t adds metadata-only CloudEvents and opt-in OTLP trace export.
 
 Explore:
 - signed policy/provider packs; **implemented in Phase 6a**
@@ -193,6 +196,9 @@ Explore:
 - signed runtime trust-state attestations; **implemented in Phase 6o**
 - provider-neutral signed time-authority receipt verification; **implemented in Phase 6p**
 - standards-based RFC 3161 timestamp verification; **implemented in Phase 6q**
+- provider-neutral OCI evidence artifacts; **implemented in Phase 6r**
+- Kubernetes/OpenShift deployment reference; **implemented in Phase 6s**
+- CloudEvents and OTLP observability contract; **implemented in Phase 6t**
 - enterprise integrations;
 - additional sectors.
 
@@ -290,6 +296,30 @@ Implemented in Phase 6q:
 - OpenSSL CMS signature, timestamping EKU and PKIX-chain verification at generation time;
 - explicit evaluation time, optional minimum generation time and metadata-only report;
 - no acquisition, provider selection, online revocation or long-term evidence-renewal claim.
+
+Implemented in Phase 6r:
+- canonical OCI index, evidence manifest/config and SHA-256 artifact layers;
+- normalized package reference, explicit UTC time and allowlisted artifact-kind binding;
+- complete descriptor, digest, size, metadata and tracked-blob inventory verification;
+- bounded JSON/YAML inputs with safe names, no symlinks and private-key marker rejection;
+- no registry access, credentials, transport policy, signing, retention or availability claim.
+
+Implemented in Phase 6s:
+- real non-root API container entrypoint and digest-substituted Kustomize image;
+- restricted single-replica SQLite service with external state, signed-pack, trust and secret mounts;
+- startup/readiness/liveness probes, resource limits, no token and read-only root filesystem;
+- default-deny egress, labeled-client ingress and network-silent verifier policy;
+- periodic mounted-attestation discovery and offline runtime trust-state verification;
+- OpenShift restricted-SCC overlay with no cluster mutation or provider-specific operator.
+
+Implemented in Phase 6t:
+- CloudEvents 1.0 envelopes for stable allowlisted lifecycle events and bounded metadata;
+- deterministic structured JSON encoding with generated event id and explicit UTC time;
+- safe CloudEvent-to-span mapping over opt-in OTLP HTTP/protobuf export;
+- structured logging before runtime composition and bounded flush/shutdown on API exit;
+- no exporter without an endpoint, no baggage/content fields and no business failure on telemetry
+  failure;
+- no broker delivery, collector provisioning, retention or audit-ledger claim.
 
 Implemented in Phase 6d:
 - authenticated approved-base selection and exact-byte candidate binding;

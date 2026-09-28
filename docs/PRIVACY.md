@@ -115,6 +115,19 @@ Complete this document before processing personal or regulated data.
   policy OID, serial number and UTC generation time. They exclude artifact bytes, certificate
   subjects, credentials, private keys, people and customer data. Original DER inputs and CA bundles
   remain controlled evidence outside the report.
+- Phase 6r layouts contain the allowlisted metadata artifact bytes being distributed plus bounded
+  kind, filename, package-reference, UTC time, media-type, size and digest metadata. They reject
+  common private-key markers but are not general secret scanners. Do not package prompts, responses,
+  source content, credentials, personal data or production payloads.
+- Phase 6s manifests contain only non-personal workload/resource names, paths and configuration
+  references. Secret values are never present. The verifier CronJob writes metadata-only trust-state
+  reports to container stdout; cluster log retention and access must exclude personal/runtime
+  payloads and follow organization policy.
+- Phase 6t CloudEvents contain generated event id, stable source/type, UTC time and a bounded
+  allowlist of control identifiers/outcomes. OTLP spans contain only the event identity/type/source,
+  operation and bounded outcome. Prompts, responses, data values, tool arguments/results, URLs,
+  credentials, people, exception messages/stacks and baggage are excluded. Collector/log access,
+  residency, retention and deletion require an approved deployment privacy assessment.
 - Incident-response owner:
 
 ## Prohibited logging
