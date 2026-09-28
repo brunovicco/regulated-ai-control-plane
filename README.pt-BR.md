@@ -2,7 +2,7 @@
 
 [![Python 3.13-3.14](https://img.shields.io/badge/Python-3.13--3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Licença: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status: Pre-Alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status-do-projeto)
+[![Status: Piloto controlado](https://img.shields.io/badge/status-piloto%20controlado-blue)](#status-do-projeto)
 
 > Control plane regulatório multi-provider para IA corporativa, começando por LGPD, ANPD e requisitos do setor financeiro brasileiro.
 
@@ -93,8 +93,14 @@ Obrigações iniciais:
 
 ## Status do projeto
 
-**Pre-alpha com avaliação determinística, enforcement local, aprovações de decisão e ação
-vinculadas a digests, catálogo confiável de ferramentas e adapter opt-in via gateway governado.**
+**Release de piloto controlado com avaliação determinística, enforcement local, aprovações de
+decisão e ação vinculadas a digests, catálogo confiável de ferramentas, adapter opt-in via gateway
+governado e um conector corporativo read-only vinculado ao sandbox.**
+
+O perfil suportado de `v0.1.0rc1` é single-tenant, single-replica e não produtivo. O modo mock
+continua sendo o padrão seguro. Os caminhos de provider e conector corporativo reais são
+integrações opt-in de escopo fixo, somente para dados sintéticos e sistemas sandbox. Consulte o
+[perfil do release de piloto controlado](docs/PILOT_RELEASE.md) antes de operar esta versão.
 
 Objetivo atual:
 
@@ -460,6 +466,7 @@ Comece por:
 - [Estratégia de evals](docs/EVAL_STRATEGY.md)
 - [Ciclo de vida das chaves de verificação](docs/TRUST_KEY_LIFECYCLE.md)
 - [Custódia dos artefatos de release](docs/RELEASE_CUSTODY.md)
+- [Perfil do release de piloto controlado](docs/PILOT_RELEASE.md)
 - [Piloto de composição real](docs/LIVE_COMPOSITION_PILOT.md)
 - [Conector corporativo read-only](docs/READ_ONLY_ENTERPRISE_CONNECTOR.md)
 - [Reconciliação de ações de ferramentas](docs/TOOL_ACTION_RECONCILIATION.md)

@@ -4,48 +4,45 @@ All notable changes to **Regulated AI Control Plane** will be documented in this
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project intends to use [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once tagged releases begin.
 
-The project is currently **pre-alpha**. Until the first release, breaking changes may occur under `Unreleased`.
+The project is currently a **controlled pilot**. Breaking changes may occur before the stable
+`v0.1.0` release.
 
 ## [Unreleased]
 
+## [0.1.0rc1] - 2026-09-28
+
 ### Added
 
-- Initial product definition for a multi-provider regulatory control plane for enterprise AI.
-- Brazilian regulated-environment wedge focused initially on financial services.
-- Product architecture separating control plane and enforcement plane.
-- Three-layer governance model: `authoritative source -> human-reviewed control objective -> executable technical policy`.
-- Initial decision model: `ALLOW`, `ALLOW_WITH_TRANSFORMATION`, `REQUIRE_APPROVAL`, `DENY`.
-- Initial obligation model: `REMOVE_FIELD`, `MASK`, `TOKENIZE`, `PSEUDONYMIZE`, `REQUIRE_PROVIDER_CAPABILITY`, `REQUIRE_HUMAN_APPROVAL`, `RESTRICT_TOOL`, `REQUIRE_EVIDENCE`.
-- Provider Capability Registry concept with versioned capability facts, authoritative sources, verification dates and `supported`, `unsupported`, `conditional`, `unknown` states.
-- Initial provider capability examples for OpenAI Responses API and Amazon Bedrock.
-- Initial Brazilian financial-services demo policy.
-- Metadata-only evidence model.
-- Threat model covering policy bypass, provider downgrade, stale capability data, sensitive-data leakage, evidence tampering and authority-boundary failures.
-- Deterministic evaluation strategy and initial scenario-eval plan.
-- Initial ADRs for control-plane/enforcement-plane separation, regulation-to-control-objective mapping and metadata-only evidence.
-- Initial English and Brazilian Portuguese project documentation.
-- Security policy and private vulnerability-reporting guidance.
-- MIT license.
-- Bootstrap baseline based on `brunovicco/codex-python-engineering-harness`.
-- Deterministic Phase 1 evaluation engine, validated YAML registries, SQLite evidence and HTTP API.
-- Phase 2 local enforcement with remove/mask/tokenize/pseudonymize transformations.
-- Metadata-only transformation receipts and enforcement lifecycle evidence.
-- HMAC tokenization abstraction and network-silent mock execution port.
-- Metadata-only enforcement HTTP endpoints.
-- Opt-in text-only execution through a Git-pinned `governed-llm-gateway` client.
-- Bounded gateway/provider timeouts, explicit workload/target binding and fail-closed provenance
-  validation.
-- Metadata-only gateway routing and provider-call evidence.
-
-### Planned
-
-- Additional reviewed gateway workload/target bindings, including Bedrock-backed deployments.
-- Live local composition proof with `governed-llm-gateway`.
-- Human-approval workflow and agent-authority controls.
+- Deterministic policy evaluation, local data transformations and metadata-only evidence.
+- Signed policy, provider-capability and trusted-tool control packs with lifecycle-aware trust stores.
+- Digest-bound decision approval, action approval and authenticated terminal reconciliation.
+- Closed trusted-tool schemas, proposal validation, result minimization and append-only action history.
+- Network-silent mock execution as the default runtime behavior.
+- Opt-in governed-gateway execution and a fixed-synthetic live composition probe.
+- One identity-bound, read-only enterprise sandbox connector with bounded I/O and no retries.
+- Exact-ID operator timeline and server-rendered dashboard without global record discovery.
+- Offline semantic diff, scenario replay, authenticated review and promotion-quorum evidence.
+- Content-addressed release custody, deterministic OCI evidence layouts and trusted timestamp
+  verification.
+- Restricted single-replica Kubernetes/OpenShift deployment references and metadata-only
+  CloudEvents/OpenTelemetry integration.
+- English and Brazilian Portuguese architecture, privacy, threat-model and operator guidance.
 
 ### Security
 
-- Defined fail-closed behavior for mandatory unknown/stale provider capabilities.
-- Defined prohibition on raw prompts, model responses, credentials and personal-data values in evidence.
-- Defined provider fallback as unable to weaken mandatory policy.
-- Defined policy decisions as deterministic and external to model output.
+- Required controls fail closed when trusted configuration, approvals, provider capabilities or
+  evidence are missing, stale or invalid.
+- Raw prompts, model responses, credentials, tool arguments/results and personal-data values are
+  excluded from persisted evidence and observability payloads.
+- Provider fallback cannot weaken policy and a model cannot grant itself tool authority.
+- External calls use bounded timeouts; ambiguous tool outcomes are never retried automatically.
+
+### Known limitations
+
+- This is a non-production, single-tenant, single-replica pilot release.
+- SQLite is the reference persistence implementation and is not supported for multi-replica use.
+- Enterprise operator authentication, tenant isolation and asymmetric reconciliation authority are
+  not implemented.
+- Live integrations are restricted to the reviewed fixed-synthetic provider probe and one
+  read-only sandbox connector; state-changing enterprise tools remain unsupported.
+- This release is technical evidence, not legal advice, certification or a compliance claim.
