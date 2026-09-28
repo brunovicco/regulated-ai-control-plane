@@ -26,6 +26,8 @@ from regulated_ai.domain import (
     OperatorTimelineStageKind,
     ProviderCallMetadata,
     ProviderCapabilitySnapshot,
+    ToolActionReconciliationOutcome,
+    ToolActionReconciliationReceipt,
     ToolActionRecord,
     ToolActionStatus,
     ToolProposal,
@@ -483,6 +485,7 @@ def test_tool_action_repository_migrates_phase_four_c_schema(tmp_path: Path) -> 
         "safe_output_digest",
         "result_classifications",
         "exposed_result_fields",
+        "reconciliation_receipt",
     }.issubset(columns)
     events = SqliteOperatorLifecycleEventRepository(path).list_for_timeline(
         enforcement_id="enf_legacy", evidence_id="ev_legacy", limit=257
@@ -490,3 +493,70 @@ def test_tool_action_repository_migrates_phase_four_c_schema(tmp_path: Path) -> 
     assert len(events) == 1
     assert events[0].record_id == "act_legacy"
     assert events[0].source is OperatorLifecycleEventSource.MIGRATION_BASELINE
+
+
+def test_tool_action_reconciliation_is_terminal_and_metadata_only(tmp_path: Path) -> None:
+    path = tmp_path / "reconciled-actions.sqlite3"
+    repository = SqliteToolActionRepository(path)
+    required = ToolActionRecord(
+        action_id="act_reconciliation",
+        created_at=datetime(2026, 9, 23, tzinfo=UTC),
+        enforcement_id="enf_reconciliation",
+        evaluation_id="eval_reconciliation",
+        call_id="call_reconciliation",
+        tool_name="cards.read",
+        tool_schema_version="1",
+        tool_schema_digest="sha256:schema",
+        arguments_digest="sha256:arguments",
+        workload_identity="workload.test",
+        idempotency_key_digest="sha256:idempotency",
+        action_digest="sha256:action",
+        status=ToolActionStatus.RECONCILIATION_REQUIRED,
+        output_schema_digest="sha256:output-schema",
+    )
+    repository.save(required)
+    receipt = ToolActionReconciliationReceipt(
+        reconciliation_id="reconciliation-test",
+        actor_id="operator-test",
+        action_digest=required.action_digest,
+        action_id=required.action_id,
+        outcome=ToolActionReconciliationOutcome.EXECUTED,
+        tool_execution_id="sandbox-execution-test",
+        issued_at=datetime(2026, 9, 23, 11, 55, tzinfo=UTC),
+        expires_at=datetime(2026, 9, 23, 12, 5, tzinfo=UTC),
+        consumed_at=datetime(2026, 9, 23, 12, tzinfo=UTC),
+    )
+
+    forged = repository.save(
+        replace(
+            required,
+            status=ToolActionStatus.RECONCILED_EXECUTED,
+            tool_execution_id=receipt.tool_execution_id,
+            output_digest="sha256:invented-output",
+            reconciliation_receipt=receipt,
+        )
+    )
+    reconciled = repository.save(
+        replace(
+            required,
+            status=ToolActionStatus.RECONCILED_EXECUTED,
+            tool_execution_id=receipt.tool_execution_id,
+            reconciliation_receipt=receipt,
+        )
+    )
+    reopened = repository.save(required)
+
+    assert forged.status is ToolActionStatus.RECONCILIATION_REQUIRED
+    assert reconciled.reconciliation_receipt == receipt
+    assert reopened.status is ToolActionStatus.RECONCILED_EXECUTED
+    events = SqliteOperatorLifecycleEventRepository(path).list_for_timeline(
+        enforcement_id=required.enforcement_id,
+        evidence_id="ev_missing",
+        limit=257,
+    )
+    assert tuple(event.status for event in events) == (
+        "RECONCILIATION_REQUIRED",
+        "RECONCILED_EXECUTED",
+    )
+    stored = path.read_bytes().decode(errors="ignore")
+    assert "raw-tool-output-sentinel" not in stored

@@ -370,7 +370,8 @@ Status: Phase 7a implements a fixed-synthetic, opt-in proof through one reviewed
 gateway/provider workload. It composes deterministic evaluation, local tokenization, provider
 execution, metadata-only evidence and operator-timeline validation without accepting arbitrary
 content or enabling tool effects. Phase 7b adds one opt-in enterprise sandbox connector bound to
-the signed `cards.read` definition, exact workload identity and closed output boundary.
+the signed `cards.read` definition, exact workload identity and closed output boundary. Phase 7c
+adds separately authenticated, terminal resolution of ambiguous tool outcomes without reexecution.
 
 Implemented in Phase 7a:
 - explicit gateway-mode requirement and one reviewed OpenAI capability target;
@@ -388,9 +389,16 @@ Implemented in Phase 7b:
 - untrusted output validation/minimization through the existing signed catalog schema;
 - no generic HTTP tool, state-changing connector or automatic reconciliation.
 
+Implemented in Phase 7c:
+- dedicated `rr1` HMAC authority distinct from decision and action approval;
+- exact action-digest, actor, outcome and optional execution-ID binding;
+- closed `RECONCILED_EXECUTED` and `RECONCILED_NOT_EXECUTED` terminal states;
+- metadata-only receipt, idempotent exact replay and append-only lifecycle history;
+- exact-action API operation with no tool-execution dependency or automatic retry.
+
 Next:
-- explicit reconciliation operations for ambiguous execution state;
 - production persistence before multi-replica rollout;
+- asymmetric or enterprise-identity-backed operator authority;
 - state-changing integration only after connector identity, idempotency and recovery review.
 
 ## Defer

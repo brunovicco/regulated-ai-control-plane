@@ -22,6 +22,8 @@ from regulated_ai.domain import (
     OperatorLifecycleEventSource,
     OperatorTimelineStageKind,
     ProviderCapabilitySnapshot,
+    ToolActionReconciliationOutcome,
+    ToolActionReconciliationReceipt,
     ToolActionRecord,
     ToolActionStatus,
     TransformationReceipt,
@@ -338,6 +340,61 @@ def test_operator_timeline_rejects_inconsistent_action_approval_metadata() -> No
             enforcement=_enforcement(),
             evidence=_evidence(),
             actions=(replace(action, approval_receipt=approval),),
+        ).execute("enf_operator_test")
+
+
+def test_operator_timeline_accepts_consistent_terminal_reconciliation() -> None:
+    action = _action(1, ToolActionStatus.RECONCILED_EXECUTED)
+    receipt = ToolActionReconciliationReceipt(
+        reconciliation_id="reconciliation-operator-test",
+        actor_id="operator-test",
+        action_digest=action.action_digest,
+        action_id=action.action_id,
+        outcome=ToolActionReconciliationOutcome.EXECUTED,
+        tool_execution_id="sandbox-execution-test",
+        issued_at=NOW - timedelta(minutes=5),
+        expires_at=NOW + timedelta(minutes=5),
+        consumed_at=NOW,
+    )
+    reconciled = replace(
+        action,
+        tool_execution_id=receipt.tool_execution_id,
+        reconciliation_receipt=receipt,
+    )
+
+    timeline = _service(
+        enforcement=_enforcement(), evidence=_evidence(), actions=(reconciled,)
+    ).execute("enf_operator_test")
+
+    assert timeline.stages[-1].status == "RECONCILED_EXECUTED"
+    assert timeline.attention_codes == ()
+
+
+def test_operator_timeline_rejects_inconsistent_reconciliation_metadata() -> None:
+    action = _action(1, ToolActionStatus.RECONCILED_EXECUTED)
+    receipt = ToolActionReconciliationReceipt(
+        reconciliation_id="reconciliation-operator-test",
+        actor_id="operator-test",
+        action_digest=f"sha256:{'0' * 64}",
+        action_id=action.action_id,
+        outcome=ToolActionReconciliationOutcome.EXECUTED,
+        tool_execution_id="sandbox-execution-test",
+        issued_at=NOW - timedelta(minutes=5),
+        expires_at=NOW + timedelta(minutes=5),
+        consumed_at=NOW,
+    )
+
+    with pytest.raises(OperatorTimelineIntegrityError):
+        _service(
+            enforcement=_enforcement(),
+            evidence=_evidence(),
+            actions=(
+                replace(
+                    action,
+                    tool_execution_id=receipt.tool_execution_id,
+                    reconciliation_receipt=receipt,
+                ),
+            ),
         ).execute("enf_operator_test")
 
 

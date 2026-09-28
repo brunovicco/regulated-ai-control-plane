@@ -644,4 +644,5 @@ def _to_result(
         result_classifications=record.result_classifications,
         exposed_result_fields=record.exposed_result_fields,
         safe_output=safe_output,
+        reconciliation_receipt=record.reconciliation_receipt,
     )

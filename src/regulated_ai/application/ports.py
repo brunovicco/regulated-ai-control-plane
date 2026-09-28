@@ -20,6 +20,8 @@ from regulated_ai.domain import (
     ProviderExecutionReceipt,
     ProviderTarget,
     ToolActionPlan,
+    ToolActionReconciliationGrant,
+    ToolActionReconciliationReceipt,
     ToolActionRecord,
     ToolExecutionResult,
 )
@@ -192,6 +194,30 @@ class ActionApprovalPort(Protocol):
         now: datetime,
     ) -> ActionApprovalReceipt:
         """Consume one verified action grant exactly once."""
+        ...
+
+
+class ToolActionReconciliationPort(Protocol):
+    """Validate and consume authority to resolve one ambiguous action outcome."""
+
+    def inspect(
+        self,
+        assertion: str,
+        *,
+        action_digest: str,
+        now: datetime,
+    ) -> ToolActionReconciliationGrant:
+        """Verify a reconciliation assertion without consuming it."""
+        ...
+
+    def consume(
+        self,
+        grant: ToolActionReconciliationGrant,
+        *,
+        action_id: str,
+        now: datetime,
+    ) -> ToolActionReconciliationReceipt:
+        """Consume or idempotently recover one exact reconciliation grant."""
         ...
 
 

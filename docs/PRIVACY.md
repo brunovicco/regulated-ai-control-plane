@@ -142,6 +142,9 @@ Complete this document before processing personal or regulated data.
   classifications and exposed-field names, never the bearer credential, idempotency key, arguments
   or raw/safe output. The sandbox becomes an external processing boundary requiring approved
   purpose, access, retention, residency, deletion and incident-response controls.
+- Phase 7c accepts an ephemeral signed operator assertion and persists only its pseudonymous actor,
+  bounded identifiers, closed outcome and UTC timestamps. It stores no investigation notes,
+  evidence URLs, arguments, raw/safe output or assertion bytes and performs no downstream call.
 - Incident-response owner:
 
 ## Prohibited logging

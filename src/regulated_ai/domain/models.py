@@ -79,7 +79,16 @@ class ToolActionStatus(StrEnum):
     EXECUTED = "EXECUTED"
     APPROVAL_FAILED = "APPROVAL_FAILED"
     RECONCILIATION_REQUIRED = "RECONCILIATION_REQUIRED"
+    RECONCILED_EXECUTED = "RECONCILED_EXECUTED"
+    RECONCILED_NOT_EXECUTED = "RECONCILED_NOT_EXECUTED"
     RESULT_REJECTED = "RESULT_REJECTED"
+
+
+class ToolActionReconciliationOutcome(StrEnum):
+    """Closed operator-confirmed outcome for one ambiguous tool execution."""
+
+    EXECUTED = "EXECUTED"
+    NOT_EXECUTED = "NOT_EXECUTED"
 
 
 class ToolResultClassification(StrEnum):
@@ -1242,6 +1251,34 @@ class ActionApprovalReceipt:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolActionReconciliationGrant:
+    """Verified but unconsumed authority to resolve one ambiguous action."""
+
+    reconciliation_id: str
+    actor_id: str
+    action_digest: str
+    outcome: ToolActionReconciliationOutcome
+    tool_execution_id: str | None
+    issued_at: datetime
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ToolActionReconciliationReceipt:
+    """Metadata-only proof of one consumed reconciliation authority."""
+
+    reconciliation_id: str
+    actor_id: str
+    action_digest: str
+    action_id: str
+    outcome: ToolActionReconciliationOutcome
+    tool_execution_id: str | None
+    issued_at: datetime
+    expires_at: datetime
+    consumed_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class ExecutionPlan:
     """Ephemeral sanitized payload suitable for an inference execution port."""
 
@@ -1343,6 +1380,7 @@ class ToolActionRecord:
     safe_output_digest: str | None = None
     result_classifications: tuple[ToolResultClassification, ...] = ()
     exposed_result_fields: tuple[str, ...] = ()
+    reconciliation_receipt: ToolActionReconciliationReceipt | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1364,6 +1402,7 @@ class ToolActionResult:
     result_classifications: tuple[ToolResultClassification, ...] = ()
     exposed_result_fields: tuple[str, ...] = ()
     safe_output: tuple[tuple[str, str], ...] | None = None
+    reconciliation_receipt: ToolActionReconciliationReceipt | None = None
 
 
 @dataclass(frozen=True, slots=True)
