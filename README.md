@@ -2,7 +2,7 @@
 
 [![Python 3.13-3.14](https://img.shields.io/badge/Python-3.13--3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status: Pre-Alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#project-status)
+[![Status: Controlled Pilot](https://img.shields.io/badge/status-controlled%20pilot-blue)](#project-status)
 
 > Multi-provider regulatory control plane for enterprise AI, starting with LGPD, ANPD and Brazilian financial-services requirements.
 
@@ -93,8 +93,14 @@ Initial obligations include:
 
 ## Project status
 
-**Pre-alpha with deterministic evaluation, local enforcement, digest-bound decision/action
-approval, trusted tool proposals/results and an opt-in governed-gateway execution adapter.**
+**Controlled pilot release with deterministic evaluation, local enforcement, digest-bound
+decision/action approval, trusted tool proposals/results, an opt-in governed-gateway adapter and
+one bound read-only enterprise sandbox connector.**
+
+The supported `v0.1.0rc1` profile is single-tenant, single-replica and non-production. Mock mode
+remains the safe default. Live provider and enterprise connector paths are opt-in, fixed-scope
+pilot integrations for synthetic data and sandbox systems only. See the
+[controlled pilot release profile](docs/PILOT_RELEASE.md) before operating this version.
 
 Current local flow:
 
@@ -433,6 +439,7 @@ Start with:
 - [Evaluation strategy](docs/EVAL_STRATEGY.md)
 - [Verification-key lifecycle](docs/TRUST_KEY_LIFECYCLE.md)
 - [Release artifact custody](docs/RELEASE_CUSTODY.md)
+- [Controlled pilot release profile](docs/PILOT_RELEASE.md)
 - [Live composition pilot](docs/LIVE_COMPOSITION_PILOT.md)
 - [Read-only enterprise connector](docs/READ_ONLY_ENTERPRISE_CONNECTOR.md)
 - [Tool-action reconciliation](docs/TOOL_ACTION_RECONCILIATION.md)

@@ -372,6 +372,8 @@ execution, metadata-only evidence and operator-timeline validation without accep
 content or enabling tool effects. Phase 7b adds one opt-in enterprise sandbox connector bound to
 the signed `cards.read` definition, exact workload identity and closed output boundary. Phase 7c
 adds separately authenticated, terminal resolution of ambiguous tool outcomes without reexecution.
+Together these capabilities form the bounded `v0.1.0rc1` controlled pilot profile; production
+readiness is not claimed.
 
 Implemented in Phase 7a:
 - explicit gateway-mode requirement and one reviewed OpenAI capability target;
