@@ -140,8 +140,9 @@ configurado explicitamente, o modo gateway
 usa timeouts limitados, não realiza retry local, descarta a saída do modelo e aceita somente
 definições de ferramentas resolvidas pelo catálogo versionado da organização. Chamadas de
 ferramentas retornadas pelo modelo continuam sem autoridade até que os argumentos exatos sejam
-reenviados, validados e aprovados com uma autoridade de ação separada. A execução da Fase 4c usa
-somente um mock sem rede. A Fase 4d valida o resultado não confiável contra schemas fechados do
+reenviados, validados e aprovados com uma autoridade de ação separada. A execução permanece em um
+mock sem rede por padrão; a Fase 7b permite optar pelo único conector read-only vinculado ao
+sandbox. A Fase 4d valida o resultado não confiável contra schemas fechados do
 catálogo, mascara ou remove campos classificados e retorna o resultado minimizado somente na
 resposta imediata de sucesso. Outputs brutos e seguros não são persistidos nem recuperáveis em
 replays.
@@ -278,11 +279,18 @@ relatório somente com metadados. O comando não aceita prompt, provider, ferram
 arbitrários e não retorna output do modelo. Consulte o
 [runbook do piloto de composição real](docs/LIVE_COMPOSITION_PILOT.md).
 
+A Fase 7b adiciona o primeiro conector opt-in para sandbox corporativo. Ele é fixo à ferramenta
+read-only `cards.read` do catálogo assinado, a uma identidade de workload configurada e a um único
+endpoint HTTPS/loopback. O conector não realiza retry, não aceita URL ou headers escolhidos pelo
+chamador e envia o resultado não confiável para o schema fechado e as regras existentes de
+mascaramento/remoção. O mock continua sendo o padrão. Consulte o
+[runbook do conector read-only](docs/READ_ONLY_ENTERPRISE_CONNECTOR.md).
+
 Fora do primeiro ciclo:
 
 - adapters diretos de SDKs de providers;
 - retorno de completion pela API;
-- adapters reais para sistemas corporativos e retorno do resultado da ferramenta ao modelo;
+- adapters state-changing para sistemas corporativos e retorno do resultado da ferramenta ao modelo;
 - LLM decidindo política;
 - descoberta global e ações administrativas no dashboard operacional;
 - SaaS multi-tenant;
@@ -447,6 +455,7 @@ Comece por:
 - [Ciclo de vida das chaves de verificação](docs/TRUST_KEY_LIFECYCLE.md)
 - [Custódia dos artefatos de release](docs/RELEASE_CUSTODY.md)
 - [Piloto de composição real](docs/LIVE_COMPOSITION_PILOT.md)
+- [Conector corporativo read-only](docs/READ_ONLY_ENTERPRISE_CONNECTOR.md)
 - [Roadmap](docs/MVP_ROADMAP.md)
 - [Fontes primárias](SOURCES.md)
 

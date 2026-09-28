@@ -64,7 +64,8 @@ Mitigations:
 - resubmitted arguments must satisfy the closed schema and reproduce the stored proposal digest;
 - each proposal has one immutable action binding and one atomic execution claim;
 - approval is consumed before the tool port and ambiguous failures are never retried automatically;
-- Phase 4c exposes only a network-silent mock tool adapter.
+- Phase 4c defaults to a network-silent mock; Phase 7b permits only the separately configured
+  `cards.read` sandbox binding.
 
 ### Tool result injects instructions or exfiltrates data
 
@@ -648,7 +649,27 @@ Mitigations:
 - bounded timeouts;
 - gateway URL is deployment configuration, never request input;
 - the gateway SDK accepts HTTPS or literal loopback HTTP and rejects userinfo/query/fragment;
+- the Phase 7b endpoint is deployment configuration, never request or model input;
+- the read-only connector rejects non-loopback HTTP, userinfo, query/fragment and redirects, ignores
+  environment proxies and is fixed to one tool/workload identity;
 - no user-supplied arbitrary provider URL in production mode.
+
+Residual risk:
+deployment configuration, DNS, certificate trust or egress-policy compromise can still redirect
+approved sandbox traffic. Deployments must pin/monitor the intended destination and restrict egress.
+
+### Enterprise connector credential or payload leakage
+
+Mitigations:
+- bearer credential is environment-only, excluded from representations and never returned or
+  persisted;
+- header-unsafe idempotency keys fail before action persistence or approval consumption;
+- request and response bodies are bounded and never logged by the adapter; compressed responses
+  are refused so decompression cannot bypass the response-byte limit;
+- duplicate JSON keys, extra envelope fields, wrong action binding and invalid execution ids fail
+  closed;
+- untrusted output passes through the signed closed schema and RETURN/MASK/DROP rules;
+- transport and validation errors expose stable local messages without response bodies.
 
 ### Gateway credential or response leakage
 
@@ -718,6 +739,10 @@ future asymmetric or OIDC adapter should remove signing capability from the enfo
 - malformed, failed or content-free terminal gateway response.
 - mock mode, arbitrary correlation id or inconsistent receipt/timeline reaches the Phase 7a pilot;
 - fixed synthetic request values or model output appear in the pilot report or evidence database;
+- live connector receives `cards.unblock`, a mismatched workload, unsafe endpoint/idempotency key,
+  redirect, oversized body or malformed/duplicate/wrong-action response;
+- connector credential, exact arguments, idempotency key or raw output appears in logs, evidence or
+  replay responses;
 - malformed, tampered, expired, future, wrong-digest or replayed approval assertion;
 - approval consumption fails after the execution claim;
 - decision approval is presented as action approval;

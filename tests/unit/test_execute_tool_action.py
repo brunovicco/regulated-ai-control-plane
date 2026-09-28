@@ -278,6 +278,16 @@ def test_invalid_or_digest_mismatched_arguments_fail_before_execution(
     assert execution.call_count == 0
 
 
+def test_header_unsafe_idempotency_key_fails_before_action_persistence(tmp_path: Path) -> None:
+    service, execution, database_path = _service(tmp_path)
+
+    with pytest.raises(InvalidToolActionError, match="identifiers"):
+        _execute(service, idempotency_key="unsafe\r\nheader")
+
+    assert execution.call_count == 0
+    assert b"unsafe" not in database_path.read_bytes()
+
+
 def test_same_proposal_cannot_be_rebound_to_another_idempotency_key(tmp_path: Path) -> None:
     service, execution, _database_path = _service(tmp_path)
     waiting = _execute(service)

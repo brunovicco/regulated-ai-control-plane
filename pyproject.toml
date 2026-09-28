@@ -9,6 +9,7 @@ dependencies = [
     "cryptography>=50.0.1",
     "fastapi>=0.116",
     "governed-llm-gateway-client @ git+https://github.com/brunovicco/governed-llm-gateway.git@751dda744fcb0ecadbf2aac7ce1c48b29334de17#subdirectory=packages/gateway-client",
+    "httpx>=0.28",
     "pydantic>=2.11",
     "pydantic-settings>=2.8",
     "pyyaml>=6.0.2",

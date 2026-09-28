@@ -369,7 +369,8 @@ Implemented in Phase 6h:
 Status: Phase 7a implements a fixed-synthetic, opt-in proof through one reviewed non-production
 gateway/provider workload. It composes deterministic evaluation, local tokenization, provider
 execution, metadata-only evidence and operator-timeline validation without accepting arbitrary
-content or enabling tool effects.
+content or enabling tool effects. Phase 7b adds one opt-in enterprise sandbox connector bound to
+the signed `cards.read` definition, exact workload identity and closed output boundary.
 
 Implemented in Phase 7a:
 - explicit gateway-mode requirement and one reviewed OpenAI capability target;
@@ -379,8 +380,15 @@ Implemented in Phase 7a:
 - deterministic metadata-only JSON report and digest;
 - network-silent fake-boundary regression tests and an operator runbook.
 
+Implemented in Phase 7b:
+- startup-selected mock or read-only HTTP tool execution;
+- fixed `cards.read`/`read_only` and exact workload-identity binding;
+- HTTPS or literal-loopback endpoint validation with no redirects or environment proxies;
+- bounded single-attempt canonical request and response-envelope validation;
+- untrusted output validation/minimization through the existing signed catalog schema;
+- no generic HTTP tool, state-changing connector or automatic reconciliation.
+
 Next:
-- one reviewed read-only enterprise connector in a sandbox;
 - explicit reconciliation operations for ambiguous execution state;
 - production persistence before multi-replica rollout;
 - state-changing integration only after connector identity, idempotency and recovery review.

@@ -29,6 +29,8 @@ from regulated_ai.adapters import (
     HmacTokenizationAdapter,
     MockInferenceExecutionAdapter,
     MockToolExecutionAdapter,
+    ReadOnlyHttpToolExecutionAdapter,
+    ReadOnlyHttpToolExecutionConfig,
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
     SqliteOperatorLifecycleEventRepository,
@@ -190,7 +192,7 @@ class Runtime:
     lifecycle_events: OperatorLifecycleEventRepository
     operator_timeline: GetOperatorTimeline
     tool_execution: ToolExecutionPort
-    mock_tool_execution: MockToolExecutionAdapter
+    mock_tool_execution: MockToolExecutionAdapter | None
     telemetry: _TelemetryLifecycle | None = None
 
 
@@ -288,13 +290,13 @@ def build_runtime(
             ),
         )
     )
-    mock_tool_execution = MockToolExecutionAdapter()
+    tool_execution, mock_tool_execution = _tool_execution_adapter_from_environment()
     action_executor = ExecuteToolAction(
         enforcement=enforcement,
         evidence=repository,
         tools=tools,
         actions=actions,
-        execution=mock_tool_execution,
+        execution=tool_execution,
         approval=action_approval,
         observer=observer,
     )
@@ -317,7 +319,7 @@ def build_runtime(
         actions=actions,
         lifecycle_events=lifecycle_events,
         operator_timeline=operator_timeline,
-        tool_execution=mock_tool_execution,
+        tool_execution=tool_execution,
         mock_tool_execution=mock_tool_execution,
         telemetry=telemetry,
     )
@@ -352,10 +354,43 @@ def _execution_adapter_from_environment() -> tuple[
     return adapter, None
 
 
-def _required_environment(name: str) -> str:
+def _tool_execution_adapter_from_environment() -> tuple[
+    ToolExecutionPort, MockToolExecutionAdapter | None
+]:
+    mode = os.environ.get("REGULAAI_TOOL_EXECUTION_MODE", "mock").strip().casefold()
+    if mode == "mock":
+        mock = MockToolExecutionAdapter()
+        return mock, mock
+    if mode != "read_only_http":
+        raise ValueError("REGULAAI_TOOL_EXECUTION_MODE must be 'mock' or 'read_only_http'")
+    adapter = ReadOnlyHttpToolExecutionAdapter(
+        ReadOnlyHttpToolExecutionConfig(
+            endpoint_url=_required_environment(
+                "REGULAAI_READ_ONLY_TOOL_URL", context="read-only tool execution mode"
+            ),
+            api_key=_required_environment(
+                "REGULAAI_READ_ONLY_TOOL_API_KEY", context="read-only tool execution mode"
+            ),
+            workload_identity=_required_environment(
+                "REGULAAI_READ_ONLY_TOOL_WORKLOAD_IDENTITY",
+                context="read-only tool execution mode",
+            ),
+            timeout_seconds=_float_environment("REGULAAI_READ_ONLY_TOOL_TIMEOUT_SECONDS", 10.0),
+            max_request_bytes=_integer_environment(
+                "REGULAAI_READ_ONLY_TOOL_MAX_REQUEST_BYTES", 64 * 1024
+            ),
+            max_response_bytes=_integer_environment(
+                "REGULAAI_READ_ONLY_TOOL_MAX_RESPONSE_BYTES", 64 * 1024
+            ),
+        )
+    )
+    return adapter, None
+
+
+def _required_environment(name: str, *, context: str = "gateway execution mode") -> str:
     value = os.environ.get(name)
     if value is None or not value.strip():
-        raise ValueError(f"{name} is required in gateway execution mode")
+        raise ValueError(f"{name} is required in {context}")
     return value
 
 
