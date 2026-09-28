@@ -128,6 +128,12 @@ Complete this document before processing personal or regulated data.
   operation and bounded outcome. Prompts, responses, data values, tool arguments/results, URLs,
   credentials, people, exception messages/stacks and baggage are excluded. Collector/log access,
   residency, retention and deletion require an approved deployment privacy assessment.
+- Phase 7a uses only two package-owned synthetic strings. The document field is tokenized before
+  gateway execution; the question and transformed value remain ephemeral. The report includes only
+  existing control-pack, evidence, enforcement, routing, status and digest metadata. It excludes
+  prompt content, transformed values, model output, credentials and tool data. The dedicated
+  non-production evidence database remains organization metadata subject to retention and access
+  controls.
 - Incident-response owner:
 
 ## Prohibited logging

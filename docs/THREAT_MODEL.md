@@ -659,6 +659,24 @@ Mitigations:
 - response content is used only ephemerally and discarded;
 - only allowlisted routing/execution metadata is persisted or returned.
 
+### Pilot is used as an unmanaged content or egress client
+
+Threat:
+an operator supplies production data, arbitrary prompts, tools or a weaker provider target to a
+diagnostic command and treats one successful call as a production/compliance assertion.
+
+Mitigations:
+- Phase 7a owns both fixed synthetic values and accepts no content, provider, tool or credential
+  arguments;
+- gateway mode and the reviewed OpenAI target/provider binding are required;
+- an explicit non-production environment and dedicated evidence database are required;
+- a generated correlation suffix prevents an old idempotent result from appearing as a fresh call;
+- the synthetic identifier is labeled and tokenized before external I/O;
+- one attempt is made through the existing enforcement path, with no local retry;
+- the report contains only allowlisted metadata and an explicit bounded-scope statement;
+- documentation limits execution to a reviewed non-production workload and dedicated evidence
+  store.
+
 ### Duplicate execution after crash or concurrent replay
 
 Mitigations:
@@ -698,6 +716,8 @@ future asymmetric or OIDC adapter should remove signing capability from the enfo
 - gateway terminal provider differs from the configured provider boundary;
 - tool-bearing plan reaches the text-only gateway adapter;
 - malformed, failed or content-free terminal gateway response.
+- mock mode, arbitrary correlation id or inconsistent receipt/timeline reaches the Phase 7a pilot;
+- fixed synthetic request values or model output appear in the pilot report or evidence database;
 - malformed, tampered, expired, future, wrong-digest or replayed approval assertion;
 - approval consumption fails after the execution claim;
 - decision approval is presented as action approval;

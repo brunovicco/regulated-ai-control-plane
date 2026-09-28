@@ -1,5 +1,31 @@
 # Implementation plan
 
+## Phase 7a — fixed-synthetic live composition pilot
+
+### Goal
+
+Prove that deterministic evaluation, local transformation, governed gateway execution,
+metadata-only evidence and the operator timeline compose around one real non-production provider
+call without creating a general content client.
+
+### Work
+
+1. Add one package-owned Brazilian financial-services scenario with fixed synthetic values.
+2. Require explicit gateway mode and the reviewed `openai.responses_api.global` target.
+3. Reuse the existing enforcement use case so the identifier is tokenized before external I/O.
+4. Prohibit tools, arbitrary prompts, provider selection and local retry in the pilot entrypoint.
+5. Validate the terminal provider receipt and complete, attention-free operator timeline.
+6. Emit only allowlisted identifiers, categories, statuses, routing metadata and digests.
+7. Add network-silent fake-boundary tests, operating guidance and ADR-0036.
+
+### Decisions and assumptions
+
+- The command is an opt-in non-production probe and may incur provider cost.
+- Live credentials are injected by deployment controls and never accepted as CLI arguments.
+- The default runtime and automated test suite remain network-silent.
+- A successful report proves one bounded composition event, not compliance, production readiness,
+  continuous enforcement or enterprise-tool authority.
+
 ## Phase 6t — metadata-only CloudEvents and OTLP export
 
 ### Goal

@@ -10,6 +10,7 @@ the security and observability contract in ``AGENTS.md``.
 import logging
 import os
 import sys
+from typing import TextIO
 
 import structlog
 
@@ -31,7 +32,9 @@ def add_trace_context(
     return event_dict
 
 
-def configure_logging(*, service: str, environment: str, version: str) -> None:
+def configure_logging(
+    *, service: str, environment: str, version: str, stream: TextIO | None = None
+) -> None:
     """Configure structlog and standard-library logging for this process."""
     level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
@@ -60,7 +63,7 @@ def configure_logging(*, service: str, environment: str, version: str) -> None:
         processors=[structlog.stdlib.ProcessorFormatter.remove_processors_meta, renderer],
     )
 
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(stream or sys.stdout)
     handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()

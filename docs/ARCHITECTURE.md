@@ -26,6 +26,11 @@ Phase 4c binds exact proposal arguments and separate approval to an atomic tool 
 4d then validates the untrusted result against a trusted closed output schema and exposes only an
 ephemeral minimized result.
 
+Phase 7a composes the existing boundaries in an opt-in non-production pilot. A package-owned fixed
+synthetic request enters the normal enforcement use case, is tokenized locally, crosses only the
+configured governed-gateway boundary and produces a metadata-only report after operator-timeline
+validation. The pilot is not a second prompt API and enables no tool execution.
+
 ## Layers
 
 ```text
@@ -399,6 +404,24 @@ observability extra is installed; the deployment image includes that extra but c
 endpoint or egress by default.
 
 See [ADR-0035](adr/0035-metadata-only-cloudevents-and-otlp.md).
+
+## Phase 7a components
+
+- `entrypoints/live_composition_pilot.py`: fixed scenario, gateway-mode assertion, terminal receipt
+  and timeline validation, canonical metadata-only report.
+- `scripts/run_live_composition_pilot.py`: operator CLI with no content or credential arguments.
+
+```text
+fixed synthetic request
+    -> deterministic evaluation + local tokenization
+    -> governed gateway + reviewed non-production provider workload
+    -> metadata-only evidence + exact operator timeline
+    -> LIVE_COMPOSITION_VERIFIED report (no prompt or model output)
+```
+
+The pilot makes one attempt, accepts no provider or tool selection and never changes the default
+network-silent runtime. See
+[ADR-0036](adr/0036-fixed-synthetic-live-composition-pilot.md).
 
 ## Phase 4c components
 
