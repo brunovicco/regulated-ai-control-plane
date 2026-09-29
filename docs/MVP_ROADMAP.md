@@ -403,10 +403,14 @@ Implemented after Phase 7c:
   atomic authority/state transitions and append-only lifecycle triggers;
 - fail-closed production startup on missing database configuration or schema mismatch;
 - two-replica deployment reference with an explicit restricted migration job.
+- lifecycle-aware Ed25519 operator authority scoped separately to decision approval, exact action
+  approval and terminal reconciliation;
+- production fail-closed startup without the public operator-authority trust store, with HMAC
+  retained only for local/pilot compatibility.
 
 Next:
-- asymmetric or enterprise-identity-backed operator authority;
 - state-changing integration only after connector identity, idempotency and recovery review.
+- deployment-owned PostgreSQL, trust-store rotation, backup/restore, SLO and incident exercises.
 
 ## Defer
 

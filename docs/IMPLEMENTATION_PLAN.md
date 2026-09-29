@@ -1,5 +1,19 @@
 # Implementation plan
 
+## Production operator authority — role-bound Ed25519 assertions
+
+Status: implemented in source after the PostgreSQL persistence foundation.
+
+- One strict public trust store binds each key to an actor, lifecycle and explicit decision,
+  action and/or reconciliation scopes.
+- Canonical `ra1e`, `ra2e` and `rr1e` assertions remain exact-digest bound, short-lived and
+  single-use while removing signing capability from the runtime.
+- Consumption ledgers and receipts retain the non-secret verification-key identifier.
+- Production startup requires the trust store and rejects simultaneous HMAC authority settings.
+- HMAC remains a local and controlled-pilot compatibility mode.
+
+Enterprise OIDC federation and state-changing connectors remain outside this phase.
+
 ## Production persistence — PostgreSQL and multi-replica safety
 
 Status: implemented in source after the `v0.1.0rc1` controlled-pilot tag.
@@ -909,8 +923,10 @@ evidence.
 ### Decisions and assumptions
 
 - Approval assertions are issued outside RegulaAI by an organization-controlled workflow.
-- The Phase 4a assertion format is strict canonical JSON protected by HMAC-SHA256 with a dedicated
-  key of at least 32 bytes. A future asymmetric/OIDC adapter can implement the same port.
+- The Phase 4a local/pilot format is strict canonical JSON protected by HMAC-SHA256 with a
+  dedicated key of at least 32 bytes. The later production adapter implements the same port with
+  role-bound Ed25519 public-key verification; enterprise OIDC federation remains optional future
+  work.
 - `approval_id` is globally single-use. The assertion is checked before execution claim and
   consumed atomically after the claim, so losing a concurrent claim does not consume authority.
 - Approval authorizes the deterministic decision digest, not free-form text, a tool name alone or

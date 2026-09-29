@@ -69,7 +69,8 @@ production credentials, personal data or customer systems to satisfy pilot accep
 - product-grade OIDC/RBAC for the operator surface;
 - a guarantee of provider behavior, regulatory compliance or legal correctness.
 
-The PostgreSQL transactional adapter and migrations now provide the application boundary for
-multi-replica execution. Production readiness still requires organization-owned validation of that
-adapter, enterprise identity-backed operator authority, deployment-owned TLS/egress/secrets/backup
-controls, operational SLOs and incident exercises.
+The PostgreSQL transactional adapter, migrations and role-bound Ed25519 operator verifier now
+provide the application boundary for multi-replica execution with public-key-only runtime
+authority. Production readiness still requires organization-owned validation of those adapters,
+trust-store distribution/rotation, deployment-owned TLS/egress/secrets/backup controls,
+operational SLOs and incident exercises.

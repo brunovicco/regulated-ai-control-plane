@@ -36,6 +36,8 @@ what you want to understand or accomplish—not the order in which features were
 
 ## Authority and enterprise integrations
 
+- [Production operator authority](OPERATOR_AUTHORITY.md): role-bound Ed25519 assertions and
+  verification-key lifecycle for protected mutations.
 - [Read-only enterprise connector](READ_ONLY_ENTERPRISE_CONNECTOR.md): the bounded `cards.read`
   sandbox integration.
 - [Tool-action reconciliation](TOOL_ACTION_RECONCILIATION.md): authenticated terminal resolution

@@ -63,27 +63,17 @@ spec:
                 secretKeyRef:
                   name: regulaai-runtime-keys
                   key: tokenization-key
-            - name: REGULAAI_APPROVAL_HMAC_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: regulaai-runtime-keys
-                  key: decision-approval-hmac-key
-            - name: REGULAAI_ACTION_APPROVAL_HMAC_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: regulaai-runtime-keys
-                  key: action-approval-hmac-key
-            - name: REGULAAI_RECONCILIATION_HMAC_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: regulaai-runtime-keys
-                  key: reconciliation-hmac-key
+            - name: REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE
+              value: /etc/regulaai/operator-authority/operator-authority-keys.yaml
           volumeMounts:
             - name: control-pack
               mountPath: /etc/regulaai/control-pack
               readOnly: true
             - name: control-pack-trust
               mountPath: /etc/regulaai/trust
+              readOnly: true
+            - name: operator-authority-trust
+              mountPath: /etc/regulaai/operator-authority
               readOnly: true
             - name: temporary
               mountPath: /tmp
@@ -130,6 +120,9 @@ spec:
         - name: control-pack-trust
           configMap:
             name: regulaai-control-pack-trust
+        - name: operator-authority-trust
+          configMap:
+            name: regulaai-operator-authority-trust
         - name: temporary
           emptyDir:
             sizeLimit: 64Mi

@@ -54,7 +54,7 @@ RegulaAI turns those questions into deterministic, reproducible decisions and en
 | Deterministic policy evaluation | `ALLOW`, `ALLOW_WITH_TRANSFORMATION`, `REQUIRE_APPROVAL` or `DENY` |
 | Local data enforcement | Remove, mask, tokenize or pseudonymize fields before external I/O |
 | Provider capability registry | Resolve reviewed provider/service/region facts and fail closed on stale or unknown requirements |
-| Human authority boundaries | Bind approvals to exact decision and action digests, with one-time consumption |
+| Human authority boundaries | Bind role-scoped Ed25519 approvals to exact decision/action digests with one-time consumption |
 | Trusted tool execution | Treat model tool calls as proposals; validate exact arguments and closed output schemas |
 | Safe result handling | Minimize untrusted tool output and never persist raw or safe result content |
 | Operational evidence | Store versioned identifiers, reason codes, states and digests—not sensitive content |

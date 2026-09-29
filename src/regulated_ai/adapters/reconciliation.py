@@ -46,14 +46,15 @@ CREATE TABLE IF NOT EXISTS tool_action_reconciliation_consumption (
     issued_at TEXT NOT NULL,
     expires_at TEXT NOT NULL,
     consumed_at TEXT NOT NULL,
+    authority_key_id TEXT,
     UNIQUE(action_id)
 )
 """
 _INSERT = """
 INSERT INTO tool_action_reconciliation_consumption (
     reconciliation_id, actor_id, action_digest, action_id, outcome, tool_execution_id,
-    issued_at, expires_at, consumed_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    issued_at, expires_at, consumed_at, authority_key_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -78,14 +79,29 @@ class HmacToolActionReconciliationAdapter:
         """Initialize a dedicated-key verifier and local consumption ledger."""
         if len(key) < 32:
             raise ValueError("Reconciliation HMAC key must be at least 32 bytes")
+        self._key = bytes(key)
+        self._initialize_ledger(path, max_lifetime_seconds)
+
+    def _initialize_ledger(self, path: Path, max_lifetime_seconds: int) -> None:
+        """Initialize the algorithm-independent local reconciliation ledger."""
         if max_lifetime_seconds <= 0 or max_lifetime_seconds > 86_400:
             raise ValueError("Reconciliation lifetime ceiling must be in the range [1, 86400]")
         self._path = path
-        self._key = bytes(key)
         self._max_lifetime_seconds = max_lifetime_seconds
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute(_SCHEMA)
+            columns = {
+                str(row[1])
+                for row in connection.execute(
+                    "PRAGMA table_info(tool_action_reconciliation_consumption)"
+                ).fetchall()
+            }
+            if "authority_key_id" not in columns:
+                connection.execute(
+                    "ALTER TABLE tool_action_reconciliation_consumption "
+                    "ADD COLUMN authority_key_id TEXT"
+                )
 
     def inspect(
         self,
@@ -198,6 +214,10 @@ class HmacToolActionReconciliationAdapter:
         if (
             _SAFE_ID.fullmatch(grant.reconciliation_id) is None
             or _SAFE_ID.fullmatch(grant.actor_id) is None
+            or (
+                grant.authority_key_id is not None
+                and _SAFE_ID.fullmatch(grant.authority_key_id) is None
+            )
             or _DIGEST.fullmatch(grant.action_digest) is None
             or _SAFE_ID.fullmatch(action_id) is None
             or expires_at <= issued_at
@@ -217,6 +237,7 @@ class HmacToolActionReconciliationAdapter:
             issued_at=issued_at,
             expires_at=expires_at,
             consumed_at=checked_now,
+            authority_key_id=grant.authority_key_id,
         )
         existing = self.get(receipt.reconciliation_id)
         if existing is not None:
@@ -243,6 +264,7 @@ class HmacToolActionReconciliationAdapter:
                         receipt.issued_at.isoformat(),
                         receipt.expires_at.isoformat(),
                         receipt.consumed_at.isoformat(),
+                        receipt.authority_key_id,
                     ),
                 )
         except sqlite3.IntegrityError as exc:
@@ -258,7 +280,9 @@ class HmacToolActionReconciliationAdapter:
         """Return metadata-only reconciliation consumption evidence."""
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT * FROM tool_action_reconciliation_consumption WHERE reconciliation_id = ?",
+                "SELECT reconciliation_id, actor_id, action_digest, action_id, outcome, "
+                "tool_execution_id, issued_at, expires_at, consumed_at, authority_key_id "
+                "FROM tool_action_reconciliation_consumption WHERE reconciliation_id = ?",
                 (reconciliation_id,),
             ).fetchone()
         if row is None:
@@ -273,6 +297,7 @@ class HmacToolActionReconciliationAdapter:
             issued_at=datetime.fromisoformat(str(row[6])),
             expires_at=datetime.fromisoformat(str(row[7])),
             consumed_at=datetime.fromisoformat(str(row[8])),
+            authority_key_id=None if row[9] is None else str(row[9]),
         )
 
     @contextmanager
@@ -310,6 +335,7 @@ def _same_binding(
         and stored.tool_execution_id == requested.tool_execution_id
         and stored.issued_at == requested.issued_at
         and stored.expires_at == requested.expires_at
+        and stored.authority_key_id == requested.authority_key_id
     )
 
 
@@ -325,6 +351,7 @@ def _same_grant_binding(
         and stored.tool_execution_id == requested.tool_execution_id
         and stored.issued_at == requested.issued_at
         and stored.expires_at == requested.expires_at
+        and stored.authority_key_id == requested.authority_key_id
     )
 
 

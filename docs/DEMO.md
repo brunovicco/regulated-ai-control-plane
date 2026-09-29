@@ -146,8 +146,9 @@ The service persists `PREPARED`, atomically claims `DISPATCHED` before invoking 
 and then advances the same record to `EXECUTED`. A persistence or transformation failure stops
 before execution. A repeated request that observes `DISPATCHED` does not issue another call.
 
-To resume the high-impact example, configure a dedicated `REGULAAI_APPROVAL_HMAC_KEY` of at least
-32 bytes before startup. Read `output_digest` from the evaluation evidence referenced by the
+For this local/pilot-compatible example, configure a dedicated `REGULAAI_APPROVAL_HMAC_KEY` of at
+least 32 bytes before startup. Production instead uses the public-key-only flow in
+`OPERATOR_AUTHORITY.md`. Read `output_digest` from the evaluation evidence referenced by the
 waiting response, then have the organization-owned approval workflow issue the strict decision
 assertion documented in `API_CONTRACT.md`. Resend the same enforcement request with:
 
@@ -180,8 +181,8 @@ execution and acceptance criteria.
 
 ## Action-specific approval proof
 
-Configure a distinct `REGULAAI_ACTION_APPROVAL_HMAC_KEY` of at least 32 bytes. Submit the exact
-proposal arguments, workload identity and idempotency key to
+For the local example, configure a distinct `REGULAAI_ACTION_APPROVAL_HMAC_KEY` of at least 32
+bytes. Submit the exact proposal arguments, workload identity and idempotency key to
 `POST /v1/enforcements/{enforcement_id}/tool-actions`. The first response is
 `WAITING_APPROVAL` and contains the action digest. An organization-owned workflow issues the
 domain-separated `ra2` assertion documented in `API_CONTRACT.md`; resend the identical request with

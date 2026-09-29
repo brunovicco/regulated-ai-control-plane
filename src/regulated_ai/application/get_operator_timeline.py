@@ -270,6 +270,7 @@ def _approval_summary(receipt: ApprovalReceipt | None) -> OperatorApprovalSummar
         issued_at=receipt.issued_at,
         expires_at=receipt.expires_at,
         consumed_at=receipt.consumed_at,
+        authority_key_id=receipt.authority_key_id,
     )
 
 

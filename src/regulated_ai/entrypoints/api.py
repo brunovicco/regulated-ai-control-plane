@@ -19,6 +19,10 @@ from regulated_ai.adapters import (
     ControlEventTracer,
     ControlPackIdentity,
     DeterministicDataClassifier,
+    Ed25519ActionApprovalAdapter,
+    Ed25519ApprovalAdapter,
+    Ed25519OperatorAuthorityVerifier,
+    Ed25519ToolActionReconciliationAdapter,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
     FileToolCatalogRepository,
@@ -31,6 +35,9 @@ from regulated_ai.adapters import (
     MockInferenceExecutionAdapter,
     MockToolExecutionAdapter,
     PostgresDatabase,
+    PostgresEd25519ActionApprovalAdapter,
+    PostgresEd25519ApprovalAdapter,
+    PostgresEd25519ToolActionReconciliationAdapter,
     PostgresEnforcementRepository,
     PostgresEvidenceRepository,
     PostgresHmacActionApprovalAdapter,
@@ -58,11 +65,14 @@ from regulated_ai.application import (
     ReconcileToolAction,
 )
 from regulated_ai.application.ports import (
+    ActionApprovalPort,
+    ApprovalPort,
     EnforcementRepository,
     EvidenceRepository,
     InferenceExecutionPort,
     OperatorLifecycleEventRepository,
     ProviderCapabilityRepository,
+    ToolActionReconciliationPort,
     ToolActionRepository,
     ToolExecutionPort,
 )
@@ -296,64 +306,30 @@ def build_runtime(
         configured_key.encode() if configured_key is not None else secrets.token_bytes(32)
     )
     execution, mock_execution = _execution_adapter_from_environment()
+    configured_authority_store = _optional_environment_path(
+        "REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE"
+    )
     configured_approval_key = os.environ.get("REGULAAI_APPROVAL_HMAC_KEY")
-    approval = (
-        None
-        if configured_approval_key is None
-        else (
-            PostgresHmacApprovalAdapter(
-                postgres_database,
-                configured_approval_key.encode(),
-                max_lifetime_seconds=_integer_environment(
-                    "REGULAAI_APPROVAL_MAX_LIFETIME_SECONDS", 3600
-                ),
-            )
-            if postgres_database is not None
-            else HmacApprovalAdapter(
-                _required_database_path(database_path),
-                configured_approval_key.encode(),
-                max_lifetime_seconds=_integer_environment(
-                    "REGULAAI_APPROVAL_MAX_LIFETIME_SECONDS", 3600
-                ),
-            )
-        )
-    )
-    enforcer = EnforceAiOperation(
-        evaluator=evaluator,
-        tokenizer=tokenizer,
-        enforcement=enforcement,
-        execution=execution,
-        approval=approval,
-        observer=observer,
-    )
     configured_action_approval_key = os.environ.get("REGULAAI_ACTION_APPROVAL_HMAC_KEY")
+    configured_reconciliation_key = os.environ.get("REGULAAI_RECONCILIATION_HMAC_KEY")
+    configured_hmac_keys = tuple(
+        key
+        for key in (
+            configured_approval_key,
+            configured_action_approval_key,
+            configured_reconciliation_key,
+        )
+        if key is not None
+    )
+    if configured_authority_store is not None and configured_hmac_keys:
+        raise ValueError("Operator authority trust store and HMAC authority are mutually exclusive")
+    if environment.casefold() in {"prod", "production"} and configured_authority_store is None:
+        raise ValueError("REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE is required in production")
     if (
         configured_action_approval_key is not None
         and configured_action_approval_key == configured_approval_key
     ):
         raise ValueError("Decision and action approval HMAC keys must differ")
-    action_approval = (
-        None
-        if configured_action_approval_key is None
-        else (
-            PostgresHmacActionApprovalAdapter(
-                postgres_database,
-                configured_action_approval_key.encode(),
-                max_lifetime_seconds=_integer_environment(
-                    "REGULAAI_ACTION_APPROVAL_MAX_LIFETIME_SECONDS", 3600
-                ),
-            )
-            if postgres_database is not None
-            else HmacActionApprovalAdapter(
-                _required_database_path(database_path),
-                configured_action_approval_key.encode(),
-                max_lifetime_seconds=_integer_environment(
-                    "REGULAAI_ACTION_APPROVAL_MAX_LIFETIME_SECONDS", 3600
-                ),
-            )
-        )
-    )
-    configured_reconciliation_key = os.environ.get("REGULAAI_RECONCILIATION_HMAC_KEY")
     configured_authority_keys = tuple(
         key for key in (configured_approval_key, configured_action_approval_key) if key is not None
     )
@@ -362,26 +338,118 @@ def build_runtime(
         and configured_reconciliation_key in configured_authority_keys
     ):
         raise ValueError("Reconciliation and approval HMAC keys must differ")
-    reconciliation_authority = (
+    authority_verifier = (
         None
-        if configured_reconciliation_key is None
-        else (
-            PostgresHmacToolActionReconciliationAdapter(
+        if configured_authority_store is None
+        else Ed25519OperatorAuthorityVerifier(configured_authority_store)
+    )
+    approval_lifetime = _integer_environment("REGULAAI_APPROVAL_MAX_LIFETIME_SECONDS", 3600)
+    action_lifetime = _integer_environment("REGULAAI_ACTION_APPROVAL_MAX_LIFETIME_SECONDS", 3600)
+    reconciliation_lifetime = _integer_environment(
+        "REGULAAI_RECONCILIATION_MAX_LIFETIME_SECONDS", 3600
+    )
+    approval: ApprovalPort | None
+    action_approval: ActionApprovalPort | None
+    reconciliation_authority: ToolActionReconciliationPort | None
+    if authority_verifier is not None:
+        approval = (
+            PostgresEd25519ApprovalAdapter(
                 postgres_database,
-                configured_reconciliation_key.encode(),
-                max_lifetime_seconds=_integer_environment(
-                    "REGULAAI_RECONCILIATION_MAX_LIFETIME_SECONDS", 3600
-                ),
+                authority_verifier,
+                max_lifetime_seconds=approval_lifetime,
             )
             if postgres_database is not None
-            else HmacToolActionReconciliationAdapter(
+            else Ed25519ApprovalAdapter(
                 _required_database_path(database_path),
-                configured_reconciliation_key.encode(),
-                max_lifetime_seconds=_integer_environment(
-                    "REGULAAI_RECONCILIATION_MAX_LIFETIME_SECONDS", 3600
-                ),
+                authority_verifier,
+                max_lifetime_seconds=approval_lifetime,
             )
         )
+        action_approval = (
+            PostgresEd25519ActionApprovalAdapter(
+                postgres_database,
+                authority_verifier,
+                max_lifetime_seconds=action_lifetime,
+            )
+            if postgres_database is not None
+            else Ed25519ActionApprovalAdapter(
+                _required_database_path(database_path),
+                authority_verifier,
+                max_lifetime_seconds=action_lifetime,
+            )
+        )
+        reconciliation_authority = (
+            PostgresEd25519ToolActionReconciliationAdapter(
+                postgres_database,
+                authority_verifier,
+                max_lifetime_seconds=reconciliation_lifetime,
+            )
+            if postgres_database is not None
+            else Ed25519ToolActionReconciliationAdapter(
+                _required_database_path(database_path),
+                authority_verifier,
+                max_lifetime_seconds=reconciliation_lifetime,
+            )
+        )
+    else:
+        approval = (
+            None
+            if configured_approval_key is None
+            else (
+                PostgresHmacApprovalAdapter(
+                    postgres_database,
+                    configured_approval_key.encode(),
+                    max_lifetime_seconds=approval_lifetime,
+                )
+                if postgres_database is not None
+                else HmacApprovalAdapter(
+                    _required_database_path(database_path),
+                    configured_approval_key.encode(),
+                    max_lifetime_seconds=approval_lifetime,
+                )
+            )
+        )
+        action_approval = (
+            None
+            if configured_action_approval_key is None
+            else (
+                PostgresHmacActionApprovalAdapter(
+                    postgres_database,
+                    configured_action_approval_key.encode(),
+                    max_lifetime_seconds=action_lifetime,
+                )
+                if postgres_database is not None
+                else HmacActionApprovalAdapter(
+                    _required_database_path(database_path),
+                    configured_action_approval_key.encode(),
+                    max_lifetime_seconds=action_lifetime,
+                )
+            )
+        )
+        reconciliation_authority = (
+            None
+            if configured_reconciliation_key is None
+            else (
+                PostgresHmacToolActionReconciliationAdapter(
+                    postgres_database,
+                    configured_reconciliation_key.encode(),
+                    max_lifetime_seconds=reconciliation_lifetime,
+                )
+                if postgres_database is not None
+                else HmacToolActionReconciliationAdapter(
+                    _required_database_path(database_path),
+                    configured_reconciliation_key.encode(),
+                    max_lifetime_seconds=reconciliation_lifetime,
+                )
+            )
+        )
+    enforcer = EnforceAiOperation(
+        evaluator=evaluator,
+        tokenizer=tokenizer,
+        enforcement=enforcement,
+        execution=execution,
+        approval=approval,
+        observer=observer,
     )
     tool_execution, mock_tool_execution = _tool_execution_adapter_from_environment()
     action_executor = ExecuteToolAction(
@@ -948,6 +1016,7 @@ def _approval_receipt_payload(receipt: ApprovalReceipt | None) -> dict[str, obje
     return {
         "approval_id": receipt.approval_id,
         "actor_id": receipt.actor_id,
+        "authority_key_id": receipt.authority_key_id,
         "decision_digest": receipt.decision_digest,
         "enforcement_id": receipt.enforcement_id,
         "issued_at": receipt.issued_at.isoformat(),
@@ -1051,6 +1120,7 @@ def _operator_timeline_payload(timeline: OperatorTimeline) -> dict[str, object]:
             if timeline.approval is None
             else {
                 "approval_id": timeline.approval.approval_id,
+                "authority_key_id": timeline.approval.authority_key_id,
                 "issued_at": timeline.approval.issued_at.isoformat(),
                 "expires_at": timeline.approval.expires_at.isoformat(),
                 "consumed_at": timeline.approval.consumed_at.isoformat(),
@@ -1119,6 +1189,7 @@ def _action_approval_receipt_payload(
     return {
         "approval_id": receipt.approval_id,
         "actor_id": receipt.actor_id,
+        "authority_key_id": receipt.authority_key_id,
         "action_digest": receipt.action_digest,
         "action_id": receipt.action_id,
         "issued_at": receipt.issued_at.isoformat(),
@@ -1135,6 +1206,7 @@ def _tool_action_reconciliation_receipt_payload(
     return {
         "reconciliation_id": receipt.reconciliation_id,
         "actor_id": receipt.actor_id,
+        "authority_key_id": receipt.authority_key_id,
         "action_digest": receipt.action_digest,
         "action_id": receipt.action_id,
         "outcome": receipt.outcome.value,

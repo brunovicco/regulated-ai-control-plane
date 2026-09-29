@@ -396,6 +396,28 @@ def test_production_runtime_requires_postgres_database_url(
         build_runtime()
 
 
+def test_production_runtime_requires_asymmetric_operator_authority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _ConfiguredDatabase:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+        def verify_schema(self) -> None:
+            pass
+
+    monkeypatch.setattr("regulated_ai.entrypoints.api.PostgresDatabase", _ConfiguredDatabase)
+    monkeypatch.setenv("REGULAAI_ENVIRONMENT", "production")
+    monkeypatch.setenv("REGULAAI_DATABASE_URL", "postgresql://database.invalid/regulaai")
+    monkeypatch.delenv("REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE", raising=False)
+    monkeypatch.delenv("REGULAAI_APPROVAL_HMAC_KEY", raising=False)
+    monkeypatch.delenv("REGULAAI_ACTION_APPROVAL_HMAC_KEY", raising=False)
+    monkeypatch.delenv("REGULAAI_RECONCILIATION_HMAC_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="OPERATOR_AUTHORITY_TRUST_STORE is required"):
+        build_runtime()
+
+
 def test_enforcement_api_returns_only_metadata_after_mock_execution(tmp_path: Path) -> None:
     runtime = _runtime(tmp_path)
     app = create_app(lambda: runtime)

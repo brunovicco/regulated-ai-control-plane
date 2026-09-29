@@ -13,9 +13,10 @@ Before rendering for deployment:
 3. provision `regulaai-control-pack` as a read-only-at-runtime PVC populated from the independently
    verified Phase 6r OCI package while preserving manifest-relative paths;
 4. create `regulaai-control-pack-trust` with the public `control-pack-signing-keys.yaml` key;
-5. use the cluster secret manager to create `regulaai-runtime-keys` with distinct
-   `tokenization-key`, `decision-approval-hmac-key`, `action-approval-hmac-key` and
-   `reconciliation-hmac-key` values;
+5. use the cluster secret manager to create `regulaai-runtime-keys` with `tokenization-key`, and
+   create the `regulaai-operator-authority-trust` ConfigMap containing only the reviewed
+   `operator-authority-keys.yaml` Ed25519 public trust store; private issuer keys must remain
+   outside the cluster runtime;
 6. provision PostgreSQL with TLS, least-privilege runtime and migration identities, then create the
    separate `regulaai-database-runtime` and `regulaai-database-migration` Secrets whose `url` keys
    carry the corresponding least-privilege identities from the cluster secret manager;
@@ -81,6 +82,10 @@ and fails closed instead of creating tables.
 Before production acceptance, restore a backup into a separate non-production database, run the
 schema check and exercise concurrent enforcement/action claims. Record only metadata and artifact
 digests from the exercise.
+
+Production startup also requires the mounted operator-authority trust store. Validate one synthetic
+`ra1e`, `ra2e` and `rr1e` assertion according to each key's configured scope after a key rotation;
+never inject the issuer private key into an API pod. See `OPERATOR_AUTHORITY.md`.
 
 ## Platform differences and limits
 

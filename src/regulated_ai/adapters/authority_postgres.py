@@ -55,9 +55,13 @@ class PostgresHmacApprovalAdapter(HmacApprovalAdapter):
         """Bind decision verification to the shared production ledger."""
         if len(key) < 32:
             raise ValueError("Approval HMAC key must be at least 32 bytes")
+        self._key = bytes(key)
+        self._initialize_database(database, max_lifetime_seconds)
+
+    def _initialize_database(self, database: PostgresDatabase, max_lifetime_seconds: int) -> None:
+        """Initialize the algorithm-independent PostgreSQL decision ledger."""
         _validate_lifetime(max_lifetime_seconds, "Approval")
         self._database = database
-        self._key = bytes(key)
         self._max_lifetime_seconds = max_lifetime_seconds
 
     def consume(
@@ -74,6 +78,7 @@ class PostgresHmacApprovalAdapter(HmacApprovalAdapter):
         if (
             not _valid_identifier(grant.approval_id)
             or not _valid_identifier(grant.actor_id)
+            or not _valid_authority_key(grant.authority_key_id)
             or _DIGEST.fullmatch(grant.decision_digest) is None
             or not _valid_identifier(enforcement_id)
             or not _valid_window(issued_at, expires_at, checked_now, self._max_lifetime_seconds)
@@ -87,6 +92,7 @@ class PostgresHmacApprovalAdapter(HmacApprovalAdapter):
             issued_at=issued_at,
             expires_at=expires_at,
             consumed_at=checked_now,
+            authority_key_id=grant.authority_key_id,
         )
         try:
             with self._database.connect() as connection:
@@ -94,8 +100,8 @@ class PostgresHmacApprovalAdapter(HmacApprovalAdapter):
                     """
                     INSERT INTO approval_consumption (
                         approval_id, actor_id, decision_digest, enforcement_id,
-                        issued_at, expires_at, consumed_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+                        issued_at, expires_at, consumed_at, authority_key_id
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
                         receipt.approval_id,
@@ -105,6 +111,7 @@ class PostgresHmacApprovalAdapter(HmacApprovalAdapter):
                         receipt.issued_at,
                         receipt.expires_at,
                         receipt.consumed_at,
+                        receipt.authority_key_id,
                     ),
                 )
         except UniqueViolation as exc:
@@ -139,8 +146,8 @@ class PostgresHmacApprovalAdapter(HmacApprovalAdapter):
                         """
                         INSERT INTO approval_consumption (
                             approval_id, actor_id, decision_digest, enforcement_id,
-                            issued_at, expires_at, consumed_at
-                        ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+                            issued_at, expires_at, consumed_at, authority_key_id
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                         """,
                         (
                             receipt.approval_id,
@@ -150,6 +157,7 @@ class PostgresHmacApprovalAdapter(HmacApprovalAdapter):
                             receipt.issued_at,
                             receipt.expires_at,
                             receipt.consumed_at,
+                            receipt.authority_key_id,
                         ),
                     )
         except UniqueViolation as exc:
@@ -165,7 +173,7 @@ class PostgresHmacApprovalAdapter(HmacApprovalAdapter):
             row = connection.execute(
                 """
                 SELECT approval_id, actor_id, decision_digest, enforcement_id,
-                       issued_at, expires_at, consumed_at
+                       issued_at, expires_at, consumed_at, authority_key_id
                 FROM approval_consumption WHERE approval_id=%s
                 """,
                 (approval_id,),
@@ -180,6 +188,7 @@ class PostgresHmacApprovalAdapter(HmacApprovalAdapter):
             issued_at=_as_datetime(row[4]),
             expires_at=_as_datetime(row[5]),
             consumed_at=_as_datetime(row[6]),
+            authority_key_id=None if row[7] is None else str(row[7]),
         )
 
 
@@ -196,9 +205,13 @@ class PostgresHmacActionApprovalAdapter(HmacActionApprovalAdapter):
         """Bind action verification to the shared production ledger."""
         if len(key) < 32:
             raise ValueError("Action approval HMAC key must be at least 32 bytes")
+        self._key = bytes(key)
+        self._initialize_database(database, max_lifetime_seconds)
+
+    def _initialize_database(self, database: PostgresDatabase, max_lifetime_seconds: int) -> None:
+        """Initialize the algorithm-independent PostgreSQL action ledger."""
         _validate_lifetime(max_lifetime_seconds, "Action approval")
         self._database = database
-        self._key = bytes(key)
         self._max_lifetime_seconds = max_lifetime_seconds
 
     def consume(
@@ -219,6 +232,7 @@ class PostgresHmacActionApprovalAdapter(HmacActionApprovalAdapter):
         if (
             not _valid_identifier(grant.approval_id)
             or not _valid_identifier(grant.actor_id)
+            or not _valid_authority_key(grant.authority_key_id)
             or _DIGEST.fullmatch(grant.action_digest) is None
             or not _valid_identifier(action_id)
             or not _valid_window(issued_at, expires_at, checked_now, self._max_lifetime_seconds)
@@ -232,6 +246,7 @@ class PostgresHmacActionApprovalAdapter(HmacActionApprovalAdapter):
             issued_at=issued_at,
             expires_at=expires_at,
             consumed_at=checked_now,
+            authority_key_id=grant.authority_key_id,
         )
         try:
             with self._database.connect() as connection:
@@ -239,8 +254,8 @@ class PostgresHmacActionApprovalAdapter(HmacActionApprovalAdapter):
                     """
                     INSERT INTO action_approval_consumption (
                         approval_id, actor_id, action_digest, action_id,
-                        issued_at, expires_at, consumed_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+                        issued_at, expires_at, consumed_at, authority_key_id
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
                         receipt.approval_id,
@@ -250,6 +265,7 @@ class PostgresHmacActionApprovalAdapter(HmacActionApprovalAdapter):
                         receipt.issued_at,
                         receipt.expires_at,
                         receipt.consumed_at,
+                        receipt.authority_key_id,
                     ),
                 )
         except UniqueViolation as exc:
@@ -286,8 +302,8 @@ class PostgresHmacActionApprovalAdapter(HmacActionApprovalAdapter):
                         """
                         INSERT INTO action_approval_consumption (
                             approval_id, actor_id, action_digest, action_id,
-                            issued_at, expires_at, consumed_at
-                        ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+                            issued_at, expires_at, consumed_at, authority_key_id
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                         """,
                         (
                             receipt.approval_id,
@@ -297,6 +313,7 @@ class PostgresHmacActionApprovalAdapter(HmacActionApprovalAdapter):
                             receipt.issued_at,
                             receipt.expires_at,
                             receipt.consumed_at,
+                            receipt.authority_key_id,
                         ),
                     )
         except UniqueViolation as exc:
@@ -320,7 +337,7 @@ class PostgresHmacActionApprovalAdapter(HmacActionApprovalAdapter):
             row = connection.execute(
                 """
                 SELECT approval_id, actor_id, action_digest, action_id,
-                       issued_at, expires_at, consumed_at
+                       issued_at, expires_at, consumed_at, authority_key_id
                 FROM action_approval_consumption WHERE approval_id=%s
                 """,
                 (approval_id,),
@@ -335,6 +352,7 @@ class PostgresHmacActionApprovalAdapter(HmacActionApprovalAdapter):
             issued_at=_as_datetime(row[4]),
             expires_at=_as_datetime(row[5]),
             consumed_at=_as_datetime(row[6]),
+            authority_key_id=None if row[7] is None else str(row[7]),
         )
 
 
@@ -351,9 +369,13 @@ class PostgresHmacToolActionReconciliationAdapter(HmacToolActionReconciliationAd
         """Bind reconciliation verification to the shared production ledger."""
         if len(key) < 32:
             raise ValueError("Reconciliation HMAC key must be at least 32 bytes")
+        self._key = bytes(key)
+        self._initialize_database(database, max_lifetime_seconds)
+
+    def _initialize_database(self, database: PostgresDatabase, max_lifetime_seconds: int) -> None:
+        """Initialize the algorithm-independent PostgreSQL reconciliation ledger."""
         _validate_lifetime(max_lifetime_seconds, "Reconciliation")
         self._database = database
-        self._key = bytes(key)
         self._max_lifetime_seconds = max_lifetime_seconds
 
     def consume(
@@ -380,6 +402,7 @@ class PostgresHmacToolActionReconciliationAdapter(HmacToolActionReconciliationAd
         if (
             not _valid_identifier(grant.reconciliation_id)
             or not _valid_identifier(grant.actor_id)
+            or not _valid_authority_key(grant.authority_key_id)
             or _DIGEST.fullmatch(grant.action_digest) is None
             or not _valid_identifier(action_id)
             or expires_at <= issued_at
@@ -399,6 +422,7 @@ class PostgresHmacToolActionReconciliationAdapter(HmacToolActionReconciliationAd
             issued_at=issued_at,
             expires_at=expires_at,
             consumed_at=checked_now,
+            authority_key_id=grant.authority_key_id,
         )
         existing = self.get(receipt.reconciliation_id)
         if existing is not None:
@@ -417,8 +441,8 @@ class PostgresHmacToolActionReconciliationAdapter(HmacToolActionReconciliationAd
                     """
                     INSERT INTO tool_action_reconciliation_consumption (
                         reconciliation_id, actor_id, action_digest, action_id, outcome,
-                        tool_execution_id, issued_at, expires_at, consumed_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        tool_execution_id, issued_at, expires_at, consumed_at, authority_key_id
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
                         receipt.reconciliation_id,
@@ -430,6 +454,7 @@ class PostgresHmacToolActionReconciliationAdapter(HmacToolActionReconciliationAd
                         receipt.issued_at,
                         receipt.expires_at,
                         receipt.consumed_at,
+                        receipt.authority_key_id,
                     ),
                 )
         except UniqueViolation as exc:
@@ -470,8 +495,8 @@ class PostgresHmacToolActionReconciliationAdapter(HmacToolActionReconciliationAd
                     """
                     INSERT INTO tool_action_reconciliation_consumption (
                         reconciliation_id, actor_id, action_digest, action_id, outcome,
-                        tool_execution_id, issued_at, expires_at, consumed_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        tool_execution_id, issued_at, expires_at, consumed_at, authority_key_id
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
                         receipt.reconciliation_id,
@@ -483,6 +508,7 @@ class PostgresHmacToolActionReconciliationAdapter(HmacToolActionReconciliationAd
                         receipt.issued_at,
                         receipt.expires_at,
                         receipt.consumed_at,
+                        receipt.authority_key_id,
                     ),
                 )
                 updated = connection.execute(
@@ -525,7 +551,7 @@ class PostgresHmacToolActionReconciliationAdapter(HmacToolActionReconciliationAd
             row = connection.execute(
                 """
                 SELECT reconciliation_id, actor_id, action_digest, action_id, outcome,
-                       tool_execution_id, issued_at, expires_at, consumed_at
+                       tool_execution_id, issued_at, expires_at, consumed_at, authority_key_id
                 FROM tool_action_reconciliation_consumption WHERE reconciliation_id=%s
                 """,
                 (reconciliation_id,),
@@ -542,6 +568,7 @@ class PostgresHmacToolActionReconciliationAdapter(HmacToolActionReconciliationAd
             issued_at=_as_datetime(row[6]),
             expires_at=_as_datetime(row[7]),
             consumed_at=_as_datetime(row[8]),
+            authority_key_id=None if row[9] is None else str(row[9]),
         )
 
 
@@ -563,6 +590,7 @@ def _decision_receipt(
     if (
         not _valid_identifier(grant.approval_id)
         or not _valid_identifier(grant.actor_id)
+        or not _valid_authority_key(grant.authority_key_id)
         or _DIGEST.fullmatch(grant.decision_digest) is None
         or not _valid_identifier(enforcement_id)
         or not _valid_window(issued_at, expires_at, checked_now, maximum_seconds)
@@ -576,6 +604,7 @@ def _decision_receipt(
         issued_at=issued_at,
         expires_at=expires_at,
         consumed_at=checked_now,
+        authority_key_id=grant.authority_key_id,
     )
 
 
@@ -594,6 +623,7 @@ def _action_receipt(
     if (
         not _valid_identifier(grant.approval_id)
         or not _valid_identifier(grant.actor_id)
+        or not _valid_authority_key(grant.authority_key_id)
         or _DIGEST.fullmatch(grant.action_digest) is None
         or not _valid_identifier(action_id)
         or not _valid_window(issued_at, expires_at, checked_now, maximum_seconds)
@@ -607,6 +637,7 @@ def _action_receipt(
         issued_at=issued_at,
         expires_at=expires_at,
         consumed_at=checked_now,
+        authority_key_id=grant.authority_key_id,
     )
 
 
@@ -629,6 +660,7 @@ def _reconciliation_receipt(
     if (
         not _valid_identifier(grant.reconciliation_id)
         or not _valid_identifier(grant.actor_id)
+        or not _valid_authority_key(grant.authority_key_id)
         or _DIGEST.fullmatch(grant.action_digest) is None
         or not _valid_identifier(action_id)
         or not _valid_window(issued_at, expires_at, checked_now, maximum_seconds)
@@ -645,11 +677,16 @@ def _reconciliation_receipt(
         issued_at=issued_at,
         expires_at=expires_at,
         consumed_at=checked_now,
+        authority_key_id=grant.authority_key_id,
     )
 
 
 def _valid_identifier(value: str) -> bool:
     return _SAFE_ID.fullmatch(value) is not None
+
+
+def _valid_authority_key(value: str | None) -> bool:
+    return value is None or _valid_identifier(value)
 
 
 def _valid_window(
@@ -684,6 +721,7 @@ def _same_reconciliation(
         and stored.tool_execution_id == requested.tool_execution_id
         and stored.issued_at == requested.issued_at
         and stored.expires_at == requested.expires_at
+        and stored.authority_key_id == requested.authority_key_id
     )
 
 

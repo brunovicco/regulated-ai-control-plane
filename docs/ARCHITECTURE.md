@@ -116,7 +116,8 @@ Application code depends on domain contracts, never concrete infrastructure.
 
 - strict YAML loaders for policies, provider capabilities, tools and trust stores;
 - SQLite repositories and atomic lifecycle transitions;
-- HMAC approval/reconciliation verification and Ed25519 release verification;
+- role-bound Ed25519 production authority, local HMAC compatibility and Ed25519 release
+  verification;
 - governed-gateway and bounded read-only HTTP execution;
 - release review, custody, OCI and trusted-time verification;
 - structured logs, CloudEvents and optional OpenTelemetry export.
@@ -149,7 +150,7 @@ request
   -> produce decision and obligations
   -> persist metadata-only evidence
   -> apply local transformations
-  -> verify decision approval when required
+  -> verify decision approval against scoped operator authority when required
   -> atomically claim dispatch
   -> mock execution or governed gateway
   -> persist terminal metadata
@@ -167,7 +168,7 @@ model proposal
   -> caller resubmits exact arguments and workload identity
   -> validate closed input schema and proposal binding
   -> compute action digest
-  -> verify separate action approval
+  -> verify separately scoped action approval
   -> atomically claim dispatch and consume authority
   -> mock or fixed read-only sandbox adapter
   -> validate closed output schema
@@ -181,6 +182,8 @@ arguments, idempotency keys, assertions and tool results are ephemeral.
 Timeouts or ambiguous transport failures enter `RECONCILIATION_REQUIRED`. An organization-owned
 investigation can then issue a separately authenticated assertion for `EXECUTED` or
 `NOT_EXECUTED`. Reconciliation records the terminal fact and never calls the tool adapter.
+Production assertions are verified with public Ed25519 keys bound to actor, lifecycle and authority
+kind; the runtime has no signing key. HMAC authority remains a local/pilot compatibility mode.
 
 ### Release trust
 

@@ -15,11 +15,15 @@ The project is currently a **controlled pilot**. Breaking changes may occur befo
   claims, atomic authority/state transitions and append-only lifecycle triggers.
 - Restricted two-replica Kubernetes/OpenShift reference with separate runtime and migration
   database identities and an explicit migration Job.
+- Role-bound Ed25519 production operator authority with lifecycle-aware public keys, distinct
+  decision/action/reconciliation scopes and verification-key identity in metadata-only receipts.
 
 ### Changed
 
 - Production-labelled runtimes now require PostgreSQL and fail startup when the database is
   unavailable or the schema revision does not match the application.
+- Production-labelled runtimes require a public operator-authority trust store and reject
+  simultaneous HMAC authority configuration.
 
 ## [0.1.0rc1] - 2026-09-28
 

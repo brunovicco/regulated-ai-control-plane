@@ -80,11 +80,22 @@ def test_deployment_is_multi_replica_non_root_and_uses_external_authority() -> N
     assert env["REGULAAI_TOKENIZATION_KEY"]["valueFrom"]["secretKeyRef"]["name"] == (
         "regulaai-runtime-keys"
     )
+    assert env["REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE"]["value"] == (
+        "/etc/regulaai/operator-authority/operator-authority-keys.yaml"
+    )
+    assert not {
+        "REGULAAI_APPROVAL_HMAC_KEY",
+        "REGULAAI_ACTION_APPROVAL_HMAC_KEY",
+        "REGULAAI_RECONCILIATION_HMAC_KEY",
+    }.intersection(env)
     volumes = {item["name"]: item for item in pod["volumes"]}
     assert volumes["control-pack"]["persistentVolumeClaim"]["claimName"] == (
         "regulaai-control-pack"
     )
     assert volumes["control-pack-trust"]["configMap"]["name"] == ("regulaai-control-pack-trust")
+    assert volumes["operator-authority-trust"]["configMap"]["name"] == (
+        "regulaai-operator-authority-trust"
+    )
     assert all("hostPath" not in item for item in volumes.values())
     assert "data" not in volumes
 

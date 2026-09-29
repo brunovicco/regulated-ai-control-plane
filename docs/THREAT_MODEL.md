@@ -58,7 +58,8 @@ Threat:
 a valid decision approval or altered/replayed arguments execute a model-proposed external action.
 
 Mitigations:
-- decision (`ra1`) and action (`ra2`) assertions use separate schemas, prefixes and keys;
+- production decision (`ra1e`) and action (`ra2e`) assertions use separate schemas, prefixes and
+  trust-store scopes; local/pilot HMAC `ra1` and `ra2` remain domain-separated;
 - action digest binds enforcement/call, current catalog definition/schema, exact argument digest,
   downstream workload and idempotency digest;
 - resubmitted arguments must satisfy the closed schema and reproduce the stored proposal digest;
@@ -66,8 +67,8 @@ Mitigations:
 - approval is consumed before the tool port and ambiguous failures are never retried automatically;
 - Phase 4c defaults to a network-silent mock; Phase 7b permits only the separately configured
   `cards.read` sandbox binding.
-- Phase 7c requires distinct `rr1` authority to declare an investigated outcome and has no tool-port
-  dependency.
+- terminal reconciliation requires distinct `rr1e` production scope or local/pilot `rr1`
+  authority and has no tool-port dependency.
 
 ### Operator falsifies or replays reconciliation
 
@@ -76,7 +77,8 @@ an unauthorized caller closes an ambiguous action, reuses execution approval as 
 changes the outcome or causes a second tool execution.
 
 Mitigations:
-- `rr1` uses a dedicated key, prefix and strict canonical schema distinct from `ra1`/`ra2`;
+- production `rr1e` uses a dedicated authority scope, prefix and strict canonical schema distinct
+  from `ra1e`/`ra2e`; local/pilot HMAC prefixes remain separate;
 - the assertion binds exact action digest, pseudonymous actor, closed outcome, execution identifier
   semantics, bounded lifetime and unique reconciliation id;
 - only `RECONCILIATION_REQUIRED` can transition, and reconciled states are terminal;
@@ -85,9 +87,11 @@ Mitigations:
 - raw assertions, free-form notes, output and evidence URLs are neither accepted nor persisted.
 
 Residual risk:
-the HMAC verifier holds symmetric signing material, and the service does not provide organization
-identity or role enforcement. Deployments must isolate the dedicated key and protect the operator
-endpoint with their identity-aware perimeter. Issuers must not infer `NOT_EXECUTED` from a timeout.
+an authorized Ed25519 private-key compromise can mint assertions within that key's scope, and the
+service does not authenticate the interactive operator session by itself. Deployments must protect
+the endpoint with their identity-aware perimeter and preserve issuer separation of duties. The
+local/pilot HMAC verifier still holds symmetric signing material. Issuers must not infer
+`NOT_EXECUTED` from a timeout.
 
 ### Tool result injects instructions or exfiltrates data
 
@@ -733,7 +737,8 @@ Mitigations:
 ### Approval spoofing or replay
 
 Mitigations:
-- dedicated HMAC-authenticated external issuer and strict assertion schema;
+- production Ed25519 verification against actor-bound, lifecycle-aware, role-scoped public keys;
+- distinct canonical assertion schemas and prefixes for decision, action and reconciliation;
 - actor identity and policy/provider versions are transitively bound by the decision digest;
 - bounded lifetime, future-issuance rejection and globally single-use approval IDs;
 - atomic consumption after the execution claim and before execution;
@@ -741,9 +746,11 @@ Mitigations:
 - approval applies to an operation-specific decision digest that commits to normalized input and
   policy output, not free-form text, a tool name or model output.
 
-The HMAC verifier necessarily possesses symmetric signing material. Issuer/verifier separation is
-therefore operational in Phase 4a, not cryptographic; deployments must restrict key access. A
-future asymmetric or OIDC adapter should remove signing capability from the enforcement service.
+Production replicas possess only public verification keys, so issuer/verifier separation is
+cryptographic. Trust-store compromise or an authorized private-key compromise can still grant
+authority within configured scope. HMAC compatibility retains symmetric signing material only for
+local/pilot operation and must not be enabled with the production trust store. Enterprise OIDC
+session authentication remains a deployment-owned boundary.
 
 ## Abuse cases to test
 

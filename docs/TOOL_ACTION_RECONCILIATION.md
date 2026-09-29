@@ -9,7 +9,7 @@ adapter again.
 The endpoint accepts only an externally issued canonical assertion:
 
 ```text
-rr1.<base64url-canonical-json>.<base64url-hmac-sha256>
+rr1e.<base64url-canonical-json>.<base64url-ed25519-signature>
 ```
 
 Its exact payload is:
@@ -18,11 +18,13 @@ Its exact payload is:
 {
   "action_digest": "sha256:...",
   "actor_id": "operator-pseudonym",
+  "authority_kind": "reconciliation",
   "expires_at": 1790597100,
   "issued_at": 1790596800,
+  "key_id": "operator-reconciliation-2026-01",
   "outcome": "EXECUTED",
   "reconciliation_id": "reconciliation-...",
-  "schema_version": "1",
+  "schema_version": "2",
   "subject_type": "tool_action_reconciliation",
   "tool_execution_id": "sandbox-execution-..."
 }
@@ -32,9 +34,11 @@ Its exact payload is:
 execution identifier. `NOT_EXECUTED` requires `tool_execution_id: null`. Free-form notes, output,
 arguments, URLs and retry instructions are not accepted.
 
-Configure a secret of at least 32 bytes through `REGULAAI_RECONCILIATION_HMAC_KEY`. It must differ
-from the `ra1` decision and `ra2` action-approval keys. Issuance remains in an external,
-organization-controlled operator workflow. The service does not mint assertions.
+Production configures the public trust store through
+`REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE`. The selected key must bind the signed `actor_id`, be
+active and authorize `reconciliation`. The service holds no private signing key and does not mint
+assertions. Local/pilot compatibility retains the HMAC `rr1` schema and dedicated
+`REGULAAI_RECONCILIATION_HMAC_KEY`; the two modes cannot be enabled together.
 
 ## Operation
 
@@ -47,7 +51,7 @@ POST /v1/tool-actions/{action_id}/reconciliation
 with:
 
 ```json
-{"reconciliation_assertion": "rr1...."}
+{"reconciliation_assertion": "rr1e...."}
 ```
 
 The action must already be `RECONCILIATION_REQUIRED`, and the signed `action_digest` must match its
@@ -77,9 +81,10 @@ leave the action in `RECONCILIATION_REQUIRED`.
 
 - protect the endpoint with the deployment's operator authentication and network controls in
   addition to the signed assertion;
-- keep the HMAC key and raw assertion out of files, logs, traces, screenshots and evidence;
+- keep private signing keys and raw assertions out of the runtime, files, logs, traces,
+  screenshots and evidence;
 - use pseudonymous bounded actor identifiers and short assertion lifetimes;
-- rotate the reconciliation key independently from approval keys;
+- scope and rotate reconciliation public keys independently from approval authority;
 - preserve the configured SQLite or PostgreSQL database because it contains the consumption ledger
   and terminal receipt;
 - do not interpret `RECONCILED_EXECUTED` as validated output: no raw or safe result is recovered;

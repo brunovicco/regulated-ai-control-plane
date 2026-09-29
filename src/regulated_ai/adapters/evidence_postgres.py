@@ -39,7 +39,7 @@ from regulated_ai.domain import (
     ToolActionStatus,
 )
 
-POSTGRES_SCHEMA_REVISION = "0001_production_persistence"
+POSTGRES_SCHEMA_REVISION = "0002_operator_authority"
 
 _EVIDENCE_INSERT = """
 INSERT INTO evidence (

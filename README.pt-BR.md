@@ -159,9 +159,10 @@ Não suportado:
 O [perfil do release piloto](docs/PILOT_RELEASE.md) define verificação, aceite e limites de rollout.
 
 O código-fonte atual também inclui a próxima fundação produtiva: persistência PostgreSQL,
-migrations versionadas e claims concorrentes seguros para múltiplas réplicas. Isso não amplia o
-escopo do piloto publicado até existirem evidências operacionais de TLS, backup/restore, SLO e
-aceite sob responsabilidade do deployment.
+migrations versionadas, claims concorrentes seguros para múltiplas réplicas e autoridade
+operacional Ed25519 com escopo por função. Isso não amplia o escopo do piloto publicado até
+existirem evidências operacionais de TLS, rotação do trust store, backup/restore, SLO e aceite sob
+responsabilidade do deployment.
 
 ## Mapa do repositório
 
