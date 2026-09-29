@@ -158,13 +158,18 @@ Não suportado:
 
 O [perfil do release piloto](docs/PILOT_RELEASE.md) define verificação, aceite e limites de rollout.
 
+O código-fonte atual também inclui a próxima fundação produtiva: persistência PostgreSQL,
+migrations versionadas e claims concorrentes seguros para múltiplas réplicas. Isso não amplia o
+escopo do piloto publicado até existirem evidências operacionais de TLS, backup/restore, SLO e
+aceite sob responsabilidade do deployment.
+
 ## Mapa do repositório
 
 ```text
 src/regulated_ai/
 ├── domain/        # políticas, decisões, obrigações e tipos de evidência
 ├── application/   # avaliação, enforcement, autoridade e releases
-├── adapters/      # YAML, SQLite, assinaturas, gateway, ferramentas e observabilidade
+├── adapters/      # YAML, SQLite/PostgreSQL, assinaturas, gateway, ferramentas e observabilidade
 ├── entrypoints/   # FastAPI, UI do operador, logging e comando do piloto
 └── resources/     # control pack de demonstração assinado
 

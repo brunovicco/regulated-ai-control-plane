@@ -80,10 +80,12 @@ leave the action in `RECONCILIATION_REQUIRED`.
 - keep the HMAC key and raw assertion out of files, logs, traces, screenshots and evidence;
 - use pseudonymous bounded actor identifiers and short assertion lifetimes;
 - rotate the reconciliation key independently from approval keys;
-- preserve the SQLite database because it contains the consumption ledger and terminal receipt;
+- preserve the configured SQLite or PostgreSQL database because it contains the consumption ledger
+  and terminal receipt;
 - do not interpret `RECONCILED_EXECUTED` as validated output: no raw or safe result is recovered;
 - do not create an automatic retry from `RECONCILED_NOT_EXECUTED`; any future retry requires a new,
   separately designed action contract.
 
-The local SQLite implementation is a single-instance reference. Multi-replica production rollout
-still requires a production persistence and transaction design.
+The local SQLite implementation remains a single-instance reference. PostgreSQL atomically consumes
+reconciliation authority with the terminal action transition and supports multi-replica claims;
+production use still requires deployment-owned migration, TLS, backup/restore and SLO evidence.

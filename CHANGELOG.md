@@ -9,6 +9,18 @@ The project is currently a **controlled pilot**. Breaking changes may occur befo
 
 ## [Unreleased]
 
+### Added
+
+- PostgreSQL production persistence with versioned Alembic migrations, multi-replica execution
+  claims, atomic authority/state transitions and append-only lifecycle triggers.
+- Restricted two-replica Kubernetes/OpenShift reference with separate runtime and migration
+  database identities and an explicit migration Job.
+
+### Changed
+
+- Production-labelled runtimes now require PostgreSQL and fail startup when the database is
+  unavailable or the schema revision does not match the application.
+
 ## [0.1.0rc1] - 2026-09-28
 
 ### Added

@@ -6,9 +6,12 @@ metadata:
     app.kubernetes.io/name: regulaai-control-plane
     app.kubernetes.io/part-of: regulaai
 spec:
-  replicas: 1
+  replicas: 2
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: regulaai-control-plane
@@ -44,8 +47,11 @@ spec:
                 configMapKeyRef:
                   name: regulaai-deployment-metadata
                   key: service-version
-            - name: REGULAAI_EVIDENCE_DB
-              value: /var/lib/regulaai/evidence.sqlite3
+            - name: REGULAAI_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: regulaai-database-runtime
+                  key: url
             - name: REGULAAI_CONTROL_PACK_MANIFEST
               value: /etc/regulaai/control-pack/control-pack-manifest.yaml
             - name: REGULAAI_CONTROL_PACK_TRUST_STORE
@@ -67,9 +73,12 @@ spec:
                 secretKeyRef:
                   name: regulaai-runtime-keys
                   key: action-approval-hmac-key
+            - name: REGULAAI_RECONCILIATION_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: regulaai-runtime-keys
+                  key: reconciliation-hmac-key
           volumeMounts:
-            - name: data
-              mountPath: /var/lib/regulaai
             - name: control-pack
               mountPath: /etc/regulaai/control-pack
               readOnly: true
@@ -115,9 +124,6 @@ spec:
               drop:
                 - ALL
       volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: regulaai-data
         - name: control-pack
           persistentVolumeClaim:
             claimName: regulaai-control-pack

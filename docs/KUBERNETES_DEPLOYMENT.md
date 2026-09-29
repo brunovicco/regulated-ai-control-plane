@@ -14,11 +14,16 @@ Before rendering for deployment:
    verified Phase 6r OCI package while preserving manifest-relative paths;
 4. create `regulaai-control-pack-trust` with the public `control-pack-signing-keys.yaml` key;
 5. use the cluster secret manager to create `regulaai-runtime-keys` with distinct
-   `tokenization-key`, `decision-approval-hmac-key` and `action-approval-hmac-key` values;
-6. configure backup, restore and encryption for the `regulaai-data` PVC;
-7. create `regulaai-deployment-metadata` with the non-secret immutable `service-version` matching
+   `tokenization-key`, `decision-approval-hmac-key`, `action-approval-hmac-key` and
+   `reconciliation-hmac-key` values;
+6. provision PostgreSQL with TLS, least-privilege runtime and migration identities, then create the
+   separate `regulaai-database-runtime` and `regulaai-database-migration` Secrets whose `url` keys
+   carry the corresponding least-privilege identities from the cluster secret manager;
+7. configure encrypted backups, point-in-time recovery, retention and restore exercises for the
+   PostgreSQL database;
+8. create `regulaai-deployment-metadata` with the non-secret immutable `service-version` matching
    the image release;
-8. label only approved caller pods with `regulaai.openai.com/client: "true"`.
+9. label only approved caller pods with `regulaai.openai.com/client: "true"`.
 
 Do not place private keys, HMAC keys or credentials in Kustomize files, ConfigMaps, command lines or
 Git. Admission policy should verify the image signature/digest and reject privileged exceptions.
@@ -56,17 +61,38 @@ The server-side dry run contacts the selected cluster and is intentionally an op
 repository quality-gate step. Review the complete rendered output and admission results before an
 approved apply.
 
+## Database migration and rollout
+
+The base contains a restricted `regulaai-database-migration` Job. A deployment pipeline must apply
+and wait for that Job before rolling out the API; Kustomize itself does not impose resource order.
+Use an immutable Job name per release or delete a successfully completed prior Job through the
+deployment platform before applying the next revision.
+
+```bash
+kubectl apply -f <rendered-migration-job.yaml>
+kubectl wait --for=condition=complete --timeout=5m job/regulaai-database-migration
+kubectl rollout status deployment/regulaai-control-plane --timeout=5m
+```
+
+The migration identity should own DDL. The runtime identity should have only the DML and sequence
+permissions required by the migrated tables. The API verifies the exact Alembic revision at startup
+and fails closed instead of creating tables.
+
+Before production acceptance, restore a backup into a separate non-production database, run the
+schema check and exercise concurrent enforcement/action claims. Record only metadata and artifact
+digests from the exercise.
+
 ## Platform differences and limits
 
 The Kubernetes base uses UID/GID/fsGroup 10001. The OpenShift overlay removes those fixed fields so
 `restricted-v2` can allocate namespace-specific identities and volume groups. Both keep non-root,
 seccomp, capability and read-only-root controls.
 
-The API uses SQLite and `ReadWriteOnce`, so the reference fixes one replica and `Recreate` strategy.
-Do not increase replicas until persistence, migrations and consistency semantics are redesigned.
-The default NetworkPolicy permits no egress; gateway mode needs a separate reviewed overlay with
-specific DNS/HTTPS destinations and credential delivery. Cluster ingress, TLS, OIDC, external
-routes, storage classes, registry authentication, backups and disaster recovery remain external.
+The API uses PostgreSQL and the base runs two replicas with a rolling strategy. SQLite remains only
+the local and controlled-pilot default. The default NetworkPolicy permits no egress; production
+requires a reviewed overlay limited to the exact PostgreSQL endpoint, and gateway mode additionally
+needs specific DNS/HTTPS destinations. Cluster ingress, TLS, OIDC, external routes, registry
+authentication, database availability, backups and disaster recovery remain external.
 
 OTLP is also inactive by default even though the image contains the observability extra. Enabling it
 requires an explicit OTLP endpoint plus a narrowly reviewed DNS/HTTPS NetworkPolicy, collector

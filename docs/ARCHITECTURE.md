@@ -212,14 +212,20 @@ trust-store checks. The same authenticated bytes feed runtime parsing and offlin
 
 ## Persistence and consistency
 
-SQLite is the reference persistence implementation. It stores evaluation evidence, enforcement
-state, approval consumption, tool-action lifecycle, reconciliation receipts and append-only history.
-Externally visible execution is preceded by an atomic dispatch claim so retries cannot silently
-duplicate an effect.
+SQLite is the local and controlled-pilot persistence implementation. PostgreSQL is the production
+adapter selected through `REGULAAI_DATABASE_URL` and managed by explicit Alembic migrations. Both
+store only evaluation evidence, enforcement state, authority consumption, tool-action lifecycle,
+reconciliation receipts and append-only history.
 
-The supported pilot profile is one replica with a dedicated database. Multi-replica operation is
-blocked until a transactional production adapter, migrations and distributed consistency semantics
-are defined.
+PostgreSQL conditional updates provide single-winner dispatch claims across replicas. Decision and
+action approval consumption is committed in the same transaction as the corresponding claim;
+reconciliation consumption is committed with its irreversible terminal action transition. Database
+triggers append lifecycle history in each state transaction. Production startup checks the exact
+schema revision and never performs opportunistic DDL.
+
+The tagged controlled pilot remains one replica with a dedicated SQLite database. The production
+reference runs two replicas only after the explicit migration job and deployment-owned database
+controls succeed.
 
 ## Failure model
 

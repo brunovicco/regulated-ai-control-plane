@@ -1,5 +1,21 @@
 # Implementation plan
 
+## Production persistence — PostgreSQL and multi-replica safety
+
+Status: implemented in source after the `v0.1.0rc1` controlled-pilot tag.
+
+- PostgreSQL adapters preserve the evidence, enforcement, action and operator-timeline ports.
+- Alembic owns explicit schema migration; the API requires the exact supported revision.
+- Conditional updates make provider and tool dispatch claims single-winner across replicas.
+- PostgreSQL authority adapters commit decision/action approval consumption with dispatch claims and
+  reconciliation consumption with the terminal action transition.
+- Database triggers append immutable lifecycle events in the state transaction.
+- SQLite remains the network-silent local and controlled-pilot adapter.
+- The deployment reference uses two replicas and a restricted, separately completed migration job.
+
+Operational production acceptance, database TLS/egress, least-privilege roles, backup/restore,
+SLOs and incident exercises remain deployment-owned work.
+
 ## Phase 7c — authenticated terminal tool-action reconciliation
 
 ### Goal

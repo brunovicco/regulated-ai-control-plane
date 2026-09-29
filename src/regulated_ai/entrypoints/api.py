@@ -30,6 +30,14 @@ from regulated_ai.adapters import (
     HmacToolActionReconciliationAdapter,
     MockInferenceExecutionAdapter,
     MockToolExecutionAdapter,
+    PostgresDatabase,
+    PostgresEnforcementRepository,
+    PostgresEvidenceRepository,
+    PostgresHmacActionApprovalAdapter,
+    PostgresHmacApprovalAdapter,
+    PostgresHmacToolActionReconciliationAdapter,
+    PostgresOperatorLifecycleEventRepository,
+    PostgresToolActionRepository,
     ReadOnlyHttpToolExecutionAdapter,
     ReadOnlyHttpToolExecutionConfig,
     SqliteEnforcementRepository,
@@ -238,14 +246,39 @@ def build_runtime(
         raise ValueError("Tool catalog is part of the signed control pack")
     tool_file = control_pack.tool_files[0]
     tools = FileToolCatalogRepository.from_bytes(tool_file.content, tool_file.path)
-    configured_path = os.environ.get("REGULAAI_EVIDENCE_DB")
-    database_path = evidence_path or Path(configured_path or "var/regulaai-evidence.sqlite3")
-    repository = SqliteEvidenceRepository(database_path)
-    enforcement = SqliteEnforcementRepository(database_path)
-    actions = SqliteToolActionRepository(database_path)
-    lifecycle_events = SqliteOperatorLifecycleEventRepository(database_path)
     service_version = _runtime_label("REGULAAI_SERVICE_VERSION", "0.1.0")
     environment = _runtime_label("REGULAAI_ENVIRONMENT", "local")
+    configured_database_url = os.environ.get("REGULAAI_DATABASE_URL")
+    postgres_database: PostgresDatabase | None = None
+    repository: EvidenceRepository
+    enforcement: EnforcementRepository
+    actions: ToolActionRepository
+    lifecycle_events: OperatorLifecycleEventRepository
+    if evidence_path is None and configured_database_url is not None:
+        postgres_database = PostgresDatabase(
+            configured_database_url,
+            connect_timeout_seconds=_integer_environment(
+                "REGULAAI_DATABASE_CONNECT_TIMEOUT_SECONDS", 5
+            ),
+            statement_timeout_milliseconds=_integer_environment(
+                "REGULAAI_DATABASE_STATEMENT_TIMEOUT_MILLISECONDS", 5_000
+            ),
+        )
+        postgres_database.verify_schema()
+        repository = PostgresEvidenceRepository(postgres_database)
+        enforcement = PostgresEnforcementRepository(postgres_database)
+        actions = PostgresToolActionRepository(postgres_database)
+        lifecycle_events = PostgresOperatorLifecycleEventRepository(postgres_database)
+        database_path = None
+    else:
+        if evidence_path is None and environment.casefold() in {"prod", "production"}:
+            raise ValueError("REGULAAI_DATABASE_URL is required in production")
+        configured_path = os.environ.get("REGULAAI_EVIDENCE_DB")
+        database_path = evidence_path or Path(configured_path or "var/regulaai-evidence.sqlite3")
+        repository = SqliteEvidenceRepository(database_path)
+        enforcement = SqliteEnforcementRepository(database_path)
+        actions = SqliteToolActionRepository(database_path)
+        lifecycle_events = SqliteOperatorLifecycleEventRepository(database_path)
     telemetry = _build_telemetry_lifecycle(service_version=service_version, environment=environment)
     observer = StructuredEvaluationObserver(
         tracer=None if telemetry is None else telemetry.initialize()
@@ -267,12 +300,22 @@ def build_runtime(
     approval = (
         None
         if configured_approval_key is None
-        else HmacApprovalAdapter(
-            database_path,
-            configured_approval_key.encode(),
-            max_lifetime_seconds=_integer_environment(
-                "REGULAAI_APPROVAL_MAX_LIFETIME_SECONDS", 3600
-            ),
+        else (
+            PostgresHmacApprovalAdapter(
+                postgres_database,
+                configured_approval_key.encode(),
+                max_lifetime_seconds=_integer_environment(
+                    "REGULAAI_APPROVAL_MAX_LIFETIME_SECONDS", 3600
+                ),
+            )
+            if postgres_database is not None
+            else HmacApprovalAdapter(
+                _required_database_path(database_path),
+                configured_approval_key.encode(),
+                max_lifetime_seconds=_integer_environment(
+                    "REGULAAI_APPROVAL_MAX_LIFETIME_SECONDS", 3600
+                ),
+            )
         )
     )
     enforcer = EnforceAiOperation(
@@ -292,12 +335,22 @@ def build_runtime(
     action_approval = (
         None
         if configured_action_approval_key is None
-        else HmacActionApprovalAdapter(
-            database_path,
-            configured_action_approval_key.encode(),
-            max_lifetime_seconds=_integer_environment(
-                "REGULAAI_ACTION_APPROVAL_MAX_LIFETIME_SECONDS", 3600
-            ),
+        else (
+            PostgresHmacActionApprovalAdapter(
+                postgres_database,
+                configured_action_approval_key.encode(),
+                max_lifetime_seconds=_integer_environment(
+                    "REGULAAI_ACTION_APPROVAL_MAX_LIFETIME_SECONDS", 3600
+                ),
+            )
+            if postgres_database is not None
+            else HmacActionApprovalAdapter(
+                _required_database_path(database_path),
+                configured_action_approval_key.encode(),
+                max_lifetime_seconds=_integer_environment(
+                    "REGULAAI_ACTION_APPROVAL_MAX_LIFETIME_SECONDS", 3600
+                ),
+            )
         )
     )
     configured_reconciliation_key = os.environ.get("REGULAAI_RECONCILIATION_HMAC_KEY")
@@ -312,12 +365,22 @@ def build_runtime(
     reconciliation_authority = (
         None
         if configured_reconciliation_key is None
-        else HmacToolActionReconciliationAdapter(
-            database_path,
-            configured_reconciliation_key.encode(),
-            max_lifetime_seconds=_integer_environment(
-                "REGULAAI_RECONCILIATION_MAX_LIFETIME_SECONDS", 3600
-            ),
+        else (
+            PostgresHmacToolActionReconciliationAdapter(
+                postgres_database,
+                configured_reconciliation_key.encode(),
+                max_lifetime_seconds=_integer_environment(
+                    "REGULAAI_RECONCILIATION_MAX_LIFETIME_SECONDS", 3600
+                ),
+            )
+            if postgres_database is not None
+            else HmacToolActionReconciliationAdapter(
+                _required_database_path(database_path),
+                configured_reconciliation_key.encode(),
+                max_lifetime_seconds=_integer_environment(
+                    "REGULAAI_RECONCILIATION_MAX_LIFETIME_SECONDS", 3600
+                ),
+            )
         )
     )
     tool_execution, mock_tool_execution = _tool_execution_adapter_from_environment()
@@ -437,6 +500,12 @@ def _optional_environment_path(name: str) -> Path | None:
     if not value.strip():
         raise ValueError(f"{name} must not be empty")
     return Path(value)
+
+
+def _required_database_path(path: Path | None) -> Path:
+    if path is None:
+        raise RuntimeError("SQLite database path is unavailable")
+    return path
 
 
 def _float_environment(name: str, default: float) -> float:

@@ -5,11 +5,25 @@ from regulated_ai.adapters.action_approval import (
     HmacActionApprovalAdapter,
 )
 from regulated_ai.adapters.approval import ApprovalAssertionError, HmacApprovalAdapter
+from regulated_ai.adapters.authority_postgres import (
+    PostgresHmacActionApprovalAdapter,
+    PostgresHmacApprovalAdapter,
+    PostgresHmacToolActionReconciliationAdapter,
+)
 from regulated_ai.adapters.classifier import DeterministicDataClassifier
 from regulated_ai.adapters.evaluation_observability import (
     ControlEventTracer,
     StructuredEvaluationObserver,
     encode_cloudevent,
+)
+from regulated_ai.adapters.evidence_postgres import (
+    POSTGRES_SCHEMA_REVISION,
+    PostgresDatabase,
+    PostgresEnforcementRepository,
+    PostgresEvidenceRepository,
+    PostgresOperatorLifecycleEventRepository,
+    PostgresSchemaError,
+    PostgresToolActionRepository,
 )
 from regulated_ai.adapters.evidence_sqlite import (
     SqliteEnforcementRepository,
@@ -108,6 +122,7 @@ from regulated_ai.adapters.yaml_files import (
 )
 
 __all__ = [
+    "POSTGRES_SCHEMA_REVISION",
     "ActionApprovalAssertionError",
     "ApprovalAssertionError",
     "ConfigurationBoundaryError",
@@ -129,6 +144,15 @@ __all__ = [
     "OciEvidenceError",
     "OciEvidenceIdentity",
     "PolicyReviewBoundaryError",
+    "PostgresDatabase",
+    "PostgresEnforcementRepository",
+    "PostgresEvidenceRepository",
+    "PostgresHmacActionApprovalAdapter",
+    "PostgresHmacApprovalAdapter",
+    "PostgresHmacToolActionReconciliationAdapter",
+    "PostgresOperatorLifecycleEventRepository",
+    "PostgresSchemaError",
+    "PostgresToolActionRepository",
     "ProviderReviewBoundaryError",
     "ReadOnlyHttpToolExecutionAdapter",
     "ReadOnlyHttpToolExecutionConfig",

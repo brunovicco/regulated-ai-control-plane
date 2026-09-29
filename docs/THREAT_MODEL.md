@@ -372,8 +372,8 @@ Residual risks:
 
 Threat:
 a mutable image, injected service-account token, writable root filesystem, broad network access,
-embedded secret or multiple SQLite writers weakens the control boundary; stale runtime assertions
-may also be mistaken for a live probe.
+embedded secret, schema drift or an over-privileged database identity weakens the control boundary;
+stale runtime assertions may also be mistaken for a live probe.
 
 Mitigations:
 - Phase 6s requires image substitution by SHA-256 digest and references secrets/trust/pack volumes
@@ -382,15 +382,16 @@ Mitigations:
   capabilities, bounded resources and restricted seccomp profiles;
 - NetworkPolicies deny verifier traffic and control-plane egress while limiting ingress to labeled
   clients;
-- the SQLite deployment is exactly one replica with `Recreate`, state PVC and health probes;
+- the production deployment uses PostgreSQL, an explicit migration job, exact schema revision
+  checks, two replicas with rolling updates and health probes;
 - the CronJob reads a mounted checkpoint/policy/attestation set, verifies it offline and treats a
   blocked result as a failed job rather than mutating workloads.
 
 Residual risks:
 - the example image digest is deliberately non-routable and deployment automation must replace and
   independently verify it before apply;
-- PVC population, CSI permissions, Secret/ConfigMap integrity, admission, node security, backup,
-  alerting and cluster control-plane availability remain external;
+- database TLS/egress, migration and runtime roles, Secret/ConfigMap integrity, admission, node
+  security, backup/restore, alerting and cluster control-plane availability remain external;
 - signed assertions depend on target/signer integrity and are not independent continuous probes;
 - gateway mode requires reviewed egress/DNS/credential overlays and is unsafe with the default
   network policy unchanged.

@@ -378,7 +378,8 @@ inventing earlier transitions. At most 256 events are returned; a longer sequenc
 `events_truncated=true`, adds `EVENT_LIST_TRUNCATED`, and also makes `history_complete=false`.
 The completeness flag is also false when current actions are truncated or the transition events do
 not cover the current evaluation, enforcement and returned action states.
-Append-only enforcement is local to SQLite and is not a signed or externally anchored audit claim.
+Append-only enforcement is implemented by the selected SQLite or PostgreSQL persistence boundary;
+it is not a signed or externally anchored audit claim.
 
 The control context uses only metadata captured by the linked evidence and enforcement records.
 Approval summaries omit actor identity, and tool-action stages expose only whether an approval was

@@ -20,7 +20,7 @@ def test_kustomization_uses_digest_and_complete_restricted_resources() -> None:
     assert resources == {
         "namespace.yaml",
         "service-account.yaml",
-        "data-pvc.yaml",
+        "database-migration-job.yaml",
         "deployment.yaml",
         "runtime-trust-verifier-cronjob.yaml",
         "service.yaml",
@@ -35,11 +35,14 @@ def test_kustomization_uses_digest_and_complete_restricted_resources() -> None:
     assert namespace["metadata"]["labels"]["pod-security.kubernetes.io/enforce"] == "restricted"
 
 
-def test_deployment_is_single_replica_non_root_and_uses_external_authority() -> None:
+def test_deployment_is_multi_replica_non_root_and_uses_external_authority() -> None:
     deployment = _documents("deployment.yaml")[0]
     spec = deployment["spec"]
-    assert spec["replicas"] == 1
-    assert spec["strategy"] == {"type": "Recreate"}
+    assert spec["replicas"] == 2
+    assert spec["strategy"] == {
+        "type": "RollingUpdate",
+        "rollingUpdate": {"maxUnavailable": 0, "maxSurge": 1},
+    }
     pod = spec["template"]["spec"]
     assert pod["automountServiceAccountToken"] is False
     assert pod["securityContext"] == {
@@ -69,6 +72,10 @@ def test_deployment_is_single_replica_non_root_and_uses_external_authority() -> 
         "regulaai-deployment-metadata"
     )
     assert env["REGULAAI_EXECUTION_MODE"]["value"] == "mock"
+    assert env["REGULAAI_DATABASE_URL"]["valueFrom"]["secretKeyRef"] == {
+        "name": "regulaai-database-runtime",
+        "key": "url",
+    }
     assert env["REGULAAI_CONTROL_PACK_MANIFEST"]["value"].startswith("/etc/regulaai/")
     assert env["REGULAAI_TOKENIZATION_KEY"]["valueFrom"]["secretKeyRef"]["name"] == (
         "regulaai-runtime-keys"
@@ -79,6 +86,30 @@ def test_deployment_is_single_replica_non_root_and_uses_external_authority() -> 
     )
     assert volumes["control-pack-trust"]["configMap"]["name"] == ("regulaai-control-pack-trust")
     assert all("hostPath" not in item for item in volumes.values())
+    assert "data" not in volumes
+
+
+def test_database_migration_is_an_explicit_restricted_job() -> None:
+    job = _documents("database-migration-job.yaml")[0]
+    assert job["kind"] == "Job"
+    pod = job["spec"]["template"]["spec"]
+    assert pod["automountServiceAccountToken"] is False
+    assert pod["restartPolicy"] == "OnFailure"
+    container = pod["containers"][0]
+    assert container["command"] == ["alembic", "upgrade", "head"]
+    assert container["env"][0]["valueFrom"]["secretKeyRef"] == {
+        "name": "regulaai-database-migration",
+        "key": "url",
+    }
+    assert container["securityContext"]["readOnlyRootFilesystem"] is True
+    policies = _documents("network-policy.yaml")
+    migration_policy = next(
+        item
+        for item in policies
+        if item["metadata"]["name"] == "regulaai-database-migration-default"
+    )
+    assert migration_policy["spec"]["ingress"] == []
+    assert migration_policy["spec"]["egress"] == []
 
 
 def test_runtime_verifier_is_network_silent_bounded_and_reads_mounted_assertions() -> None:

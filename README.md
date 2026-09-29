@@ -158,13 +158,17 @@ Not supported:
 The [pilot release profile](docs/PILOT_RELEASE.md) defines verification, acceptance and rollout
 boundaries.
 
+The current source also includes the next production foundation: PostgreSQL persistence, versioned
+migrations and concurrency-safe multi-replica claims. It does not expand the tagged pilot's scope
+until deployment-owned TLS, backup/restore, SLO and acceptance evidence are complete.
+
 ## Repository map
 
 ```text
 src/regulated_ai/
 ├── domain/        # policies, decisions, obligations and evidence types
 ├── application/   # evaluation, enforcement, tool authority and release use cases
-├── adapters/      # YAML, SQLite, signatures, gateway, tools and observability
+├── adapters/      # YAML, SQLite/PostgreSQL, signatures, gateway, tools and observability
 ├── entrypoints/   # FastAPI, operator UI, logging and pilot command
 └── resources/     # packaged signed demo control pack
 

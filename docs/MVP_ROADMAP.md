@@ -398,8 +398,13 @@ Implemented in Phase 7c:
 - metadata-only receipt, idempotent exact replay and append-only lifecycle history;
 - exact-action API operation with no tool-execution dependency or automatic retry.
 
+Implemented after Phase 7c:
+- PostgreSQL production persistence with versioned migrations, guarded single-winner claims,
+  atomic authority/state transitions and append-only lifecycle triggers;
+- fail-closed production startup on missing database configuration or schema mismatch;
+- two-replica deployment reference with an explicit restricted migration job.
+
 Next:
-- production persistence before multi-replica rollout;
 - asymmetric or enterprise-identity-backed operator authority;
 - state-changing integration only after connector identity, idempotency and recovery review.
 

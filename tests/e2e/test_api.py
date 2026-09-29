@@ -385,6 +385,17 @@ def test_runtime_reconciliation_key_is_dedicated_and_bounded(
         build_runtime(evidence_path=tmp_path / "reconciliation-evidence.sqlite3")
 
 
+def test_production_runtime_requires_postgres_database_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REGULAAI_ENVIRONMENT", "production")
+    monkeypatch.delenv("REGULAAI_DATABASE_URL", raising=False)
+    monkeypatch.delenv("REGULAAI_EVIDENCE_DB", raising=False)
+
+    with pytest.raises(ValueError, match="REGULAAI_DATABASE_URL is required"):
+        build_runtime()
+
+
 def test_enforcement_api_returns_only_metadata_after_mock_execution(tmp_path: Path) -> None:
     runtime = _runtime(tmp_path)
     app = create_app(lambda: runtime)

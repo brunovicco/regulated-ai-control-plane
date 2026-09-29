@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regulaai-database-migration
+  labels:
+    app.kubernetes.io/name: regulaai-database-migration
+    app.kubernetes.io/part-of: regulaai
+    app.kubernetes.io/component: database-migration
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: regulaai-database-migration
+        app.kubernetes.io/part-of: regulaai
+        app.kubernetes.io/component: database-migration
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: regulaai-control-plane
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: example.invalid/regulated-ai-control-plane
+          imagePullPolicy: IfNotPresent
+          command: ["alembic", "upgrade", "head"]
+          env:
+            - name: REGULAAI_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: regulaai-database-migration
+                  key: url
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+              ephemeral-storage: 32Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+              ephemeral-storage: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
