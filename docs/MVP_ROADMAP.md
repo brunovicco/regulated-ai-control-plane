@@ -372,8 +372,9 @@ execution, metadata-only evidence and operator-timeline validation without accep
 content or enabling tool effects. Phase 7b adds one opt-in enterprise sandbox connector bound to
 the signed `cards.read` definition, exact workload identity and closed output boundary. Phase 7c
 adds separately authenticated, terminal resolution of ambiguous tool outcomes without reexecution.
-Together these capabilities form the bounded `v0.1.0rc1` controlled pilot profile; production
-readiness is not claimed.
+Phase 7d adds one non-production `cards.unblock` connector with exact idempotency-response binding
+and the existing recovery path. Together these capabilities extend the bounded controlled-pilot
+profile; production readiness is not claimed.
 
 Implemented in Phase 7a:
 - explicit gateway-mode requirement and one reviewed OpenAI capability target;
@@ -398,6 +399,13 @@ Implemented in Phase 7c:
 - metadata-only receipt, idempotent exact replay and append-only lifecycle history;
 - exact-action API operation with no tool-execution dependency or automatic retry.
 
+Implemented in Phase 7d:
+- startup-selected, non-production-only `cards.unblock` HTTP execution;
+- fixed high-impact risk class, workload identity and endpoint binding;
+- exact action ID, action digest and SHA-256 idempotency-key digest in the closed response contract;
+- one bounded attempt with no redirects, environment proxies, retry or fallback;
+- ambiguous outcomes routed to authenticated terminal reconciliation.
+
 Implemented after Phase 7c:
 - PostgreSQL production persistence with versioned migrations, guarded single-winner claims,
   atomic authority/state transitions and append-only lifecycle triggers;
@@ -409,7 +417,9 @@ Implemented after Phase 7c:
   retained only for local/pilot compatibility.
 
 Next:
-- state-changing integration only after connector identity, idempotency and recovery review.
+- exercise downstream idempotency and recovery cases in the controlled sandbox.
+- production state-changing integration only after selecting and reviewing a concrete enterprise
+  identity, authorization and durable idempotency contract.
 - deployment-owned PostgreSQL, trust-store rotation, backup/restore, SLO and incident exercises.
 
 ## Defer

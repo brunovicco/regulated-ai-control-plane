@@ -96,6 +96,10 @@ from regulated_ai.adapters.signed_packs import (
     VerifiedControlPack,
     verify_control_pack,
 )
+from regulated_ai.adapters.state_changing_tool_execution import (
+    StateChangingHttpToolExecutionAdapter,
+    StateChangingHttpToolExecutionConfig,
+)
 from regulated_ai.adapters.tokenization import HmacTokenizationAdapter
 from regulated_ai.adapters.tool_review_files import (
     ToolReviewBoundaryError,
@@ -186,6 +190,8 @@ __all__ = [
     "SqliteEvidenceRepository",
     "SqliteOperatorLifecycleEventRepository",
     "SqliteToolActionRepository",
+    "StateChangingHttpToolExecutionAdapter",
+    "StateChangingHttpToolExecutionConfig",
     "StructuredEvaluationObserver",
     "TimestampSubjectKind",
     "ToolActionReconciliationAssertionError",

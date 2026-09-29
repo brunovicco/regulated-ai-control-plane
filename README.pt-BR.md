@@ -55,7 +55,7 @@ reproduzíveis.
 | Enforcement local de dados | Remove, mascara, tokeniza ou pseudonimiza campos antes de I/O externo |
 | Registro de capacidades | Resolve fatos revisados de provider/serviço/região e falha fechado quando requisitos estão obsoletos ou desconhecidos |
 | Fronteiras de autoridade humana | Vincula aprovações aos digests exatos da decisão e da ação, com consumo único |
-| Execução confiável de ferramentas | Trata tool calls do modelo como propostas e valida argumentos e schemas de saída fechados |
+| Execução confiável de ferramentas | Trata tool calls como propostas, valida argumentos e schemas fechados e vincula uma operação mutável de sandbox não produtiva |
 | Tratamento seguro de resultados | Minimiza outputs não confiáveis e nunca persiste conteúdo bruto ou seguro do resultado |
 | Evidência operacional | Armazena IDs versionados, reason codes, estados e digests—não conteúdo sensível |
 | Governança de releases | Verifica control packs assinados, analisa impacto, autoriza promoção e preserva custódia |

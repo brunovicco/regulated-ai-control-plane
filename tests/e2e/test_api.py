@@ -26,6 +26,7 @@ from regulated_ai.adapters import (
     SqliteEvidenceRepository,
     SqliteOperatorLifecycleEventRepository,
     SqliteToolActionRepository,
+    StateChangingHttpToolExecutionAdapter,
 )
 from regulated_ai.application import (
     EnforceAiOperation,
@@ -39,6 +40,7 @@ from regulated_ai.entrypoints.api import (
     EvaluationRequest,
     Runtime,
     _to_context,
+    _tool_execution_adapter_from_environment,
     build_runtime,
     create_app,
 )
@@ -347,6 +349,43 @@ def test_runtime_read_only_tool_mode_fails_closed_on_partial_configuration(
 
     with pytest.raises(ValueError, match="REGULAAI_READ_ONLY_TOOL_URL"):
         build_runtime(evidence_path=tmp_path / "tool-evidence.sqlite3")
+
+
+def test_runtime_state_change_tool_mode_requires_complete_explicit_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_TOOL_EXECUTION_MODE", "state_change_http")
+    monkeypatch.setenv(
+        "REGULAAI_STATE_CHANGE_TOOL_URL",
+        "https://cards-sandbox.example.test/v1/card-unblocks",
+    )
+    monkeypatch.setenv("REGULAAI_STATE_CHANGE_TOOL_API_KEY", "synthetic-sandbox-credential")
+    monkeypatch.setenv(
+        "REGULAAI_STATE_CHANGE_TOOL_WORKLOAD_IDENTITY", "workload.cards-unblock-sandbox"
+    )
+
+    runtime = build_runtime(evidence_path=tmp_path / "state-change-tool-evidence.sqlite3")
+
+    assert isinstance(runtime.tool_execution, StateChangingHttpToolExecutionAdapter)
+    assert runtime.mock_tool_execution is None
+
+
+def test_runtime_state_change_tool_mode_fails_closed_on_partial_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_TOOL_EXECUTION_MODE", "state_change_http")
+
+    with pytest.raises(ValueError, match="REGULAAI_STATE_CHANGE_TOOL_URL"):
+        build_runtime(evidence_path=tmp_path / "state-change-tool-evidence.sqlite3")
+
+
+def test_runtime_state_change_tool_mode_rejects_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REGULAAI_TOOL_EXECUTION_MODE", "state_change_http")
+
+    with pytest.raises(ValueError, match="restricted to non-production"):
+        _tool_execution_adapter_from_environment("production")
 
 
 def test_runtime_approval_verifier_rejects_short_key(

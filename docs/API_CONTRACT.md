@@ -230,10 +230,11 @@ rejected in either mode, and asymmetric receipts expose the verification `author
 
 After an atomic `DISPATCHED` claim, authority is consumed once and the configured tool port
 executes. The default remains the network-silent mock. Opt-in `read_only_http` mode is fixed to
-`cards.read`, the configured workload identity and a deployment-controlled sandbox endpoint; it
-does not enable `cards.unblock` or caller-selected HTTP. Success is accepted only when the untrusted
-output exactly matches the trusted, action-bound closed output schema. Per-field catalog rules
-return a closed enum, replace a value
+`cards.read`, the configured workload identity and a deployment-controlled sandbox endpoint.
+Opt-in `state_change_http` is restricted to non-production and fixed to `cards.unblock`, its exact
+workload and an idempotency-key digest echoed by the downstream response. Neither mode accepts
+caller-selected HTTP. Success is accepted only when the untrusted output exactly matches the
+trusted, action-bound closed output schema. Per-field catalog rules return a closed enum, replace a value
 with `***MASKED***`, or drop the field. Personal/financial values cannot be returned directly and
 authentication secrets are always dropped.
 

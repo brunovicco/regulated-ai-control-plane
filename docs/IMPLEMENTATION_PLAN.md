@@ -1,5 +1,22 @@
 # Implementation plan
 
+## Phase 7d — bound state-changing enterprise sandbox connector
+
+Status: implemented after transactional persistence and asymmetric operator authority.
+
+- One opt-in adapter is fixed to signed-catalog `cards.unblock`, its high-impact risk class, one
+  configured workload identity and one non-production sandbox endpoint.
+- Exact action approval is consumed before a single bounded POST; redirects, environment proxies,
+  retry and fallback remain disabled.
+- The idempotency key is header-only, while the exact action digest and key's SHA-256 digest bind
+  the canonical request and success response.
+- Invalid or uncertain outcomes use the existing `RECONCILIATION_REQUIRED` path without
+  reexecution; successful output still crosses the signed closed-schema minimization boundary.
+- Production-labelled runtime rejects this connector until a concrete enterprise identity,
+  durable idempotency and recovery contract receives a separate review.
+
+Operational sandbox exercises and any production integration remain deployment-owned work.
+
 ## Production operator authority — role-bound Ed25519 assertions
 
 Status: implemented in source after the PostgreSQL persistence foundation.

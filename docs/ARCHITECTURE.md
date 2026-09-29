@@ -208,7 +208,8 @@ trust-store checks. The same authenticated bytes feed runtime parsing and offlin
 | Application → RegulaAI | Explicit runtime context and ephemeral field values | Input is untrusted and schema-validated |
 | RegulaAI → provider gateway | Sanitized in-memory execution plan | Policy must allow execution; configuration fixes target/provider |
 | Model → tool proposal | Tool name plus ephemeral arguments | Proposal carries no execution authority |
-| RegulaAI → enterprise sandbox | One validated, approved `cards.read` request | Exact action digest, workload identity and one-time authority required |
+| RegulaAI → read-only enterprise sandbox | One validated, approved `cards.read` request | Exact action digest, workload identity and one-time authority required |
+| RegulaAI → state-changing sandbox | One validated, approved `cards.unblock` request | Exact action, workload and idempotency binding; non-production only; ambiguous outcomes require reconciliation |
 | Operator → reconciliation | Signed terminal outcome assertion | Separate domain/key and exact action binding required |
 | Runtime → evidence/telemetry | Allowlisted metadata and digests | Content, credentials and tool results are prohibited |
 | Release workflow → runtime | Signed public control material | Private keys remain outside the repository and runtime |

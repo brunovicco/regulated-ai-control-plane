@@ -51,6 +51,8 @@ from regulated_ai.adapters import (
     SqliteEvidenceRepository,
     SqliteOperatorLifecycleEventRepository,
     SqliteToolActionRepository,
+    StateChangingHttpToolExecutionAdapter,
+    StateChangingHttpToolExecutionConfig,
     StructuredEvaluationObserver,
     verify_control_pack,
 )
@@ -451,7 +453,7 @@ def build_runtime(
         approval=approval,
         observer=observer,
     )
-    tool_execution, mock_tool_execution = _tool_execution_adapter_from_environment()
+    tool_execution, mock_tool_execution = _tool_execution_adapter_from_environment(environment)
     action_executor = ExecuteToolAction(
         enforcement=enforcement,
         evidence=repository,
@@ -521,37 +523,68 @@ def _execution_adapter_from_environment() -> tuple[
     return adapter, None
 
 
-def _tool_execution_adapter_from_environment() -> tuple[
-    ToolExecutionPort, MockToolExecutionAdapter | None
-]:
+def _tool_execution_adapter_from_environment(
+    environment: str,
+) -> tuple[ToolExecutionPort, MockToolExecutionAdapter | None]:
     mode = os.environ.get("REGULAAI_TOOL_EXECUTION_MODE", "mock").strip().casefold()
     if mode == "mock":
         mock = MockToolExecutionAdapter()
         return mock, mock
-    if mode != "read_only_http":
-        raise ValueError("REGULAAI_TOOL_EXECUTION_MODE must be 'mock' or 'read_only_http'")
-    adapter = ReadOnlyHttpToolExecutionAdapter(
-        ReadOnlyHttpToolExecutionConfig(
-            endpoint_url=_required_environment(
-                "REGULAAI_READ_ONLY_TOOL_URL", context="read-only tool execution mode"
-            ),
-            api_key=_required_environment(
-                "REGULAAI_READ_ONLY_TOOL_API_KEY", context="read-only tool execution mode"
-            ),
-            workload_identity=_required_environment(
-                "REGULAAI_READ_ONLY_TOOL_WORKLOAD_IDENTITY",
-                context="read-only tool execution mode",
-            ),
-            timeout_seconds=_float_environment("REGULAAI_READ_ONLY_TOOL_TIMEOUT_SECONDS", 10.0),
-            max_request_bytes=_integer_environment(
-                "REGULAAI_READ_ONLY_TOOL_MAX_REQUEST_BYTES", 64 * 1024
-            ),
-            max_response_bytes=_integer_environment(
-                "REGULAAI_READ_ONLY_TOOL_MAX_RESPONSE_BYTES", 64 * 1024
-            ),
+    if mode == "read_only_http":
+        adapter: ToolExecutionPort = ReadOnlyHttpToolExecutionAdapter(
+            ReadOnlyHttpToolExecutionConfig(
+                endpoint_url=_required_environment(
+                    "REGULAAI_READ_ONLY_TOOL_URL", context="read-only tool execution mode"
+                ),
+                api_key=_required_environment(
+                    "REGULAAI_READ_ONLY_TOOL_API_KEY", context="read-only tool execution mode"
+                ),
+                workload_identity=_required_environment(
+                    "REGULAAI_READ_ONLY_TOOL_WORKLOAD_IDENTITY",
+                    context="read-only tool execution mode",
+                ),
+                timeout_seconds=_float_environment("REGULAAI_READ_ONLY_TOOL_TIMEOUT_SECONDS", 10.0),
+                max_request_bytes=_integer_environment(
+                    "REGULAAI_READ_ONLY_TOOL_MAX_REQUEST_BYTES", 64 * 1024
+                ),
+                max_response_bytes=_integer_environment(
+                    "REGULAAI_READ_ONLY_TOOL_MAX_RESPONSE_BYTES", 64 * 1024
+                ),
+            )
         )
+        return adapter, None
+    if mode == "state_change_http":
+        if environment.casefold() in {"prod", "production"}:
+            raise ValueError("State-changing HTTP tool execution is restricted to non-production")
+        state_adapter = StateChangingHttpToolExecutionAdapter(
+            StateChangingHttpToolExecutionConfig(
+                endpoint_url=_required_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_URL",
+                    context="state-changing tool execution mode",
+                ),
+                api_key=_required_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_API_KEY",
+                    context="state-changing tool execution mode",
+                ),
+                workload_identity=_required_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_WORKLOAD_IDENTITY",
+                    context="state-changing tool execution mode",
+                ),
+                timeout_seconds=_float_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_TIMEOUT_SECONDS", 10.0
+                ),
+                max_request_bytes=_integer_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_MAX_REQUEST_BYTES", 64 * 1024
+                ),
+                max_response_bytes=_integer_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_MAX_RESPONSE_BYTES", 64 * 1024
+                ),
+            )
+        )
+        return state_adapter, None
+    raise ValueError(
+        "REGULAAI_TOOL_EXECUTION_MODE must be 'mock', 'read_only_http' or 'state_change_http'"
     )
-    return adapter, None
 
 
 def _required_environment(name: str, *, context: str = "gateway execution mode") -> str:

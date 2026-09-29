@@ -17,6 +17,8 @@ The project is currently a **controlled pilot**. Breaking changes may occur befo
   database identities and an explicit migration Job.
 - Role-bound Ed25519 production operator authority with lifecycle-aware public keys, distinct
   decision/action/reconciliation scopes and verification-key identity in metadata-only receipts.
+- An opt-in, non-production `cards.unblock` connector with exact workload, action and idempotency
+  binding, bounded single-attempt I/O and mandatory ambiguous-outcome reconciliation.
 
 ### Changed
 

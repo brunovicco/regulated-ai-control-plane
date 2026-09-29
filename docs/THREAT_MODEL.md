@@ -66,7 +66,9 @@ Mitigations:
 - each proposal has one immutable action binding and one atomic execution claim;
 - approval is consumed before the tool port and ambiguous failures are never retried automatically;
 - Phase 4c defaults to a network-silent mock; Phase 7b permits only the separately configured
-  `cards.read` sandbox binding.
+  `cards.read` sandbox binding, and Phase 7d permits only a non-production `cards.unblock` binding;
+- the state-changing connector requires the exact idempotency-key digest in the response, makes one
+  attempt and sends any uncertainty to terminal reconciliation instead of retrying;
 - terminal reconciliation requires distinct `rr1e` production scope or local/pilot `rr1`
   authority and has no tool-port dependency.
 
@@ -769,8 +771,11 @@ session authentication remains a deployment-owned boundary.
 - malformed, failed or content-free terminal gateway response.
 - mock mode, arbitrary correlation id or inconsistent receipt/timeline reaches the Phase 7a pilot;
 - fixed synthetic request values or model output appear in the pilot report or evidence database;
-- live connector receives `cards.unblock`, a mismatched workload, unsafe endpoint/idempotency key,
+- read-only connector receives `cards.unblock`, a mismatched workload, unsafe endpoint/idempotency key,
   redirect, oversized body or malformed/duplicate/wrong-action response;
+- state-changing connector receives `cards.read`, a mismatched workload, wrong idempotency digest,
+  redirect, oversized body or malformed/duplicate/wrong-action response;
+- production-labelled runtime attempts to enable the state-changing sandbox connector;
 - connector credential, exact arguments, idempotency key or raw output appears in logs, evidence or
   replay responses;
 - `ra1`/`ra2`, wrong-action, expired, malformed or conflicting `rr1` authority changes an action;

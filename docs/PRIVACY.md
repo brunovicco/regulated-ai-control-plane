@@ -50,6 +50,10 @@ Complete this document before processing personal or regulated data.
   exact approved `cards.read` arguments, action id, configured workload identity and ephemeral
   idempotency header to an organization-controlled sandbox. Its bearer credential and raw response
   remain ephemeral and excluded from logs, responses and persistence.
+- Opt-in Phase 7d sends exact approved `cards.unblock` arguments and the raw idempotency key only to
+  one configured non-production sandbox. The body and response use the key's SHA-256 digest for
+  binding. RegulaAI persists the digest already present in action metadata, never the key,
+  credential, arguments or raw result.
 - The Phase 5a operator timeline requires one exact enforcement ID and composes only metadata
   already allowlisted in evidence/enforcement/action records. It does not list activity globally or
   recover payloads. Deployments must protect this operator surface with their existing access and

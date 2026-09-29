@@ -195,6 +195,12 @@ To exercise the read-only sandbox boundary instead, configure every
 the live connector. See `READ_ONLY_ENTERPRISE_CONNECTOR.md` for the downstream contract and egress
 requirements.
 
+To exercise the separately reviewed state-changing sandbox boundary, use only synthetic data,
+configure every `REGULAAI_STATE_CHANGE_TOOL_*` variable and select
+`REGULAAI_TOOL_EXECUTION_MODE=state_change_http` in a non-production environment. The connector is
+fixed to `cards.unblock`, makes one request and verifies the returned idempotency-key digest. Follow
+`STATE_CHANGING_ENTERPRISE_CONNECTOR.md`; do not infer failure or retry after an ambiguous outcome.
+
 The mock result is validated against the trusted output schema. The immediate successful response
 contains only `safe_result`: a closed status enum may be returned, a financial reference is
 replaced with `***MASKED***`, and diagnostic content is dropped. `GET /v1/tool-actions/{action_id}`
@@ -202,7 +208,7 @@ and action replay return metadata/digests only and set `safe_result` to `null`.
 
 The demo never persists arguments, idempotency keys, raw assertions, raw tool output or the safe
 result. Schema-invalid output becomes terminal `RESULT_REJECTED`; it is not retried because the
-downstream effect may already have occurred. State-changing enterprise-system connectors and model
+downstream effect may already have occurred. Production state-changing connectors and model
 continuation remain disabled.
 
 If a tool call ends in `RECONCILIATION_REQUIRED`, do not resubmit the action. Follow

@@ -40,6 +40,8 @@ what you want to understand or accomplish—not the order in which features were
   verification-key lifecycle for protected mutations.
 - [Read-only enterprise connector](READ_ONLY_ENTERPRISE_CONNECTOR.md): the bounded `cards.read`
   sandbox integration.
+- [State-changing enterprise connector](STATE_CHANGING_ENTERPRISE_CONNECTOR.md): the bounded,
+  non-production `cards.unblock` integration and recovery contract.
 - [Tool-action reconciliation](TOOL_ACTION_RECONCILIATION.md): authenticated terminal resolution
   of ambiguous outcomes without reexecution.
 - [Live composition pilot](LIVE_COMPOSITION_PILOT.md): fixed-synthetic provider integration proof.
