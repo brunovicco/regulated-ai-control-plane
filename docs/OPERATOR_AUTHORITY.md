@@ -35,6 +35,10 @@ enforce operational separation of duties.
 Only public keys belong in this file. Generate and retain private keys in an organization-approved
 KMS, HSM or signing service outside the RegulaAI runtime.
 
+Invalid configuration produces a generic startup error without parser or validation content in
+the traceback. This also prevents an accidentally supplied private field from appearing in logs;
+it does not authorize storing private material in the public trust store.
+
 ## Assertion envelopes
 
 The issuer signs the ASCII bytes before the second period:

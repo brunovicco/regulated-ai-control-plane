@@ -42,6 +42,7 @@ from regulated_ai.domain import (
 OperatorAuthorityKind = Literal["decision_approval", "action_approval", "reconciliation"]
 
 _MAX_ASSERTION_BYTES = 4096
+_MAX_TRUST_STORE_BYTES = 262_144
 _SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}\Z")
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _BASE64URL = re.compile(r"[A-Za-z0-9_-]+\Z")
@@ -473,8 +474,9 @@ class PostgresEd25519ToolActionReconciliationAdapter(PostgresHmacToolActionRecon
 
 def _load_trust_store(path: Path) -> _OperatorTrustStoreModel:
     try:
-        encoded = path.read_bytes()
-        if len(encoded) > 262_144:
+        with path.open("rb") as stream:
+            encoded = stream.read(_MAX_TRUST_STORE_BYTES + 1)
+        if len(encoded) > _MAX_TRUST_STORE_BYTES:
             raise OperatorAuthorityTrustStoreError("Operator authority trust store is too large")
         content = encoded.decode("utf-8", errors="strict")
         syntax_tree = yaml.compose(content, Loader=yaml.SafeLoader)
@@ -487,8 +489,18 @@ def _load_trust_store(path: Path) -> _OperatorTrustStoreModel:
         return trust_store
     except OperatorAuthorityTrustStoreError:
         raise
-    except (OSError, UnicodeDecodeError, yaml.YAMLError, ValidationError, ValueError) as exc:
-        raise OperatorAuthorityTrustStoreError("Operator authority trust store is invalid") from exc
+    except (
+        OSError,
+        UnicodeDecodeError,
+        yaml.YAMLError,
+        ValidationError,
+        ValueError,
+        RecursionError,
+    ):
+        # Parser/validation errors can include forbidden private material from the document.
+        raise OperatorAuthorityTrustStoreError(
+            "Operator authority trust store is invalid"
+        ) from None
 
 
 def _decode_trust_public_key(value: str) -> bytes:

@@ -1,5 +1,6 @@
 import base64
 import json
+import traceback
 from datetime import timedelta
 from pathlib import Path
 
@@ -241,6 +242,27 @@ def test_runtime_rejects_mixed_asymmetric_and_hmac_authority(
 
     with pytest.raises(ValueError, match="mutually exclusive"):
         build_runtime(evidence_path=tmp_path / "evidence.sqlite3")
+
+
+@pytest.mark.parametrize("malformed_yaml", [False, True])
+def test_trust_store_failure_does_not_expose_private_content_in_traceback(
+    tmp_path: Path, malformed_yaml: bool
+) -> None:
+    sentinel = "synthetic-private-content-sentinel"
+    path = _trust_store(tmp_path / "trust.yaml", Ed25519PrivateKey.generate())
+    content = path.read_text(encoding="utf-8")
+    if malformed_yaml:
+        content += f"private_key: [{sentinel}\n"
+    else:
+        content += f"private_key: {sentinel}\n"
+    path.write_text(content, encoding="utf-8")
+
+    with pytest.raises(OperatorAuthorityTrustStoreError) as captured:
+        Ed25519OperatorAuthorityVerifier(path)
+
+    rendered = "".join(traceback.format_exception(captured.value))
+    assert sentinel not in rendered
+    assert "Operator authority trust store is invalid" in rendered
 
 
 def test_reconciliation_rejects_invalid_outcome_binding(tmp_path: Path) -> None:
