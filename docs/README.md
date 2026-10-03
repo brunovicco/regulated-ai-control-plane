@@ -36,6 +36,7 @@ what you want to understand or accomplish—not the order in which features were
 
 ## Authority and enterprise integrations
 
+- [Enterprise API identity](API_IDENTITY.md): offline EdDSA JWT verification and route-level RBAC.
 - [Production operator authority](OPERATOR_AUTHORITY.md): role-bound Ed25519 assertions and
   verification-key lifecycle for protected mutations.
 - [Read-only enterprise connector](READ_ONLY_ENTERPRISE_CONNECTOR.md): the bounded `cards.read`

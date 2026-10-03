@@ -79,8 +79,8 @@ leave the action in `RECONCILIATION_REQUIRED`.
 
 ## Security and operations
 
-- protect the endpoint with the deployment's operator authentication and network controls in
-  addition to the signed assertion;
+- require the production `regulaai.reconciler` API role and network controls in addition to the
+  separately signed exact-action assertion;
 - keep private signing keys and raw assertions out of the runtime, files, logs, traces,
   screenshots and evidence;
 - use pseudonymous bounded actor identifiers and short assertion lifetimes;

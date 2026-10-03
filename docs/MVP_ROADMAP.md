@@ -57,7 +57,8 @@ Still allow a mock provider.
 
 Status: Phase 3a implemented as an opt-in `governed-llm-gateway` adapter. Phase 4b adds trusted tool
 definitions and proposal-only results. Phase 7a adds a fixed-synthetic live composition pilot.
-Mock execution remains the default; live tool side-effect execution remains pending.
+Mock execution remains the default; Phases 7b and 7d add separately reviewed read-only and
+non-production state-changing sandbox connectors.
 
 Goal:
 execute a sanitized request without duplicating gateway responsibilities.
@@ -113,7 +114,7 @@ Status: Phase 5a implements the bounded metadata-only operator timeline API. Pha
 append-only transition history with explicit legacy baselines. Phase 5c adds decision, control,
 transformation and sanitized approval context. Phase 5d binds provider source/freshness snapshots
 to new decision evidence. Phase 5e adds a server-rendered exact-ID dashboard. Global discovery,
-cryptographic anchoring and reconciliation mutations remain pending.
+cryptographic anchoring remains pending; authenticated reconciliation was added later in Phase 7c.
 
 Show:
 - decision timeline;
@@ -415,11 +416,15 @@ Implemented after Phase 7c:
   approval and terminal reconciliation;
 - production fail-closed startup without the public operator-authority trust store, with HMAC
   retained only for local/pilot compatibility.
+- Restricted EdDSA JWT access-token identity with pinned issuer/audience/JWKS and distinct runtime,
+  operator and reconciler roles; production API startup fails closed when it is absent.
 
 Next:
 - exercise downstream idempotency and recovery cases in the controlled sandbox.
-- production state-changing integration only after selecting and reviewing a concrete enterprise
-  identity, authorization and durable idempotency contract.
+- integrate and exercise token issuance, role mapping and signing-key rotation against the selected
+  enterprise identity provider.
+- production state-changing integration only after selecting and reviewing its concrete workload
+  authorization and durable idempotency contract.
 - deployment-owned PostgreSQL, trust-store rotation, backup/restore, SLO and incident exercises.
 
 ## Defer

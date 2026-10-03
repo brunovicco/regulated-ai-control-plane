@@ -4,6 +4,21 @@ The API exposes deterministic evaluation, enforcement, tool authority, reconcili
 metadata-only inspection. Schemas may evolve before the stable release, but privacy and authority
 boundaries are compatibility requirements.
 
+## Authentication and route roles
+
+Local development defaults to authentication disabled. A production-labelled API requires
+`oidc_jwt` mode and verifies short-lived EdDSA bearer access tokens offline against a mounted public
+JWKS. Exact issuer, audience, signature, time and role validation apply before request parsing.
+
+- `regulaai.runtime`: POST evaluation, enforcement and tool-action operations;
+- `regulaai.operator`: GET metadata, OpenAPI/docs and operator dashboard routes;
+- `regulaai.reconciler`: POST reconciliation operations.
+
+`/health` and the dashboard stylesheet are public. Missing or invalid tokens receive generic HTTP
+401; a valid token lacking the exact route role receives generic HTTP 403. API roles do not replace
+the separate exact-digest approval or reconciliation assertions described below. See
+[Enterprise API identity](API_IDENTITY.md).
+
 ## POST /v1/evaluations
 
 Evaluates an AI operation without invoking a provider.

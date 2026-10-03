@@ -11,6 +11,15 @@ from regulated_ai.adapters.authority_postgres import (
     PostgresHmacToolActionReconciliationAdapter,
 )
 from regulated_ai.adapters.classifier import DeterministicDataClassifier
+from regulated_ai.adapters.enterprise_identity import (
+    ApiAuthenticationError,
+    ApiAuthorizationError,
+    ApiIdentityConfigurationError,
+    ApiRole,
+    AuthenticatedApiPrincipal,
+    EnterpriseJwtConfig,
+    EnterpriseJwtVerifier,
+)
 from regulated_ai.adapters.evaluation_observability import (
     ControlEventTracer,
     StructuredEvaluationObserver,
@@ -138,7 +147,12 @@ from regulated_ai.adapters.yaml_files import (
 __all__ = [
     "POSTGRES_SCHEMA_REVISION",
     "ActionApprovalAssertionError",
+    "ApiAuthenticationError",
+    "ApiAuthorizationError",
+    "ApiIdentityConfigurationError",
+    "ApiRole",
     "ApprovalAssertionError",
+    "AuthenticatedApiPrincipal",
     "ConfigurationBoundaryError",
     "ControlEventTracer",
     "ControlPackIdentity",
@@ -147,6 +161,8 @@ __all__ = [
     "Ed25519ApprovalAdapter",
     "Ed25519OperatorAuthorityVerifier",
     "Ed25519ToolActionReconciliationAdapter",
+    "EnterpriseJwtConfig",
+    "EnterpriseJwtVerifier",
     "FilePolicyRepository",
     "FileProviderCapabilityRepository",
     "FileToolCatalogRepository",

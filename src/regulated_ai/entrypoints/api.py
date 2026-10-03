@@ -3,19 +3,23 @@
 import os
 import re
 import secrets
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 from typing import Annotated, Protocol, cast
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from regulated_ai.adapters import (
+    ApiAuthenticationError,
+    ApiAuthorizationError,
+    ApiRole,
     ControlEventTracer,
     ControlPackIdentity,
     DeterministicDataClassifier,
@@ -23,6 +27,8 @@ from regulated_ai.adapters import (
     Ed25519ApprovalAdapter,
     Ed25519OperatorAuthorityVerifier,
     Ed25519ToolActionReconciliationAdapter,
+    EnterpriseJwtConfig,
+    EnterpriseJwtVerifier,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
     FileToolCatalogRepository,
@@ -111,6 +117,7 @@ from regulated_ai.entrypoints.operator_dashboard import (
 )
 
 _RUNTIME_LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+_API_IDENTITY_LOGGER = structlog.get_logger("regulated_ai.api_identity")
 
 
 class _TelemetryLifecycle(Protocol):
@@ -587,6 +594,67 @@ def _tool_execution_adapter_from_environment(
     )
 
 
+def _api_identity_from_environment(environment: str) -> EnterpriseJwtVerifier | None:
+    mode = os.environ.get("REGULAAI_API_AUTH_MODE", "disabled").strip().casefold()
+    if mode == "disabled":
+        if environment.casefold() in {"prod", "production"}:
+            raise ValueError("REGULAAI_API_AUTH_MODE=oidc_jwt is required in production")
+        return None
+    if mode != "oidc_jwt":
+        raise ValueError("REGULAAI_API_AUTH_MODE must be 'disabled' or 'oidc_jwt'")
+    return EnterpriseJwtVerifier(
+        EnterpriseJwtConfig(
+            issuer=_required_environment("REGULAAI_OIDC_ISSUER", context="OIDC JWT API auth mode"),
+            audience=_required_environment(
+                "REGULAAI_OIDC_AUDIENCE", context="OIDC JWT API auth mode"
+            ),
+            jwks_path=Path(
+                _required_environment("REGULAAI_OIDC_JWKS_PATH", context="OIDC JWT API auth mode")
+            ),
+            max_token_age_seconds=_integer_environment("REGULAAI_OIDC_MAX_TOKEN_AGE_SECONDS", 3600),
+            clock_skew_seconds=_integer_environment("REGULAAI_OIDC_CLOCK_SKEW_SECONDS", 30),
+        )
+    )
+
+
+def _required_api_role(method: str, path: str) -> ApiRole | None:
+    if path in {"/health", "/operator/assets/dashboard.css"}:
+        return None
+    if method == "POST" and re.fullmatch(r"/v1/tool-actions/[^/]+/reconciliation", path):
+        return "regulaai.reconciler"
+    if method in {"GET", "HEAD"}:
+        return "regulaai.operator"
+    return "regulaai.runtime"
+
+
+def _api_route_path(request: Request) -> str:
+    path = cast(str, request.scope["path"])
+    root_path = cast(str, request.scope.get("root_path", ""))
+    if not root_path or not path.startswith(root_path):
+        return path
+    if path == root_path:
+        return ""
+    if path[len(root_path)] == "/":
+        return path[len(root_path) :]
+    return path
+
+
+def _bearer_token(request: Request) -> str:
+    values = request.headers.getlist("authorization")
+    if len(values) != 1:
+        raise ApiAuthenticationError("Bearer token is invalid")
+    value = values[0]
+    scheme, separator, token = value.partition(" ")
+    if (
+        scheme.casefold() != "bearer"
+        or not separator
+        or not token
+        or any(char.isspace() for char in token)
+    ):
+        raise ApiAuthenticationError("Bearer token is invalid")
+    return token
+
+
 def _required_environment(name: str, *, context: str = "gateway execution mode") -> str:
     value = os.environ.get(name)
     if value is None or not value.strip():
@@ -671,11 +739,13 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        environment = _runtime_label("REGULAAI_ENVIRONMENT", "local")
         configure_logging(
             service="regulaai-control-plane",
-            environment=_runtime_label("REGULAAI_ENVIRONMENT", "local"),
+            environment=environment,
             version=_runtime_label("REGULAAI_SERVICE_VERSION", "0.1.0"),
         )
+        application.state.api_identity = _api_identity_from_environment(environment)
         runtime = runtime_factory()
         application.state.runtime = runtime
         try:
@@ -686,6 +756,56 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
                 runtime.telemetry.shutdown(timeout_seconds=2.0)
 
     application = FastAPI(title="RegulaAI", version="0.1.0", lifespan=lifespan)
+
+    @application.middleware("http")
+    async def authenticate_api_request(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        required_role = _required_api_role(request.method, _api_route_path(request))
+        if required_role is None:
+            return await call_next(request)
+        if not hasattr(application.state, "api_identity"):
+            _API_IDENTITY_LOGGER.error(
+                "api.identity_unavailable", required_role=required_role, method=request.method
+            )
+            return _identity_error_response(
+                503,
+                "API_IDENTITY_UNAVAILABLE",
+                "API identity boundary is unavailable",
+            )
+        verifier: EnterpriseJwtVerifier | None = application.state.api_identity
+        if verifier is None:
+            return await call_next(request)
+        try:
+            verifier.authenticate(
+                _bearer_token(request),
+                required_role=required_role,
+            )
+        except ApiAuthenticationError:
+            _API_IDENTITY_LOGGER.warning(
+                "api.authentication_failed", required_role=required_role, method=request.method
+            )
+            return _identity_error_response(
+                401,
+                "API_AUTHENTICATION_FAILED",
+                "Bearer authentication failed",
+            )
+        except ApiAuthorizationError:
+            _API_IDENTITY_LOGGER.warning(
+                "api.authorization_denied", required_role=required_role, method=request.method
+            )
+            return _identity_error_response(
+                403,
+                "API_AUTHORIZATION_FAILED",
+                "Authenticated principal is not authorized",
+            )
+        _API_IDENTITY_LOGGER.info(
+            "api.identity_authenticated", required_role=required_role, method=request.method
+        )
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @application.exception_handler(RequestValidationError)
     async def invalid_request(_request: Request, _exc: RequestValidationError) -> JSONResponse:
@@ -1252,6 +1372,17 @@ def _tool_action_reconciliation_receipt_payload(
 
 def _error_response(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
+
+
+def _identity_error_response(status: int, code: str, message: str) -> JSONResponse:
+    headers = {"Cache-Control": "no-store"}
+    if status == 401:
+        headers["WWW-Authenticate"] = "Bearer"
+    return JSONResponse(
+        status_code=status,
+        content={"error": {"code": code, "message": message}},
+        headers=headers,
+    )
 
 
 app = create_app()

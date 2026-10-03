@@ -13,18 +13,20 @@ Before rendering for deployment:
 3. provision `regulaai-control-pack` as a read-only-at-runtime PVC populated from the independently
    verified Phase 6r OCI package while preserving manifest-relative paths;
 4. create `regulaai-control-pack-trust` with the public `control-pack-signing-keys.yaml` key;
-5. use the cluster secret manager to create `regulaai-runtime-keys` with `tokenization-key`, and
+5. create `regulaai-api-identity` with non-secret `issuer`, `audience` and `jwks.json` entries for
+   the reviewed enterprise EdDSA token issuer; private IdP keys and access tokens remain external;
+6. use the cluster secret manager to create `regulaai-runtime-keys` with `tokenization-key`, and
    create the `regulaai-operator-authority-trust` ConfigMap containing only the reviewed
    `operator-authority-keys.yaml` Ed25519 public trust store; private issuer keys must remain
    outside the cluster runtime;
-6. provision PostgreSQL with TLS, least-privilege runtime and migration identities, then create the
+7. provision PostgreSQL with TLS, least-privilege runtime and migration identities, then create the
    separate `regulaai-database-runtime` and `regulaai-database-migration` Secrets whose `url` keys
    carry the corresponding least-privilege identities from the cluster secret manager;
-7. configure encrypted backups, point-in-time recovery, retention and restore exercises for the
+8. configure encrypted backups, point-in-time recovery, retention and restore exercises for the
    PostgreSQL database;
-8. create `regulaai-deployment-metadata` with the non-secret immutable `service-version` matching
+9. create `regulaai-deployment-metadata` with the non-secret immutable `service-version` matching
    the image release;
-9. label only approved caller pods with `regulaai.openai.com/client: "true"`.
+10. label only approved caller pods with `regulaai.openai.com/client: "true"`.
 
 Do not place private keys, HMAC keys or credentials in Kustomize files, ConfigMaps, command lines or
 Git. Admission policy should verify the image signature/digest and reject privileged exceptions.
@@ -87,6 +89,10 @@ Production startup also requires the mounted operator-authority trust store. Val
 `ra1e`, `ra2e` and `rr1e` assertion according to each key's configured scope after a key rotation;
 never inject the issuer private key into an API pod. See `OPERATOR_AUTHORITY.md`.
 
+The API also requires the mounted enterprise JWKS plus exact issuer/audience configuration. Verify
+runtime, operator and reconciler tokens separately, confirm missing/wrong-role tokens fail closed,
+and rotate only after the new public key is present on every replica. See `API_IDENTITY.md`.
+
 ## Platform differences and limits
 
 The Kubernetes base uses UID/GID/fsGroup 10001. The OpenShift overlay removes those fixed fields so
@@ -96,8 +102,9 @@ seccomp, capability and read-only-root controls.
 The API uses PostgreSQL and the base runs two replicas with a rolling strategy. SQLite remains only
 the local and controlled-pilot default. The default NetworkPolicy permits no egress; production
 requires a reviewed overlay limited to the exact PostgreSQL endpoint, and gateway mode additionally
-needs specific DNS/HTTPS destinations. Cluster ingress, TLS, OIDC, external routes, registry
-authentication, database availability, backups and disaster recovery remain external.
+needs specific DNS/HTTPS destinations. JWT verification is network-silent; cluster ingress, TLS,
+token issuance, MFA, external routes, registry authentication, database availability, backups and
+disaster recovery remain external.
 
 OTLP is also inactive by default even though the image contains the observability extra. Enabling it
 requires an explicit OTLP endpoint plus a narrowly reviewed DNS/HTTPS NetworkPolicy, collector

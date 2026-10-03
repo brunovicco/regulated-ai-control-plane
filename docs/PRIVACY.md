@@ -19,6 +19,9 @@ Complete this document before processing personal or regulated data.
 - Approval assertions are ephemeral secrets and are never stored or returned. Approval receipts
   retain only the approval ID, pseudonymous actor ID, bound decision digest, enforcement ID and
   timestamps. Do not place names, email addresses or other personal data in either identifier.
+- API bearer tokens and claims are ephemeral and excluded from logs, evidence, responses and
+  persistence. Use bounded non-personal workload/operator subject identifiers. Identity-provider
+  audit, access-token retention and data-subject handling remain deployment-owned.
 - Access control:
 - Encryption in transit:
 - Encryption at rest:
@@ -56,8 +59,8 @@ Complete this document before processing personal or regulated data.
   credential, arguments or raw result.
 - The Phase 5a operator timeline requires one exact enforcement ID and composes only metadata
   already allowlisted in evidence/enforcement/action records. It does not list activity globally or
-  recover payloads. Deployments must protect this operator surface with their existing access and
-  network controls until product authentication and tenant isolation are implemented.
+  recover payloads. Production requires the `regulaai.operator` API role plus network controls;
+  tenant isolation remains required before multi-organization use.
 - Phase 5b lifecycle events retain only sequence, observation time, source, entity/enforcement IDs
   and status. They exclude payloads, arguments, outputs, assertions, credentials, actor data and
   error details. Append-only guards mean approved retention should rotate/remove the database as a

@@ -65,6 +65,20 @@ spec:
                   key: tokenization-key
             - name: REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE
               value: /etc/regulaai/operator-authority/operator-authority-keys.yaml
+            - name: REGULAAI_API_AUTH_MODE
+              value: oidc_jwt
+            - name: REGULAAI_OIDC_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: regulaai-api-identity
+                  key: issuer
+            - name: REGULAAI_OIDC_AUDIENCE
+              valueFrom:
+                configMapKeyRef:
+                  name: regulaai-api-identity
+                  key: audience
+            - name: REGULAAI_OIDC_JWKS_PATH
+              value: /etc/regulaai/api-identity/jwks.json
           volumeMounts:
             - name: control-pack
               mountPath: /etc/regulaai/control-pack
@@ -74,6 +88,9 @@ spec:
               readOnly: true
             - name: operator-authority-trust
               mountPath: /etc/regulaai/operator-authority
+              readOnly: true
+            - name: api-identity-trust
+              mountPath: /etc/regulaai/api-identity
               readOnly: true
             - name: temporary
               mountPath: /tmp
@@ -123,6 +140,9 @@ spec:
         - name: operator-authority-trust
           configMap:
             name: regulaai-operator-authority-trust
+        - name: api-identity-trust
+          configMap:
+            name: regulaai-api-identity
         - name: temporary
           emptyDir:
             sizeLimit: 64Mi

@@ -205,7 +205,7 @@ trust-store checks. The same authenticated bytes feed runtime parsing and offlin
 
 | Boundary | Data allowed to cross | Authority rule |
 | --- | --- | --- |
-| Application → RegulaAI | Explicit runtime context and ephemeral field values | Input is untrusted and schema-validated |
+| Application → RegulaAI | Restricted EdDSA access token plus explicit runtime context and ephemeral field values | Token is verified against pinned issuer/audience/JWKS and route role; input remains untrusted and schema-validated |
 | RegulaAI → provider gateway | Sanitized in-memory execution plan | Policy must allow execution; configuration fixes target/provider |
 | Model → tool proposal | Tool name plus ephemeral arguments | Proposal carries no execution authority |
 | RegulaAI → read-only enterprise sandbox | One validated, approved `cards.read` request | Exact action digest, workload identity and one-time authority required |

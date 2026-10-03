@@ -83,6 +83,16 @@ def test_deployment_is_multi_replica_non_root_and_uses_external_authority() -> N
     assert env["REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE"]["value"] == (
         "/etc/regulaai/operator-authority/operator-authority-keys.yaml"
     )
+    assert env["REGULAAI_API_AUTH_MODE"]["value"] == "oidc_jwt"
+    assert env["REGULAAI_OIDC_ISSUER"]["valueFrom"]["configMapKeyRef"] == {
+        "name": "regulaai-api-identity",
+        "key": "issuer",
+    }
+    assert env["REGULAAI_OIDC_AUDIENCE"]["valueFrom"]["configMapKeyRef"] == {
+        "name": "regulaai-api-identity",
+        "key": "audience",
+    }
+    assert env["REGULAAI_OIDC_JWKS_PATH"]["value"] == "/etc/regulaai/api-identity/jwks.json"
     assert not {
         "REGULAAI_APPROVAL_HMAC_KEY",
         "REGULAAI_ACTION_APPROVAL_HMAC_KEY",
@@ -96,6 +106,7 @@ def test_deployment_is_multi_replica_non_root_and_uses_external_authority() -> N
     assert volumes["operator-authority-trust"]["configMap"]["name"] == (
         "regulaai-operator-authority-trust"
     )
+    assert volumes["api-identity-trust"]["configMap"]["name"] == "regulaai-api-identity"
     assert all("hostPath" not in item for item in volumes.values())
     assert "data" not in volumes
 

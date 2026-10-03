@@ -21,8 +21,46 @@
 5. external approval system -> enforcement service approval verifier;
 6. control-plane policy/registry release -> runtime enforcement plane.
 7. enforcement service -> organization tool system through the tool execution port.
+8. enterprise identity provider -> caller -> API bearer-token verifier.
 
 ## Threats and required mitigations
+
+### API caller impersonation or role escalation
+
+Threat:
+an unauthenticated caller, ID token substituted for an access token, token issued for another
+service, algorithm-confused JWT or caller with a read-only role reaches a protected runtime or
+reconciliation route.
+
+Mitigations:
+
+- production requires offline EdDSA JWT verification against a deployment-pinned public JWKS;
+- exact HTTPS issuer and bounded audience prevent cross-issuer/service token reuse;
+- access-token `typ=at+jwt` or `typ=application/at+jwt` is required case-insensitively; generic
+  `typ=JWT` is rejected even with a valid signature;
+- strict header, key ID, signature, issued/not-before/expiry and maximum-lifetime checks fail closed;
+- `client_id` and `jti` are required bounded safe identifiers; they remain ephemeral and are not
+  permission claims or a replay cache;
+- bounded JWT/JWKS parsing rejects duplicate fields, non-JSON constants, malformed JSON and nesting
+  that exceeds parser capacity; invalid, oversized or private/unexpected JWKS material prevents
+  startup;
+- runtime, operator and reconciler roles are separate and evaluated before request parsing;
+- `/health` and static dashboard CSS contain no protected data and are the only public surfaces;
+- tokens, claims and subjects are not logged, persisted or echoed in generic 401/403 responses;
+- API roles do not replace exact-digest decision, action or reconciliation assertions.
+
+Token separation follows [RFC 8725 §3.11](https://www.rfc-editor.org/rfc/rfc8725.html#section-3.11) and
+[§3.12](https://www.rfc-editor.org/rfc/rfc8725.html#section-3.12), with access-token typing and required
+claims from [RFC 9068 §2](https://www.rfc-editor.org/rfc/rfc9068.html#section-2) and
+[§4](https://www.rfc-editor.org/rfc/rfc9068.html#section-4). The EdDSA-only offline adapter is a
+restricted integration contract, not a claim of universal OAuth/OIDC support or full standards
+conformance; the chosen issuer must produce that contract.
+
+Residual risk:
+identity-provider signing-key compromise, incorrect upstream role assignment or stale mounted JWKS
+can authorize an unintended session. A stolen valid bearer access token can be replayed until
+expiry; requiring `jti` alone does not prevent this. Issuer operations, role governance, MFA,
+revocation and key distribution remain deployment controls.
 
 ### Policy bypass
 
@@ -89,11 +127,10 @@ Mitigations:
 - raw assertions, free-form notes, output and evidence URLs are neither accepted nor persisted.
 
 Residual risk:
-an authorized Ed25519 private-key compromise can mint assertions within that key's scope, and the
-service does not authenticate the interactive operator session by itself. Deployments must protect
-the endpoint with their identity-aware perimeter and preserve issuer separation of duties. The
-local/pilot HMAC verifier still holds symmetric signing material. Issuers must not infer
-`NOT_EXECUTED` from a timeout.
+an authorized Ed25519 private-key compromise can mint assertions within that key's scope. API
+identity authenticates the caller session but cannot validate the external investigation or signing
+ceremony. The local/pilot HMAC verifier still holds symmetric signing material. Issuers must not
+infer `NOT_EXECUTED` from a timeout.
 
 ### Tool result injects instructions or exfiltrates data
 
@@ -174,8 +211,10 @@ Mitigations:
 - the HTML dashboard escapes every dynamic value, executes no JavaScript, loads only same-origin
   CSS and applies no-store, CSP, frame-denial, referrer and permissions-policy headers;
 - the endpoint is read-only and cannot approve, retry or reconcile;
-- deployments must restrict the JSON and HTML operator routes at the existing access boundary until product
-  authentication and tenant isolation are implemented.
+- the JSON and HTML operator routes require the `regulaai.operator` API role when authentication
+  is enabled, and production requires this identity boundary;
+- deployments must restrict access to the single-organization boundary; tenant isolation is not
+  implemented by the API role check.
 
 ### Lifecycle history is altered or overstated
 

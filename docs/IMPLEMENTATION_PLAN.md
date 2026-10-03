@@ -1,5 +1,22 @@
 # Implementation plan
 
+## Enterprise API identity — offline access-token JWT RBAC
+
+Status: implemented after the first state-changing sandbox connector.
+
+- A strict resource-server adapter verifies short-lived EdDSA JWTs against a mounted public JWKS
+  without discovery, remote key retrieval or identity-provider secrets.
+- Explicit access-token type, issuer, audience, signature, key ID, time window and bounded roles
+  fail closed before request parsing.
+- Separate runtime, operator and reconciler roles protect mutations, metadata inspection and
+  terminal reconciliation; health and static dashboard styling remain public.
+- Tokens, claims, subjects and roles are ephemeral and excluded from application evidence/logging.
+- Production-labelled API startup requires the identity boundary; local development remains
+  explicitly disabled by default.
+
+Concrete IdP issuance, MFA, group mapping, revocation feeds and automated JWKS refresh remain
+deployment-owned work.
+
 ## Phase 7d — bound state-changing enterprise sandbox connector
 
 Status: implemented after transactional persistence and asymmetric operator authority.
