@@ -212,12 +212,12 @@ def downgrade() -> None:
         """
         DROP TABLE IF EXISTS operator_lifecycle_event;
         DROP FUNCTION IF EXISTS regulaai_reject_lifecycle_mutation();
-        DROP FUNCTION IF EXISTS regulaai_record_lifecycle();
         DROP TABLE IF EXISTS tool_action_reconciliation_consumption;
         DROP TABLE IF EXISTS action_approval_consumption;
         DROP TABLE IF EXISTS approval_consumption;
         DROP TABLE IF EXISTS tool_action;
         DROP TABLE IF EXISTS enforcement;
         DROP TABLE IF EXISTS evidence;
+        DROP FUNCTION IF EXISTS regulaai_record_lifecycle();
         """
     )

@@ -44,3 +44,28 @@ def test_postgres_migration_matches_runtime_revision_and_metadata_boundary() -> 
     assert head_source.count("ADD COLUMN authority_key_id TEXT") == 3
     assert "private_key" not in head_source
     assert "assertion" not in head_source
+
+
+def test_postgres_downgrade_drops_trigger_owners_before_lifecycle_functions() -> None:
+    module = ast.parse(_BASE_MIGRATION.read_text(encoding="utf-8"))
+    downgrade = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.FunctionDef) and node.name == "downgrade"
+    )
+    sql = "\n".join(
+        str(ast.literal_eval(node.args[0]))
+        for node in ast.walk(downgrade)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "op"
+        and node.func.attr == "execute"
+    )
+
+    record_function = sql.index("DROP FUNCTION IF EXISTS regulaai_record_lifecycle();")
+    for table in ("evidence", "enforcement", "tool_action"):
+        assert sql.index(f"DROP TABLE IF EXISTS {table};") < record_function
+    assert sql.index("DROP TABLE IF EXISTS operator_lifecycle_event;") < sql.index(
+        "DROP FUNCTION IF EXISTS regulaai_reject_lifecycle_mutation();"
+    )
