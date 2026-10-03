@@ -210,12 +210,7 @@ class EnforceAiOperation:
                         now=consumption_time,
                     )
             except Exception as exc:
-                failed = replace(
-                    dispatched,
-                    status=EnforcementStatus.APPROVAL_FAILED,
-                    reason_codes=tuple(sorted({*dispatched.reason_codes, "APPROVAL_FAILED"})),
-                )
-                self._save(failed)
+                # The atomic port owns the claim transaction; this request may not own the row.
                 self._emit("enforcement.failed", error_type=type(exc).__name__)
                 raise ApprovalFailedError("Approval consumption failed closed") from exc
         else:
