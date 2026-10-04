@@ -159,12 +159,13 @@ Não suportado:
 
 O [perfil do release piloto](docs/PILOT_RELEASE.md) define verificação, aceite e limites de rollout.
 
-O código-fonte atual também inclui a próxima fundação produtiva e um [perfil de aceite do piloto
-financeiro integrado](docs/FINANCIAL_PILOT.md): PostgreSQL, identidade empresarial configurável,
-perfis estritos para OpenAI/Bedrock via gateway, recuperação de ferramenta com mudança de estado e
-evidência assinada baseada apenas em metadados. O escopo do piloto publicado não muda, e o aceite
-organizacional permanece bloqueado até o deployment fornecer IdP, sandbox, revisão da política,
-backup/restore e evidências reais.
+O código-fonte atual também inclui uma [prova de conceito financeira
+autoatestada](docs/FINANCIAL_PILOT.md): PostgreSQL, identidade configurável, perfis estritos para
+OpenAI/Bedrock via gateway, recuperação de ferramenta com mudança de estado e evidência baseada
+apenas em metadados, assinada com duas chaves distintas controladas pelo autor do PoC.
+`POC_VERIFIED` registra essa demonstração técnica limitada; não representa aceite independente ou
+organizacional. Um [perfil empresarial futuro](docs/ENTERPRISE_FINANCIAL_PILOT.md) mais estrito
+permanece separado.
 
 ## Mapa do repositório
 

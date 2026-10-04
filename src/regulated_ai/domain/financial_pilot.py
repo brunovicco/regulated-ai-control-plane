@@ -1,4 +1,4 @@
-"""Metadata-only contracts for organization-owned financial pilot acceptance."""
+"""Metadata-only contracts for a self-attested financial proof of concept."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -6,7 +6,7 @@ from enum import StrEnum
 
 
 class PilotCheck(StrEnum):
-    """Evidence required before an organization may accept its bounded pilot."""
+    """Evidence required before the individual PoC may be verified."""
 
     POSTGRES_CONCURRENCY = "POSTGRES_CONCURRENCY"
     ENTERPRISE_IDENTITY = "ENTERPRISE_IDENTITY"
@@ -21,7 +21,7 @@ class PilotCheck(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class FinancialPilotScope:
-    """Exact artifacts and configuration covered by acceptance."""
+    """Exact artifacts and configuration covered by PoC verification."""
 
     pilot_id: str
     environment: str
@@ -29,6 +29,7 @@ class FinancialPilotScope:
     image_digest: str
     control_pack_digest: str
     policy_set_version: str
+    attestation_mode: str
     openai_profile_digest: str
     bedrock_profile_digest: str
     ready: bool
@@ -48,7 +49,7 @@ class PilotEvidence:
 
 @dataclass(frozen=True, slots=True)
 class VerifiedPilotReview:
-    """Authenticated organization review of an exact acceptance bundle."""
+    """One role-specific self-attestation of the exact PoC bundle."""
 
     bundle_digest: str
     role: str
@@ -60,7 +61,7 @@ class VerifiedPilotReview:
 
 @dataclass(frozen=True, slots=True)
 class FinancialPilotAcceptance:
-    """Acceptance decision without deployment authority or compliance claims."""
+    """PoC verification without independent review or compliance claims."""
 
     scope_digest: str
     bundle_digest: str

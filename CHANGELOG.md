@@ -21,9 +21,9 @@ The project is currently a **controlled pilot**. Breaking changes may occur befo
   binding, bounded single-attempt I/O and mandatory ambiguous-outcome reconciliation.
 - Offline EdDSA JWT API identity with pinned issuer/audience/JWKS and separate runtime, operator and
   reconciler roles.
-- An integrated financial-pilot acceptance profile with PostgreSQL 17 in CI, strict OpenAI and
-  Bedrock gateway profiles, a non-mutating enterprise identity probe, complete tool recovery tests
-  and metadata-only, dual-role signed acceptance evidence.
+- A self-attested financial PoC profile with PostgreSQL 17 in CI, configurable identity, strict
+  OpenAI and Bedrock gateway profiles, complete tool recovery tests and metadata-only evidence
+  signed by two distinct role-bound keys, plus a separate stricter enterprise reference profile.
 
 ### Changed
 

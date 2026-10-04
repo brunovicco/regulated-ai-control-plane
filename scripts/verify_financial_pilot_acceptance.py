@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify metadata evidence and signed organizational acceptance; never deploy."""
+"""Verify metadata evidence and two-key individual PoC self-attestation; never deploy."""
 
 import argparse
 import json
@@ -54,13 +54,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     report = {
         "schema_version": "1",
-        "status": "PILOT_ACCEPTED" if result.accepted else "PILOT_BLOCKED",
+        "status": "POC_VERIFIED" if result.accepted else "POC_BLOCKED",
         "evaluated_at": now.isoformat(),
         "scope_digest": result.scope_digest,
         "bundle_digest": result.bundle_digest,
         "findings": result.findings,
-        "scope": "Authenticated organizational acceptance of referenced non-production evidence; "
-        "not independent provider verification, production authorization or compliance.",
+        "scope": "Two-key self-attestation by an individual PoC author over referenced "
+        "non-production evidence; not independent review, production authorization or compliance.",
     }
     print(json.dumps(report, sort_keys=True, separators=(",", ":")))
     return 0 if result.accepted else 2

@@ -25,7 +25,7 @@ def _bundle(directory: Path) -> tuple[list[str], Path, list[Path]]:
     evidence = observations()
     args = [
         "--scope",
-        str(_write(directory / "scope.json", {"schema_version": "1", **asdict(selected)})),
+        str(_write(directory / "scope.json", {"schema_version": "2", **asdict(selected)})),
         "--evaluated-at",
         NOW.isoformat(),
     ]
@@ -38,7 +38,7 @@ def _bundle(directory: Path) -> tuple[list[str], Path, list[Path]]:
         args.extend(["--evidence", str(_write(directory / f"{observation.check}.json", payload))])
     keys = {}
     review_paths = []
-    for role in ("OPERATIONS", "POLICY_OWNER"):
+    for role in ("POC_OPERATOR", "POC_POLICY_REVIEWER"):
         private = Ed25519PrivateKey.generate()
         key_id = f"key-{role}"
         keys[key_id] = {
@@ -50,8 +50,8 @@ def _bundle(directory: Path) -> tuple[list[str], Path, list[Path]]:
             "valid_until": (NOW + timedelta(days=2)).isoformat(),
         }
         payload = {
-            "schema_version": "1",
-            "domain": "regulaai.financial-pilot.review.v1",
+            "schema_version": "2",
+            "domain": "regulaai.financial-poc.review.v1",
             "bundle_digest": pilot_bundle_digest(selected, evidence),
             "role": role,
             "key_id": key_id,
@@ -76,14 +76,16 @@ def _bundle(directory: Path) -> tuple[list[str], Path, list[Path]]:
     return args, trust, review_paths
 
 
-def test_cli_accepts_only_verified_exact_organization_review(
+def test_cli_accepts_only_exact_two_key_self_attestation(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     args, _, _ = _bundle(tmp_path)
     assert main(args) == 0
     report = json.loads(capsys.readouterr().out)
-    assert report["status"] == "PILOT_ACCEPTED"
+    assert report["status"] == "POC_VERIFIED"
+    assert "self-attestation" in report["scope"]
+    assert "not independent review" in report["scope"]
     observation = tmp_path / "OPENAI_GATEWAY.json"
     modified = json.loads(observation.read_text())
     modified["artifact_digest"] = f"sha256:{'b' * 64}"
@@ -102,15 +104,15 @@ def test_pilot_review_rejects_forgery_scope_confusion_and_revocation(
         document = json.loads(trust.read_text())
         keys = document["keys"]
         if change == "revoked":
-            keys["key-OPERATIONS"]["status"] = "REVOKED"
+            keys["key-POC_OPERATOR"]["status"] = "REVOKED"
         else:
-            keys["key-POLICY_OWNER"]["public_key"] = keys["key-OPERATIONS"]["public_key"]
+            keys["key-POC_POLICY_REVIEWER"]["public_key"] = keys["key-POC_OPERATOR"]["public_key"]
         _write(trust, document)
     else:
         document = json.loads(paths[0].read_text())
         document[change] = {
             "signature": "A" * 88,
-            "role": "POLICY_OWNER",
+            "role": "POC_POLICY_REVIEWER",
             "domain": "regulaai.release-promotion",
         }[change]
         _write(paths[0], document)

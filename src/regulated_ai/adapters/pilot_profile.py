@@ -12,7 +12,7 @@ from regulated_ai.domain import ProviderTarget
 
 
 class FinancialPilotProfile(BaseModel):
-    """Organization-owned assertions and one explicit gateway/provider binding."""
+    """Non-secret condition assertions and one explicit gateway/provider binding."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

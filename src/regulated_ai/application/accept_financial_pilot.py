@@ -1,4 +1,4 @@
-"""Evaluate bounded pilot evidence and authenticated organizational review."""
+"""Evaluate bounded PoC evidence and authenticated self-attestation."""
 
 import hashlib
 import json
@@ -20,10 +20,10 @@ def pilot_scope_digest(scope: FinancialPilotScope) -> str:
 
 
 def pilot_bundle_digest(scope: FinancialPilotScope, evidence: tuple[PilotEvidence, ...]) -> str:
-    """Bind all evidence references and observations before reviewers sign."""
+    """Bind all evidence references and observations before the author signs."""
     return _digest(
         {
-            "domain": "regulaai.financial-pilot.bundle.v1",
+            "domain": "regulaai.financial-poc.bundle.v1",
             "scope": asdict(scope),
             "evidence": [
                 {**asdict(item), "observed_at": item.observed_at.isoformat()}
@@ -44,7 +44,7 @@ class AcceptFinancialPilot:
         reviews: tuple[VerifiedPilotReview, ...],
         evaluated_at: datetime,
     ) -> FinancialPilotAcceptance:
-        """Require all checks and distinct operations and policy-owner signatures."""
+        """Require all checks and two distinct role-bound self-attestation keys."""
         _require_utc(evaluated_at)
         scope_digest = pilot_scope_digest(scope)
         bundle_digest = pilot_bundle_digest(scope, evidence)
@@ -53,8 +53,10 @@ class AcceptFinancialPilot:
             findings.add("SCOPE_NOT_READY")
         if scope.environment not in {"pilot", "sandbox", "test"}:
             findings.add("NON_PRODUCTION_SCOPE_REQUIRED")
-        if scope.policy_set_version.startswith("br-financial-demo@"):
-            findings.add("ORGANIZATION_POLICY_REQUIRED")
+        if not scope.policy_set_version.startswith("poc-financial@"):
+            findings.add("POC_POLICY_REVIEW_REQUIRED")
+        if scope.attestation_mode != "SELF_ATTESTED_POC":
+            findings.add("SELF_ATTESTATION_REQUIRED")
         if scope.source_revision == "0" * 40 or any(
             value == f"sha256:{'0' * 64}"
             for value in (
@@ -88,7 +90,7 @@ class AcceptFinancialPilot:
                 findings.add(f"STALE_{item.check.value}")
             if item.artifact_digest == f"sha256:{'0' * 64}":
                 findings.add(f"PLACEHOLDER_{item.check.value}")
-        required_roles = {"OPERATIONS", "POLICY_OWNER"}
+        required_roles = {"POC_OPERATOR", "POC_POLICY_REVIEWER"}
         roles: set[str] = set()
         keys: set[str] = set()
         for review in reviews:
@@ -104,12 +106,12 @@ class AcceptFinancialPilot:
             ):
                 findings.add("REVIEW_INVALID")
             elif review.role in roles or review.key_id in keys:
-                findings.add("DISTINCT_REVIEWERS_REQUIRED")
+                findings.add("DISTINCT_ATTESTATION_KEYS_REQUIRED")
             else:
                 roles.add(review.role)
                 keys.add(review.key_id)
         if roles != required_roles:
-            findings.add("ORGANIZATION_REVIEW_REQUIRED")
+            findings.add("POC_SELF_ATTESTATION_REQUIRED")
         return FinancialPilotAcceptance(
             scope_digest, bundle_digest, not findings, tuple(sorted(findings))
         )

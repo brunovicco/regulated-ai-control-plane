@@ -1,4 +1,4 @@
-"""Strict JSON and domain-separated public-key verification for pilot acceptance."""
+"""Strict JSON and public-key verification for self-attested PoC evidence."""
 
 import base64
 import json
@@ -27,7 +27,7 @@ class _StrictModel(BaseModel):
 
 
 class _ScopeModel(_StrictModel):
-    schema_version: Literal["1"]
+    schema_version: Literal["2"]
     pilot_id: str = Field(pattern=_ID)
     environment: Literal["pilot", "sandbox", "test"]
     source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
@@ -36,6 +36,7 @@ class _ScopeModel(_StrictModel):
     policy_set_version: str = Field(
         min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*@[A-Za-z0-9._-]+$"
     )
+    attestation_mode: Literal["SELF_ATTESTED_POC"]
     openai_profile_digest: str = Field(pattern=_DIGEST)
     bedrock_profile_digest: str = Field(pattern=_DIGEST)
     ready: bool = Field(strict=True)
@@ -52,10 +53,10 @@ class _EvidenceModel(_StrictModel):
 
 
 class _ReviewModel(_StrictModel):
-    schema_version: Literal["1"]
-    domain: Literal["regulaai.financial-pilot.review.v1"]
+    schema_version: Literal["2"]
+    domain: Literal["regulaai.financial-poc.review.v1"]
     bundle_digest: str = Field(pattern=_DIGEST)
-    role: Literal["OPERATIONS", "POLICY_OWNER"]
+    role: Literal["POC_OPERATOR", "POC_POLICY_REVIEWER"]
     key_id: str = Field(pattern=_ID)
     approved: bool = Field(strict=True)
     issued_at: datetime
@@ -66,7 +67,7 @@ class _ReviewModel(_StrictModel):
 class _KeyModel(TrustKeyLifecycleModel):
     algorithm: Literal["ed25519"]
     public_key: str = Field(min_length=44, max_length=44)
-    role: Literal["OPERATIONS", "POLICY_OWNER"]
+    role: Literal["POC_OPERATOR", "POC_POLICY_REVIEWER"]
 
 
 class _TrustModel(_StrictModel):
@@ -75,13 +76,13 @@ class _TrustModel(_StrictModel):
 
 
 def load_pilot_scope(path: Path) -> FinancialPilotScope:
-    """Parse non-secret deployment artifacts with no inferred approvals."""
+    """Parse non-secret PoC artifacts with no inferred independent approval."""
     model = _ScopeModel.model_validate(_read_json(path))
     return FinancialPilotScope(**model.model_dump(exclude={"schema_version"}))
 
 
 def load_pilot_evidence(path: Path) -> PilotEvidence:
-    """Read an organization-owned observation referencing retained evidence by digest."""
+    """Read one PoC observation referencing retained evidence by digest."""
     model = _EvidenceModel.model_validate(_read_json(path))
     return PilotEvidence(**model.model_dump(exclude={"schema_version"}))
 

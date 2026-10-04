@@ -1,164 +1,119 @@
-# Integrated financial pilot
+# Self-attested financial proof of concept
 
-The integrated financial pilot is the acceptance profile for the current source candidate. It
-combines a real PostgreSQL transaction boundary, enterprise-issued API identity, fixed synthetic
-OpenAI and Amazon Bedrock calls through the governed gateway, a separately approved state-changing
-sandbox action, terminal recovery of both ambiguous outcomes, an organization-owned policy pack
-and authenticated acceptance of the resulting metadata evidence.
+This is an individual, non-production demonstration using synthetic data. It composes PostgreSQL,
+API identity, fixed OpenAI and Amazon Bedrock gateway calls, approved sandbox tool execution,
+terminal recovery, a technically reviewed PoC policy and metadata-only evidence. A successful
+result is `POC_VERIFIED`: it is not independent review, organizational acceptance, production
+authorization or a compliance claim.
 
-This profile is non-production and uses synthetic data. Repository CI proves the composition with
-real PostgreSQL and in-process external substitutes. It does not prove an enterprise issuer,
-provider account, network path, sandbox system, backup or organizational approval. Those checks
-become acceptable only when run against the selected organization-owned environment.
+The future organization-owned profile remains separate in [Enterprise financial pilot
+profile](ENTERPRISE_FINANCIAL_PILOT.md) and `examples/financial-pilot-enterprise/`.
 
 ## Fixed scope
 
-Create one acceptance scope from `examples/financial-pilot/scope.json`. Replace every zero digest,
-record the exact 40-character source revision and immutable image digest, then set `ready` to
-`true`. The scope binds:
+Start with `examples/financial-pilot/scope.json`. Replace every zero digest, record the exact source
+revision and immutable image digest, and set `ready` to `true`. Schema version 2 requires
+`attestation_mode=SELF_ATTESTED_POC` and binds:
 
-- one non-production environment and source/image pair;
-- one promoted, signed organization control pack;
-- the exact `org-financial-pilot@1.0.0` policy version;
-- one reviewed OpenAI profile and one reviewed Bedrock profile.
+- one non-production environment and exact source/image pair;
+- one signed control pack containing `poc-financial@1.0.0`;
+- exact OpenAI and Bedrock profile digests;
+- the explicit two-key individual self-attestation model.
 
-The example profiles and policy are drafts. Copy them to organization-controlled configuration,
-replace the model and deployment placeholders, and change a condition assertion to `true` only
-when deployment evidence supports it. Compute each profile digest from the normalized loader
-output; do not edit the digest after evidence or reviews have been issued.
+Replace the model and deployment placeholders in both profiles. OpenAI must run with `store=false`;
+Bedrock must use IAM authorization. The PoC policy deliberately avoids claims that require
+enterprise eligibility, PrivateLink or organization-managed CloudTrail configuration. The gateway
+must constrain its complete candidate/fallback set and return the exact reviewed provider, model
+and deployment with `cached=false`.
 
-The gateway workload must constrain its complete candidate and fallback set. A successful terminal
-response must report the reviewed provider, model and deployment and must not be a cached result.
-For Bedrock, the current fixed target is `aws.bedrock_runtime.sa-east-1`; selecting another region
-requires a reviewed code/profile change rather than a runtime string override.
+## Repository and identity proof
 
-## Repository proof
+CI starts disposable PostgreSQL 17, applies migrations and exercises concurrent single-winner
+dispatch, atomic Ed25519 authority, API role separation, both gateway providers, one tool attempt
+and `EXECUTED`/`NOT_EXECUTED` recovery. Its metadata artifact explicitly records that provider and
+issuer boundaries are simulated, so it proves only `POSTGRES_CONCURRENCY` in
+`CI_REAL_POSTGRES` mode.
 
-CI starts a disposable PostgreSQL 17 service, applies Alembic migrations and requires the
-integration suite. The suite exercises concurrent single-winner dispatch, atomic Ed25519 authority
-consumption, API role separation, OpenAI and Bedrock gateway responses, exact decision/action
-approval, one state-changing tool attempt and terminal `EXECUTED` and `NOT_EXECUTED`
-reconciliation. `scripts/report_financial_pilot_ci.py` reduces the JUnit document to counts,
-revision and a digest; failure details are excluded from the retained pilot artifact.
-
-The CI report declares `external_provider_mode=SIMULATED` and
-`enterprise_issuer_mode=SYNTHETIC`. It can satisfy only `POSTGRES_CONCURRENCY` with execution mode
-`CI_REAL_POSTGRES`; it cannot satisfy any live sandbox check.
-
-## Enterprise identity proof
-
-Choose an issuer that can produce the exact access-token contract in [Enterprise API
-identity](API_IDENTITY.md). Configure the deployment with its issuer, audience and public JWKS.
-Inject three short-lived test tokens through the process environment and run:
+For a live individual demonstration, use a local IdP capable of the contract in [Enterprise API
+identity](API_IDENTITY.md). Keycloak with an Ed25519 realm key, `at+jwt` access tokens and protocol
+mappers for `client_id`, `aud` and top-level `roles` is one compatible option. Use three clients for
+runtime, operator and reconciler roles, mount only the exported public JWKS, then run:
 
 ```bash
 REGULAAI_ENVIRONMENT=pilot \
-REGULAAI_PILOT_API_URL=https://regulaai-pilot.example.internal \
+REGULAAI_PILOT_API_URL=https://regulaai-poc.local \
 REGULAAI_PILOT_RUNTIME_TOKEN="$RUNTIME_TOKEN" \
 REGULAAI_PILOT_OPERATOR_TOKEN="$OPERATOR_TOKEN" \
 REGULAAI_PILOT_RECONCILER_TOKEN="$RECONCILER_TOKEN" \
 uv run python scripts/probe_enterprise_identity.py > identity-report.json
 ```
 
-The probe sends invalid mutation bodies, so it verifies authentication and the complete role matrix
-without creating business records. It records only status codes, a control-pack digest and report
-digest. Tokens, claims, subjects and roles are neither printed nor persisted. Retain issuer-side
-issuance and denied-access audit evidence separately; exercise signing-key overlap and emergency
-revocation before approval.
+The probe uses invalid mutation bodies and retains no token or claim content.
 
-## OpenAI and Bedrock gateway proof
+## Provider proof
 
-For each reviewed profile, inject gateway credentials using the platform secret boundary. Set the
-allowed target and expected provider exactly as declared by the profile, then run:
+Create one isolated OpenAI project and one AWS development identity, inject credentials outside
+Git, and configure separate gateway workloads. Run the fixed-synthetic composition once per profile:
 
 ```bash
 REGULAAI_ENVIRONMENT=pilot \
 REGULAAI_EXECUTION_MODE=gateway \
-REGULAAI_DATABASE_URL="$PILOT_DATABASE_URL" \
+REGULAAI_DATABASE_URL="$POC_DATABASE_URL" \
 REGULAAI_GATEWAY_ALLOWED_TARGET=openai.responses_api.global \
 REGULAAI_GATEWAY_EXPECTED_PROVIDER=openai \
 uv run python scripts/run_live_composition_pilot.py \
-  --profile /approved/config/financial-pilot-openai.json \
-  --correlation-prefix approved-change-reference > openai-report.json
+  --profile /poc/config/openai.json \
+  --correlation-prefix poc-openai > openai-report.json
 ```
 
-Repeat with `aws.bedrock_runtime.sa-east-1`, the profile's reviewed Bedrock gateway provider and
-the Bedrock profile. The command sends fixed synthetic content, locally tokenizes the identifier,
-enables no tools and returns metadata only. Accept a report only when it says
-`LIVE_COMPOSITION_VERIFIED`, its profile/control-pack digests match the scope, and its terminal
-provider, model and deployment match the reviewed workload.
+Repeat with `aws.bedrock_runtime.sa-east-1` and the Bedrock profile. Accept each report only when it
+says `LIVE_COMPOSITION_VERIFIED`, its digests match the scope and the terminal provider, model and
+deployment match the configured workload.
 
-## Tool approval and recovery proof
+## Tool and backup proof
 
-Use only the bound `cards.unblock` non-production connector described in [State-changing enterprise
-connector](STATE_CHANGING_ENTERPRISE_CONNECTOR.md). The organization must demonstrate all three
-paths against a sandbox that durably binds the idempotency key to the exact operation:
+Use a local stateful `cards.unblock` sandbox that durably binds idempotency key to action digest.
+Demonstrate success, effect-then-timeout reconciled as `EXECUTED`, and timeout-without-effect
+reconciled as `NOT_EXECUTED`. Investigation and reconciliation must never re-execute the action.
 
-1. consume distinct decision and action approvals, execute once, and record a successful terminal
-   action;
-2. create an ambiguous outcome, investigate downstream, issue a reconciliation assertion for
-   `EXECUTED`, and prove exact replay is idempotent;
-3. create a separate ambiguous outcome, investigate downstream, issue a reconciliation assertion
-   for `NOT_EXECUTED`, and prove the original action was not re-executed.
+Back up the dedicated PostgreSQL database with `pg_dump -Fc`, record the SHA-256 digest, restore it
+into a separate database with `pg_restore --exit-on-error --no-owner`, verify the Alembic revision
+and read representative timelines. Retain only digests, bounded identifiers, timestamps, schema
+revision and result.
 
-Retain metadata-only API/timeline exports, downstream idempotency/audit references and report
-digests. Do not retain request fields, action arguments, tool output, credentials, tokens or
-personal data in pilot evidence.
+## Policy self-review and evidence
 
-## Policy and operational review
+Complete `examples/financial-pilot/policy-review.md` over the exact PoC policy bytes. The author may
+perform both roles, but must use two distinct Ed25519 key pairs and keep the limitation explicit:
 
-Review `examples/financial-pilot/policy.yaml` using the existing signed-pack onboarding, scenario
-replay, release-evidence and promotion-quorum workflow. The worksheet in
-`examples/financial-pilot/policy-review.md` names the required owner decisions. The repository
-does not infer legal requirements or approve the draft.
+- `POC_OPERATOR` attests execution and operational evidence;
+- `POC_POLICY_REVIEWER` attests the technical policy review.
 
-Run backup and restore against the exact dedicated PostgreSQL pilot database under the deployment's
-TLS, least-privilege and retention controls. Verify the restored schema revision and metadata
-records in an isolated database. Record only the backup artifact digest, source/recovered database
-identifiers suitable for evidence, timestamps, schema revision and result.
+Private keys stay outside the repository. The public trust store binds each key to exactly one
+role. Reviews use schema version 2 and domain `regulaai.financial-poc.review.v1`.
 
-## Acceptance evidence
+Create one evidence document for every `PilotCheck`. PostgreSQL uses `CI_REAL_POSTGRES`, policy
+review uses `HUMAN_REVIEW`, and the other checks use `SANDBOX_LIVE`. All observations must pass,
+match the exact scope, contain non-placeholder artifact digests and be no older than seven days.
 
-Create one strict evidence JSON document per required check:
-
-```json
-{
-  "schema_version": "1",
-  "check": "ENTERPRISE_IDENTITY",
-  "scope_digest": "sha256:...",
-  "artifact_digest": "sha256:...",
-  "observed_at": "2026-10-04T12:00:00+00:00",
-  "passed": true,
-  "execution_mode": "SANDBOX_LIVE"
-}
-```
-
-The nine required check names are defined by `PilotCheck` in
-`src/regulated_ai/domain/financial_pilot.py`. PostgreSQL uses `CI_REAL_POSTGRES`, policy review uses
-`HUMAN_REVIEW`, and every other check uses `SANDBOX_LIVE`. All evidence must be scoped exactly,
-successful, non-placeholder and no older than seven days when evaluated.
-
-After all evidence exists, distinct organization-owned `OPERATIONS` and `POLICY_OWNER` Ed25519 keys
-sign the exact bundle digest with domain `regulaai.financial-pilot.review.v1`. Runtime receives only
-the lifecycle-aware public trust store. Evaluate the bundle with:
+Evaluate the complete bundle with:
 
 ```bash
 uv run python scripts/verify_financial_pilot_acceptance.py \
-  --scope /approved/evidence/scope.json \
-  --evidence /approved/evidence/postgres.json \
-  --evidence /approved/evidence/identity.json \
-  --evidence /approved/evidence/openai.json \
-  --evidence /approved/evidence/bedrock.json \
-  --evidence /approved/evidence/tool-execution.json \
-  --evidence /approved/evidence/recovery-executed.json \
-  --evidence /approved/evidence/recovery-not-executed.json \
-  --evidence /approved/evidence/policy-review.json \
-  --evidence /approved/evidence/backup-restore.json \
-  --review /approved/evidence/operations-review.json \
-  --review /approved/evidence/policy-owner-review.json \
-  --trust-store /approved/config/pilot-review-keys.json
+  --scope /poc/evidence/scope.json \
+  --evidence /poc/evidence/postgres.json \
+  --evidence /poc/evidence/identity.json \
+  --evidence /poc/evidence/openai.json \
+  --evidence /poc/evidence/bedrock.json \
+  --evidence /poc/evidence/tool-execution.json \
+  --evidence /poc/evidence/recovery-executed.json \
+  --evidence /poc/evidence/recovery-not-executed.json \
+  --evidence /poc/evidence/policy-review.json \
+  --evidence /poc/evidence/backup-restore.json \
+  --review /poc/evidence/operator-attestation.json \
+  --review /poc/evidence/policy-attestation.json \
+  --trust-store /poc/config/poc-attestation-keys.json
 ```
 
-Exit `0` and `PILOT_ACCEPTED` mean that the supplied organization reviewers accepted the exact
-referenced non-production evidence. They do not independently verify providers, authorize a
-deployment, establish production readiness or make a compliance claim.
+Exit `0` and `POC_VERIFIED` mean only that the two role-specific keys self-attested the complete,
+fresh, exact-scope PoC evidence.

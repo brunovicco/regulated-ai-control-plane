@@ -1,4 +1,4 @@
-# ADR-0043: Bind integrated financial-pilot evidence to authenticated acceptance
+# ADR-0043: Bind individual financial-PoC evidence to two-key self-attestation
 
 ## Status
 
@@ -16,52 +16,57 @@ decision/action authority, a state-changing sandbox connector and terminal recon
 their isolated tests does not prove that one organization exercised the controls together against
 its selected issuer, provider workloads and downstream sandbox.
 
-The enterprise identity provider and sandbox environment have not been selected. The repository
-therefore cannot encode their credentials, claim organizational approval or manufacture live
-evidence. It can define a configurable integration contract, prove the composition locally and
-fail closed until organization-owned evidence and reviews are supplied.
+This repository is an individual proof of concept rather than an organization deployment. It must
+not encode external credentials, claim organizational approval or manufacture live evidence. It can
+define a configurable integration contract, prove the composition and distinguish self-attestation
+from independent enterprise acceptance.
 
 ## Decision
 
-Define an integrated, non-production financial-pilot profile bound to the exact source revision,
-image, promoted control pack, organization policy version, OpenAI profile and Bedrock profile.
-Provider profiles contain only reviewed non-secret target, model, deployment and organization
-condition assertions. The live fixed-synthetic probe rejects mismatched or cached terminal gateway
-metadata.
+Define an integrated, non-production financial-PoC profile bound to the exact source revision,
+image, signed control pack, PoC policy version, OpenAI profile and Bedrock profile. Provider profiles
+contain only reviewed non-secret target, model and deployment metadata. The live fixed-synthetic
+probe rejects mismatched or cached terminal gateway metadata.
 
 Require nine distinct metadata-only observations: real PostgreSQL concurrency in CI, enterprise
 identity, OpenAI and Bedrock gateway calls, tool execution, both terminal recovery outcomes,
-organization policy review and backup/restore. CI may attest only its real PostgreSQL check;
+technical policy self-review and backup/restore. CI may attest only its real PostgreSQL check;
 synthetic issuer and external adapters are explicitly identified as simulated.
 
 Bind the complete scope and evidence set into a canonical SHA-256 bundle. Accept it only when every
 observation is successful, recent, exact-scope and uses its required live mode, and when distinct
-organization-owned Ed25519 keys for `OPERATIONS` and `POLICY_OWNER` approve the exact bundle. Keep
-private signing keys and evidence artifacts outside the runtime and repository.
+Ed25519 keys for `POC_OPERATOR` and `POC_POLICY_REVIEWER` self-attest the exact bundle. The same
+individual may control both keys, but the keys must be cryptographically distinct and the report
+must state that review was not independent. Keep private keys and evidence outside the repository.
+
+Use controls demonstrable by an individual: OpenAI `store=false`, Bedrock IAM authorization and the
+documented provider-access behavior. Keep ZDR eligibility, PrivateLink, CloudTrail deployment and
+independent organizational review in a separate future enterprise profile.
 
 ## Alternatives considered
 
 - Treat the existing unit and integration suite as pilot acceptance: rejected because external
-  issuer, provider, sandbox, backup and organization review boundaries are substituted in tests.
-- Select a concrete IdP, cloud account or sandbox in source: deferred because none has been chosen
-  and credentials and organizational authority belong to the deployment.
+  issuer, provider, sandbox, backup and independent-review boundaries are substituted in tests.
+- Select a hosted enterprise IdP or real financial sandbox: rejected for the PoC because a local
+  compatible issuer and stateful synthetic sandbox demonstrate the boundary without implying an
+  organization relationship.
 - Accept screenshots or a free-form checklist: rejected because they do not reproducibly bind the
-  exact artifacts, scope, observations and reviewers.
-- Permit one reviewer or a runtime-held shared secret: rejected because operations and policy
-  ownership are separate decisions and runtime verification must not grant signing authority.
+  exact artifacts, scope, observations and attestations.
+- Permit one key or a runtime-held shared secret: rejected because the PoC still needs to
+  demonstrate separation between operational and policy-review attestations.
 - Store prompts, provider responses or tool arguments as stronger proof: rejected because it would
   violate the metadata-only evidence boundary and could retain personal or secret data.
 
 ## Consequences
 
-The repository can show an end-to-end technical composition without claiming that simulated
-boundaries are live. Organizations can select compatible identity and sandbox products later by
-supplying configuration and evidence rather than changing the acceptance semantics.
+The repository can show an end-to-end technical composition without claiming independent review or
+enterprise adoption. A future organization can use the retained enterprise profile, but it must
+supply its own authority, infrastructure and acceptance semantics.
 
 Acceptance is deliberately blocked by placeholder scope, missing checks, simulated modes, stale or
-wrong-scope evidence, duplicate evidence, invalid signatures, overlapping reviewer keys or an
-unreviewed demo policy. Producing the live evidence requires organization-owned infrastructure and
-human decisions.
+wrong-scope evidence, duplicate evidence, invalid signatures, overlapping attestation keys, a
+non-PoC policy or a missing two-key self-attestation. Producing live provider evidence still
+requires the author's development accounts and synthetic sandbox.
 
 ## Security and privacy impact
 
@@ -70,22 +75,21 @@ credentials, claims, prompt values, model output, tool arguments/results and per
 excluded. The identity probe verifies the route matrix with invalid mutation bodies. Provider
 proof uses fixed synthetic content, while tool recovery forbids reexecution of an ambiguous action.
 
-Ed25519 review signatures are domain-separated, role-bound, lifecycle-checked and tied to the exact
-bundle. A valid signature attests reviewer approval; it does not make a referenced external report
-truthful. Evidence custody, reviewer authentication and investigation integrity remain
-organization-owned controls.
+Ed25519 signatures are domain-separated, role-bound, lifecycle-checked and tied to the exact
+bundle. A valid signature proves possession of one PoC role key; it does not provide independent
+review or make a referenced external report truthful.
 
 ## Operational impact
 
 CI runs migrations and concurrency cases against a disposable PostgreSQL 17 service and retains a
-metadata-only summary. Pilot operators must maintain dedicated non-production databases, public
-trust stores, exact gateway configuration, downstream idempotency, backup/restore proof and a
-seven-day acceptance window. Any material scope change requires new evidence and signatures.
+metadata-only summary. The PoC author maintains dedicated non-production databases, public trust
+stores, exact gateway configuration, downstream idempotency, backup/restore proof and a seven-day
+verification window. Any material scope change requires new evidence and signatures.
 
 ## Follow-up
 
-- Select the enterprise IdP and validate issuance, role mapping, rotation and revocation.
+- Configure a compatible local IdP and validate issuance, role mapping and key rotation.
 - Select reviewed OpenAI and Bedrock gateway workloads and replace profile placeholders.
 - Select the downstream sandbox and exercise success plus both investigated recovery outcomes.
-- Promote the organization policy through the existing signed release workflow.
-- Run backup/restore, gather all nine evidence records and obtain both acceptance signatures.
+- Self-review and sign the PoC policy; retain the stricter enterprise profile for future use.
+- Run backup/restore, gather all nine evidence records and produce both PoC attestations.

@@ -20,15 +20,16 @@ from ..helpers import NOW
 
 def scope() -> FinancialPilotScope:
     return FinancialPilotScope(
-        "pilot-test",
-        "pilot",
-        "1" * 40,
-        f"sha256:{'2' * 64}",
-        f"sha256:{'3' * 64}",
-        "org-financial-pilot@1.0.0",
-        f"sha256:{'4' * 64}",
-        f"sha256:{'5' * 64}",
-        True,
+        pilot_id="pilot-test",
+        environment="pilot",
+        source_revision="1" * 40,
+        image_digest=f"sha256:{'2' * 64}",
+        control_pack_digest=f"sha256:{'3' * 64}",
+        policy_set_version="poc-financial@1.0.0",
+        attestation_mode="SELF_ATTESTED_POC",
+        openai_profile_digest=f"sha256:{'4' * 64}",
+        bedrock_profile_digest=f"sha256:{'5' * 64}",
+        ready=True,
     )
 
 
@@ -60,11 +61,11 @@ def reviews(evidence: tuple[PilotEvidence, ...]) -> tuple[VerifiedPilotReview, .
             NOW - timedelta(minutes=10),
             NOW + timedelta(days=1),
         )
-        for role in ("OPERATIONS", "POLICY_OWNER")
+        for role in ("POC_OPERATOR", "POC_POLICY_REVIEWER")
     )
 
 
-def test_complete_exact_bundle_requires_both_organization_roles() -> None:
+def test_complete_exact_bundle_requires_both_self_attestation_roles() -> None:
     evidence = observations()
     report = AcceptFinancialPilot().execute(
         scope=scope(), evidence=evidence, reviews=reviews(evidence), evaluated_at=NOW
@@ -75,7 +76,7 @@ def test_complete_exact_bundle_requires_both_organization_roles() -> None:
     )
     assert not unsigned.accepted
     assert unsigned.bundle_digest == report.bundle_digest
-    assert "ORGANIZATION_REVIEW_REQUIRED" in unsigned.findings
+    assert "POC_SELF_ATTESTATION_REQUIRED" in unsigned.findings
 
 
 @pytest.mark.parametrize(
@@ -130,14 +131,14 @@ def test_changed_artifact_invalidates_prior_review_and_missing_checks_block() ->
     assert "MISSING_BACKUP_RESTORE" in report.findings
 
 
-def test_expired_review_same_key_and_demo_scope_cannot_authorize_acceptance() -> None:
+def test_expired_review_same_key_and_invalid_scope_cannot_verify_poc() -> None:
     evidence = observations()
     approvals = reviews(evidence)
     duplicate = (approvals[0], replace(approvals[1], key_id=approvals[0].key_id))
     result = AcceptFinancialPilot().execute(
         scope=scope(), evidence=evidence, reviews=duplicate, evaluated_at=NOW
     )
-    assert "DISTINCT_REVIEWERS_REQUIRED" in result.findings
+    assert "DISTINCT_ATTESTATION_KEYS_REQUIRED" in result.findings
     expired = (replace(approvals[0], expires_at=NOW), approvals[1])
     assert (
         not AcceptFinancialPilot()
@@ -146,7 +147,13 @@ def test_expired_review_same_key_and_demo_scope_cannot_authorize_acceptance() ->
     )
     draft = replace(scope(), ready=False, policy_set_version="br-financial-demo@1.0.0")
     result = AcceptFinancialPilot().execute(scope=draft, evidence=(), reviews=(), evaluated_at=NOW)
-    assert {"ORGANIZATION_POLICY_REQUIRED", "SCOPE_NOT_READY"}.issubset(result.findings)
+    assert {"POC_POLICY_REVIEW_REQUIRED", "SCOPE_NOT_READY"}.issubset(result.findings)
+
+    wrong_mode = replace(scope(), attestation_mode="INDEPENDENT_ENTERPRISE")
+    result = AcceptFinancialPilot().execute(
+        scope=wrong_mode, evidence=evidence, reviews=approvals, evaluated_at=NOW
+    )
+    assert "SELF_ATTESTATION_REQUIRED" in result.findings
 
 
 def test_evidence_order_does_not_change_bundle_but_duplicates_block() -> None:

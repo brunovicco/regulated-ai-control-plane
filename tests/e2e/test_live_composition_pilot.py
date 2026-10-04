@@ -182,7 +182,7 @@ def test_live_composition_cli_rejects_profile_gateway_binding_mismatch(
                 "gateway_provider": "aws",
                 "gateway_model": "reviewed-model",
                 "gateway_deployment": "reviewed-deployment",
-                "policy_set_version": "org-financial-pilot@1.0.0",
+                "policy_set_version": "poc-financial@1.0.0",
                 "organization_assertions": {},
             }
         ),
