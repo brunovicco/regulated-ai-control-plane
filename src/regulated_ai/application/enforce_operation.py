@@ -14,6 +14,7 @@ from regulated_ai.application.evaluate_operation import (
 )
 from regulated_ai.application.ports import (
     ApprovalPort,
+    AtomicApprovalExecutionPort,
     EnforcementRepository,
     EvaluationObserver,
     InferenceExecutionPort,
@@ -190,39 +191,66 @@ class EnforceAiOperation:
             self._emit("enforcement.completed", status=stored_prepared.status.value)
             return _to_result(stored_prepared)
         dispatched = replace(prepared, status=EnforcementStatus.DISPATCHED)
-        stored_dispatched, claimed = self._claim_execution(dispatched)
+        atomic_receipt: ApprovalReceipt | None = None
+        if approval_grant is not None and isinstance(self._approval, AtomicApprovalExecutionPort):
+            consumption_time = self._clock()
+            try:
+                stored_dispatched, claimed, atomic_receipt = self._approval.claim_execution(
+                    approval_grant,
+                    record=dispatched,
+                    now=consumption_time,
+                )
+                if claimed:
+                    if atomic_receipt is None:
+                        raise ValueError("Atomic approval receipt is unavailable")
+                    _validate_approval_receipt(
+                        atomic_receipt,
+                        grant=approval_grant,
+                        enforcement_id=dispatched.enforcement_id,
+                        now=consumption_time,
+                    )
+            except Exception as exc:
+                # The atomic port owns the claim transaction; this request may not own the row.
+                self._emit("enforcement.failed", error_type=type(exc).__name__)
+                raise ApprovalFailedError("Approval consumption failed closed") from exc
+        else:
+            stored_dispatched, claimed = self._claim_execution(dispatched)
         if not claimed:
             self._emit("enforcement.completed", status=stored_dispatched.status.value)
             return _to_result(stored_dispatched)
         active_plan = plan
         active_record = dispatched
         if approval_grant is not None:
-            consumption_time = self._clock()
-            try:
-                if self._approval is None:
-                    raise ValueError("Approval verifier is unavailable")
-                approval_receipt = self._approval.consume(
-                    approval_grant,
-                    enforcement_id=dispatched.enforcement_id,
-                    now=consumption_time,
-                )
-                _validate_approval_receipt(
-                    approval_receipt,
-                    grant=approval_grant,
-                    enforcement_id=dispatched.enforcement_id,
-                    now=consumption_time,
-                )
-            except Exception as exc:
-                failed = replace(
-                    dispatched,
-                    status=EnforcementStatus.APPROVAL_FAILED,
-                    reason_codes=tuple(sorted({*dispatched.reason_codes, "APPROVAL_FAILED"})),
-                )
-                self._save(failed)
-                self._emit("enforcement.failed", error_type=type(exc).__name__)
-                raise ApprovalFailedError("Approval consumption failed closed") from exc
+            approval_receipt = atomic_receipt
+            if approval_receipt is None:
+                consumption_time = self._clock()
+                try:
+                    if self._approval is None:
+                        raise ValueError("Approval verifier is unavailable")
+                    approval_receipt = self._approval.consume(
+                        approval_grant,
+                        enforcement_id=dispatched.enforcement_id,
+                        now=consumption_time,
+                    )
+                    _validate_approval_receipt(
+                        approval_receipt,
+                        grant=approval_grant,
+                        enforcement_id=dispatched.enforcement_id,
+                        now=consumption_time,
+                    )
+                except Exception as exc:
+                    failed = replace(
+                        dispatched,
+                        status=EnforcementStatus.APPROVAL_FAILED,
+                        reason_codes=tuple(sorted({*dispatched.reason_codes, "APPROVAL_FAILED"})),
+                    )
+                    self._save(failed)
+                    self._emit("enforcement.failed", error_type=type(exc).__name__)
+                    raise ApprovalFailedError("Approval consumption failed closed") from exc
+            if approval_receipt is None:
+                raise ApprovalFailedError("Approval consumption failed closed")
             active_plan = replace(plan, approval_receipt=approval_receipt)
-            active_record = replace(dispatched, approval_receipt=approval_receipt)
+            active_record = replace(stored_dispatched, approval_receipt=approval_receipt)
             self._emit("approval.consumed", approval_id=approval_receipt.approval_id)
         try:
             provider_receipt = self._execution.execute(active_plan)

@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import shutil
@@ -5,6 +6,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 
 from regulated_ai.adapters import (
@@ -26,6 +29,7 @@ from regulated_ai.adapters import (
     SqliteEvidenceRepository,
     SqliteOperatorLifecycleEventRepository,
     SqliteToolActionRepository,
+    StateChangingHttpToolExecutionAdapter,
 )
 from regulated_ai.application import (
     EnforceAiOperation,
@@ -38,7 +42,9 @@ from regulated_ai.domain import ToolActionRecord, ToolActionStatus, ToolProposal
 from regulated_ai.entrypoints.api import (
     EvaluationRequest,
     Runtime,
+    _api_identity_from_environment,
     _to_context,
+    _tool_execution_adapter_from_environment,
     build_runtime,
     create_app,
 )
@@ -54,6 +60,74 @@ from ..helpers import (
 APPROVAL_KEY = b"p" * 32
 ACTION_APPROVAL_KEY = b"r" * 32
 RECONCILIATION_KEY = b"s" * 32
+
+
+def _base64url(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode().rstrip("=")
+
+
+def _write_api_jwks(path: Path, private_key: Ed25519PrivateKey) -> None:
+    public_key = private_key.public_key().public_bytes(
+        serialization.Encoding.Raw,
+        serialization.PublicFormat.Raw,
+    )
+    path.write_text(
+        json.dumps(
+            {
+                "keys": [
+                    {
+                        "alg": "EdDSA",
+                        "crv": "Ed25519",
+                        "kid": "api-key-1",
+                        "kty": "OKP",
+                        "use": "sig",
+                        "x": _base64url(public_key),
+                    }
+                ]
+            }
+        )
+    )
+
+
+def _api_token(private_key: Ed25519PrivateKey, roles: list[str]) -> str:
+    now = int(datetime.now(UTC).timestamp())
+    header = _base64url(
+        json.dumps(
+            {"alg": "EdDSA", "kid": "api-key-1", "typ": "at+jwt"},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    )
+    payload = _base64url(
+        json.dumps(
+            {
+                "aud": "regulaai-api",
+                "client_id": "synthetic-e2e",
+                "exp": now + 300,
+                "iat": now - 10,
+                "iss": "https://identity.example.test/tenant/regulaai",
+                "jti": "synthetic-token-1",
+                "nbf": now - 10,
+                "roles": roles,
+                "sub": "workload:synthetic-e2e",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    )
+    signing_input = f"{header}.{payload}"
+    return f"{signing_input}.{_base64url(private_key.sign(signing_input.encode()))}"
+
+
+def _configure_api_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Ed25519PrivateKey:
+    private_key = Ed25519PrivateKey.generate()
+    jwks_path = tmp_path / "api-identity.jwks.json"
+    _write_api_jwks(jwks_path, private_key)
+    monkeypatch.setenv("REGULAAI_API_AUTH_MODE", "oidc_jwt")
+    monkeypatch.setenv("REGULAAI_OIDC_ISSUER", "https://identity.example.test/tenant/regulaai")
+    monkeypatch.setenv("REGULAAI_OIDC_AUDIENCE", "regulaai-api")
+    monkeypatch.setenv("REGULAAI_OIDC_JWKS_PATH", str(jwks_path))
+    return private_key
 
 
 def _runtime(
@@ -349,6 +423,189 @@ def test_runtime_read_only_tool_mode_fails_closed_on_partial_configuration(
         build_runtime(evidence_path=tmp_path / "tool-evidence.sqlite3")
 
 
+def test_runtime_state_change_tool_mode_requires_complete_explicit_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_TOOL_EXECUTION_MODE", "state_change_http")
+    monkeypatch.setenv(
+        "REGULAAI_STATE_CHANGE_TOOL_URL",
+        "https://cards-sandbox.example.test/v1/card-unblocks",
+    )
+    monkeypatch.setenv("REGULAAI_STATE_CHANGE_TOOL_API_KEY", "synthetic-sandbox-credential")
+    monkeypatch.setenv(
+        "REGULAAI_STATE_CHANGE_TOOL_WORKLOAD_IDENTITY", "workload.cards-unblock-sandbox"
+    )
+
+    runtime = build_runtime(evidence_path=tmp_path / "state-change-tool-evidence.sqlite3")
+
+    assert isinstance(runtime.tool_execution, StateChangingHttpToolExecutionAdapter)
+    assert runtime.mock_tool_execution is None
+
+
+def test_runtime_state_change_tool_mode_fails_closed_on_partial_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGULAAI_TOOL_EXECUTION_MODE", "state_change_http")
+
+    with pytest.raises(ValueError, match="REGULAAI_STATE_CHANGE_TOOL_URL"):
+        build_runtime(evidence_path=tmp_path / "state-change-tool-evidence.sqlite3")
+
+
+def test_runtime_state_change_tool_mode_rejects_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REGULAAI_TOOL_EXECUTION_MODE", "state_change_http")
+
+    with pytest.raises(ValueError, match="restricted to non-production"):
+        _tool_execution_adapter_from_environment("production")
+
+
+def test_api_identity_enforces_runtime_and_operator_roles(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    private_key = _configure_api_identity(tmp_path, monkeypatch)
+    app = create_app(lambda: _runtime(tmp_path))
+    runtime_token = _api_token(private_key, ["regulaai.runtime"])
+    operator_token = _api_token(private_key, ["regulaai.operator"])
+
+    with TestClient(app) as client:
+        assert client.get("/health").status_code == 200
+        assert client.get("/operator/assets/dashboard.css").status_code == 200
+
+        missing = client.post("/v1/evaluations", json=_request())
+        wrong_runtime_role = client.post(
+            "/v1/evaluations",
+            json=_request(),
+            headers={"Authorization": f"Bearer {operator_token}"},
+        )
+        evaluation = client.post(
+            "/v1/evaluations",
+            json=_request(),
+            headers={"Authorization": f"Bearer {runtime_token}"},
+        )
+        wrong_operator_role = client.get(
+            "/v1/providers",
+            headers={"Authorization": f"Bearer {runtime_token}"},
+        )
+        providers = client.get(
+            "/v1/providers",
+            headers={"Authorization": f"Bearer {operator_token}"},
+        )
+
+    assert missing.status_code == 401
+    assert missing.headers["www-authenticate"] == "Bearer"
+    assert missing.headers["cache-control"] == "no-store"
+    assert missing.json()["error"]["code"] == "API_AUTHENTICATION_FAILED"
+    assert wrong_runtime_role.status_code == 403
+    assert wrong_runtime_role.json()["error"]["code"] == "API_AUTHORIZATION_FAILED"
+    assert evaluation.status_code == 200
+    assert evaluation.headers["cache-control"] == "no-store"
+    assert wrong_operator_role.status_code == 403
+    assert providers.status_code == 200
+    assert providers.headers["cache-control"] == "no-store"
+
+
+def test_api_identity_requires_reconciler_role_and_redacts_invalid_token(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    private_key = _configure_api_identity(tmp_path, monkeypatch)
+    app = create_app(lambda: _runtime(tmp_path))
+    runtime_token = _api_token(private_key, ["regulaai.runtime"])
+    reconciler_token = _api_token(private_key, ["regulaai.reconciler"])
+
+    with TestClient(app) as client:
+        wrong_role = client.post(
+            "/v1/tool-actions/missing/reconciliation",
+            json={},
+            headers={"Authorization": f"Bearer {runtime_token}"},
+        )
+        authorized_boundary = client.post(
+            "/v1/tool-actions/missing/reconciliation",
+            json={},
+            headers={"Authorization": f"Bearer {reconciler_token}"},
+        )
+        invalid = client.get(
+            "/v1/providers",
+            headers={"Authorization": "Bearer secret-sentinel-token"},
+        )
+
+    assert wrong_role.status_code == 403
+    assert authorized_boundary.status_code == 422
+    assert invalid.status_code == 401
+    assert "secret-sentinel-token" not in invalid.text
+    assert "secret-sentinel-token" not in capsys.readouterr().out
+
+
+def test_production_api_requires_oidc_jwt_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("REGULAAI_API_AUTH_MODE", raising=False)
+
+    with pytest.raises(ValueError, match="required in production"):
+        _api_identity_from_environment("production")
+
+
+@pytest.mark.parametrize("action_id", ["missing", "missing%3F", "missing%23"])
+@pytest.mark.parametrize("root_path", ["", "/control"])
+def test_api_identity_uses_router_path_for_reconciliation_role(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, action_id: str, root_path: str
+) -> None:
+    private_key = _configure_api_identity(tmp_path, monkeypatch)
+    app = create_app(lambda: _runtime(tmp_path))
+    runtime_token = _api_token(private_key, ["regulaai.runtime"])
+    reconciler_token = _api_token(private_key, ["regulaai.reconciler"])
+
+    with TestClient(app, root_path=root_path) as client:
+        assert client.get(f"{root_path}/health").status_code == 200
+        denied = client.post(
+            f"{root_path}/v1/tool-actions/{action_id}/reconciliation",
+            json={},
+            headers={"Authorization": f"Bearer {runtime_token}"},
+        )
+        authorized_boundary = client.post(
+            f"{root_path}/v1/tool-actions/{action_id}/reconciliation",
+            json={},
+            headers={"Authorization": f"Bearer {reconciler_token}"},
+        )
+
+    assert denied.status_code == 403
+    assert authorized_boundary.status_code == 422
+
+
+def test_api_identity_rejects_ambiguous_bearer_headers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    private_key = _configure_api_identity(tmp_path, monkeypatch)
+    app = create_app(lambda: _runtime(tmp_path))
+    runtime_token = _api_token(private_key, ["regulaai.runtime"])
+
+    with TestClient(app) as client:
+        duplicate = client.post(
+            "/v1/evaluations",
+            json=_request(),
+            headers=[
+                ("Authorization", f"Bearer {runtime_token}"),
+                ("Authorization", f"Bearer {runtime_token}"),
+            ],
+        )
+        lowercase_scheme = client.post(
+            "/v1/evaluations",
+            json=_request(),
+            headers={"Authorization": f"bearer {runtime_token}"},
+        )
+
+    assert duplicate.status_code == 401
+    assert lowercase_scheme.status_code == 200
+
+
+def test_oidc_jwt_auth_requires_complete_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REGULAAI_API_AUTH_MODE", "oidc_jwt")
+    monkeypatch.delenv("REGULAAI_OIDC_ISSUER", raising=False)
+
+    with pytest.raises(ValueError, match="REGULAAI_OIDC_ISSUER"):
+        _api_identity_from_environment("local")
+
+
 def test_runtime_approval_verifier_rejects_short_key(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -383,6 +640,39 @@ def test_runtime_reconciliation_key_is_dedicated_and_bounded(
 
     with pytest.raises(ValueError, match="must differ"):
         build_runtime(evidence_path=tmp_path / "reconciliation-evidence.sqlite3")
+
+
+def test_production_runtime_requires_postgres_database_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REGULAAI_ENVIRONMENT", "production")
+    monkeypatch.delenv("REGULAAI_DATABASE_URL", raising=False)
+    monkeypatch.delenv("REGULAAI_EVIDENCE_DB", raising=False)
+
+    with pytest.raises(ValueError, match="REGULAAI_DATABASE_URL is required"):
+        build_runtime()
+
+
+def test_production_runtime_requires_asymmetric_operator_authority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _ConfiguredDatabase:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+        def verify_schema(self) -> None:
+            pass
+
+    monkeypatch.setattr("regulated_ai.entrypoints.api.PostgresDatabase", _ConfiguredDatabase)
+    monkeypatch.setenv("REGULAAI_ENVIRONMENT", "production")
+    monkeypatch.setenv("REGULAAI_DATABASE_URL", "postgresql://database.invalid/regulaai")
+    monkeypatch.delenv("REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE", raising=False)
+    monkeypatch.delenv("REGULAAI_APPROVAL_HMAC_KEY", raising=False)
+    monkeypatch.delenv("REGULAAI_ACTION_APPROVAL_HMAC_KEY", raising=False)
+    monkeypatch.delenv("REGULAAI_RECONCILIATION_HMAC_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="OPERATOR_AUTHORITY_TRUST_STORE is required"):
+        build_runtime()
 
 
 def test_enforcement_api_returns_only_metadata_after_mock_execution(tmp_path: Path) -> None:

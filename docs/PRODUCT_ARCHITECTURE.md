@@ -36,6 +36,8 @@ result minimization. Phase 7b adds one opt-in HTTP adapter bound to the read-onl
 sandbox contract while preserving the same approval and result boundary. Mock execution remains
 the default; no result is supplied to a model. Phase 7c adds separately authorized terminal
 reconciliation of ambiguous tool outcomes through a path that has no execution-port dependency.
+Phase 7d adds a separate non-production adapter fixed to the state-changing `cards.unblock`
+sandbox contract, with exact downstream idempotency-response binding.
 
 ## Control plane vs enforcement plane
 

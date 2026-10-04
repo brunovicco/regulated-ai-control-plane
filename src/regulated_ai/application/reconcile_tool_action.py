@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 from regulated_ai.application.evaluate_operation import EvaluationError
 from regulated_ai.application.ports import (
+    AtomicToolActionReconciliationPort,
     EvaluationObserver,
     ToolActionReconciliationPort,
     ToolActionRepository,
@@ -99,24 +100,37 @@ class ReconcileToolAction:
                 )
             return _to_result(record)
 
-        receipt = self._consume(grant, action_id)
         target_status = (
             ToolActionStatus.RECONCILED_EXECUTED
             if grant.outcome is ToolActionReconciliationOutcome.EXECUTED
             else ToolActionStatus.RECONCILED_NOT_EXECUTED
         )
-        candidate = replace(
-            record,
-            status=target_status,
-            tool_execution_id=grant.tool_execution_id,
-            reconciliation_receipt=receipt,
-        )
-        try:
-            stored = self._actions.save(candidate)
-        except Exception as exc:
-            raise ToolActionReconciliationPersistenceError(
-                "Tool-action reconciliation metadata could not be persisted"
-            ) from exc
+        if isinstance(self._authority, AtomicToolActionReconciliationPort):
+            try:
+                stored = self._authority.reconcile(grant, record=record, now=self._clock())
+            except Exception as exc:
+                raise ToolActionReconciliationPersistenceError(
+                    "Tool-action reconciliation metadata could not be persisted"
+                ) from exc
+            receipt = stored.reconciliation_receipt
+            if receipt is None:
+                raise ToolActionReconciliationPersistenceError(
+                    "Tool-action reconciliation receipt was not persisted"
+                )
+        else:
+            receipt = self._consume(grant, action_id)
+            candidate = replace(
+                record,
+                status=target_status,
+                tool_execution_id=grant.tool_execution_id,
+                reconciliation_receipt=receipt,
+            )
+            try:
+                stored = self._actions.save(candidate)
+            except Exception as exc:
+                raise ToolActionReconciliationPersistenceError(
+                    "Tool-action reconciliation metadata could not be persisted"
+                ) from exc
         if (
             stored.status is not target_status
             or stored.reconciliation_receipt != receipt

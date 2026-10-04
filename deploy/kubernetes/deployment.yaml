@@ -6,9 +6,12 @@ metadata:
     app.kubernetes.io/name: regulaai-control-plane
     app.kubernetes.io/part-of: regulaai
 spec:
-  replicas: 1
+  replicas: 2
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: regulaai-control-plane
@@ -44,8 +47,11 @@ spec:
                 configMapKeyRef:
                   name: regulaai-deployment-metadata
                   key: service-version
-            - name: REGULAAI_EVIDENCE_DB
-              value: /var/lib/regulaai/evidence.sqlite3
+            - name: REGULAAI_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: regulaai-database-runtime
+                  key: url
             - name: REGULAAI_CONTROL_PACK_MANIFEST
               value: /etc/regulaai/control-pack/control-pack-manifest.yaml
             - name: REGULAAI_CONTROL_PACK_TRUST_STORE
@@ -57,24 +63,34 @@ spec:
                 secretKeyRef:
                   name: regulaai-runtime-keys
                   key: tokenization-key
-            - name: REGULAAI_APPROVAL_HMAC_KEY
+            - name: REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE
+              value: /etc/regulaai/operator-authority/operator-authority-keys.yaml
+            - name: REGULAAI_API_AUTH_MODE
+              value: oidc_jwt
+            - name: REGULAAI_OIDC_ISSUER
               valueFrom:
-                secretKeyRef:
-                  name: regulaai-runtime-keys
-                  key: decision-approval-hmac-key
-            - name: REGULAAI_ACTION_APPROVAL_HMAC_KEY
+                configMapKeyRef:
+                  name: regulaai-api-identity
+                  key: issuer
+            - name: REGULAAI_OIDC_AUDIENCE
               valueFrom:
-                secretKeyRef:
-                  name: regulaai-runtime-keys
-                  key: action-approval-hmac-key
+                configMapKeyRef:
+                  name: regulaai-api-identity
+                  key: audience
+            - name: REGULAAI_OIDC_JWKS_PATH
+              value: /etc/regulaai/api-identity/jwks.json
           volumeMounts:
-            - name: data
-              mountPath: /var/lib/regulaai
             - name: control-pack
               mountPath: /etc/regulaai/control-pack
               readOnly: true
             - name: control-pack-trust
               mountPath: /etc/regulaai/trust
+              readOnly: true
+            - name: operator-authority-trust
+              mountPath: /etc/regulaai/operator-authority
+              readOnly: true
+            - name: api-identity-trust
+              mountPath: /etc/regulaai/api-identity
               readOnly: true
             - name: temporary
               mountPath: /tmp
@@ -115,15 +131,18 @@ spec:
               drop:
                 - ALL
       volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: regulaai-data
         - name: control-pack
           persistentVolumeClaim:
             claimName: regulaai-control-pack
         - name: control-pack-trust
           configMap:
             name: regulaai-control-pack-trust
+        - name: operator-authority-trust
+          configMap:
+            name: regulaai-operator-authority-trust
+        - name: api-identity-trust
+          configMap:
+            name: regulaai-api-identity
         - name: temporary
           emptyDir:
             sizeLimit: 64Mi

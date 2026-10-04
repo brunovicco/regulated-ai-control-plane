@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from regulated_ai.application.evaluate_operation import EvaluationError
 from regulated_ai.application.ports import (
     ActionApprovalPort,
+    AtomicActionApprovalExecutionPort,
     EnforcementRepository,
     EvaluationObserver,
     EvidenceRepository,
@@ -200,11 +201,37 @@ class ExecuteToolAction:
         _require_same_binding(stored_prepared, candidate)
         if stored_prepared.status is not ToolActionStatus.PREPARED:
             return _to_result(stored_prepared)
-        dispatched, claimed = self._claim(replace(prepared, status=ToolActionStatus.DISPATCHED))
+        dispatched_candidate = replace(prepared, status=ToolActionStatus.DISPATCHED)
+        approval_receipt: ActionApprovalReceipt | None = None
+        if isinstance(self._approval, AtomicActionApprovalExecutionPort):
+            now = self._clock()
+            try:
+                dispatched, claimed, approval_receipt = self._approval.claim_execution(
+                    approval_grant,
+                    record=dispatched_candidate,
+                    now=now,
+                )
+                if claimed:
+                    if approval_receipt is None:
+                        raise ValueError("Atomic action approval receipt is unavailable")
+                    _validate_approval_receipt(
+                        approval_receipt,
+                        grant=approval_grant,
+                        action_id=action_id,
+                        now=now,
+                    )
+            except Exception as exc:
+                self._emit("tool_action.failed", error_type=type(exc).__name__)
+                raise ActionApprovalFailedError(
+                    "Action approval consumption failed closed"
+                ) from exc
+        else:
+            dispatched, claimed = self._claim(dispatched_candidate)
         if not claimed:
             return _to_result(dispatched)
 
-        approval_receipt = self._consume_approval(approval_grant, action_id)
+        if approval_receipt is None:
+            approval_receipt = self._consume_approval(approval_grant, action_id)
         active_record = replace(dispatched, approval_receipt=approval_receipt)
         plan = ToolActionPlan(
             action_id=action_id,

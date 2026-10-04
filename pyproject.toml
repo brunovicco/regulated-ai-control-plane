@@ -5,6 +5,7 @@ description = "Regulatory control plane for governed enterprise AI execution"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
 dependencies = [
+    "alembic>=1.16",
     "asn1crypto>=1.5.1",
     "cryptography>=50.0.1",
     "fastapi>=0.116",
@@ -12,6 +13,7 @@ dependencies = [
     "httpx>=0.28",
     "pydantic>=2.11",
     "pydantic-settings>=2.8",
+    "psycopg[binary]>=3.2",
     "pyyaml>=6.0.2",
     "structlog>=25.1",
     "uvicorn>=0.35",

@@ -1051,6 +1051,7 @@ def _approval_receipt_json(receipt: ApprovalReceipt | None) -> str | None:
         {
             "actor_id": receipt.actor_id,
             "approval_id": receipt.approval_id,
+            "authority_key_id": receipt.authority_key_id,
             "consumed_at": receipt.consumed_at.isoformat(),
             "decision_digest": receipt.decision_digest,
             "enforcement_id": receipt.enforcement_id,
@@ -1066,7 +1067,7 @@ def _approval_receipt(value: object) -> ApprovalReceipt | None:
     if value is None:
         return None
     parsed = json.loads(str(value))
-    expected = {
+    required = {
         "actor_id",
         "approval_id",
         "consumed_at",
@@ -1075,10 +1076,15 @@ def _approval_receipt(value: object) -> ApprovalReceipt | None:
         "expires_at",
         "issued_at",
     }
+    expected = {frozenset(required), frozenset({*required, "authority_key_id"})}
     if (
         not isinstance(parsed, dict)
-        or set(parsed) != expected
-        or not all(isinstance(parsed[key], str) for key in expected)
+        or frozenset(parsed) not in expected
+        or not all(isinstance(parsed[key], str) for key in required)
+        or (
+            parsed.get("authority_key_id") is not None
+            and not isinstance(parsed.get("authority_key_id"), str)
+        )
     ):
         raise ValueError("Stored approval receipt is invalid")
     from datetime import datetime
@@ -1091,6 +1097,7 @@ def _approval_receipt(value: object) -> ApprovalReceipt | None:
         issued_at=datetime.fromisoformat(parsed["issued_at"]),
         expires_at=datetime.fromisoformat(parsed["expires_at"]),
         consumed_at=datetime.fromisoformat(parsed["consumed_at"]),
+        authority_key_id=parsed.get("authority_key_id"),
     )
 
 
@@ -1103,6 +1110,7 @@ def _action_approval_receipt_json(receipt: ActionApprovalReceipt | None) -> str 
             "action_id": receipt.action_id,
             "actor_id": receipt.actor_id,
             "approval_id": receipt.approval_id,
+            "authority_key_id": receipt.authority_key_id,
             "consumed_at": receipt.consumed_at.isoformat(),
             "expires_at": receipt.expires_at.isoformat(),
             "issued_at": receipt.issued_at.isoformat(),
@@ -1116,7 +1124,7 @@ def _action_approval_receipt(value: object) -> ActionApprovalReceipt | None:
     if value is None:
         return None
     parsed = json.loads(str(value))
-    expected = {
+    required = {
         "action_digest",
         "action_id",
         "actor_id",
@@ -1125,10 +1133,15 @@ def _action_approval_receipt(value: object) -> ActionApprovalReceipt | None:
         "expires_at",
         "issued_at",
     }
+    expected = {frozenset(required), frozenset({*required, "authority_key_id"})}
     if (
         not isinstance(parsed, dict)
-        or set(parsed) != expected
-        or not all(isinstance(parsed[key], str) for key in expected)
+        or frozenset(parsed) not in expected
+        or not all(isinstance(parsed[key], str) for key in required)
+        or (
+            parsed.get("authority_key_id") is not None
+            and not isinstance(parsed.get("authority_key_id"), str)
+        )
     ):
         raise ValueError("Stored action approval receipt is invalid")
     from datetime import datetime
@@ -1141,6 +1154,7 @@ def _action_approval_receipt(value: object) -> ActionApprovalReceipt | None:
         issued_at=datetime.fromisoformat(parsed["issued_at"]),
         expires_at=datetime.fromisoformat(parsed["expires_at"]),
         consumed_at=datetime.fromisoformat(parsed["consumed_at"]),
+        authority_key_id=parsed.get("authority_key_id"),
     )
 
 
@@ -1154,6 +1168,7 @@ def _tool_action_reconciliation_receipt_json(
             "action_digest": receipt.action_digest,
             "action_id": receipt.action_id,
             "actor_id": receipt.actor_id,
+            "authority_key_id": receipt.authority_key_id,
             "consumed_at": receipt.consumed_at.isoformat(),
             "expires_at": receipt.expires_at.isoformat(),
             "issued_at": receipt.issued_at.isoformat(),
@@ -1182,14 +1197,19 @@ def _tool_action_reconciliation_receipt(
         "outcome",
         "reconciliation_id",
     }
-    expected = {*string_fields, "tool_execution_id"}
+    required = {*string_fields, "tool_execution_id"}
+    expected = {frozenset(required), frozenset({*required, "authority_key_id"})}
     if (
         not isinstance(parsed, dict)
-        or set(parsed) != expected
+        or frozenset(parsed) not in expected
         or not all(isinstance(parsed[key], str) for key in string_fields)
         or (
             parsed["tool_execution_id"] is not None
             and not isinstance(parsed["tool_execution_id"], str)
+        )
+        or (
+            parsed.get("authority_key_id") is not None
+            and not isinstance(parsed.get("authority_key_id"), str)
         )
     ):
         raise ValueError("Stored tool-action reconciliation receipt is invalid")
@@ -1205,6 +1225,7 @@ def _tool_action_reconciliation_receipt(
         issued_at=datetime.fromisoformat(parsed["issued_at"]),
         expires_at=datetime.fromisoformat(parsed["expires_at"]),
         consumed_at=datetime.fromisoformat(parsed["consumed_at"]),
+        authority_key_id=parsed.get("authority_key_id"),
     )
 
 

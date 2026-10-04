@@ -21,6 +21,16 @@ Tests use in-memory exporters or fakes. Do not point development or CI checks at
 uv run python scripts/quality_gate.py
 ```
 
+PostgreSQL concurrency tests are opt-in because they mutate a dedicated non-production database.
+Apply migrations and run them with an explicitly isolated test URL:
+
+```bash
+REGULAAI_TEST_POSTGRES_URL=postgresql://... uv run pytest -m integration \
+  tests/integration/test_postgres_concurrency.py
+```
+
+Never point this setting at production or a database containing customer data.
+
 ## Container
 
 ```bash
@@ -30,10 +40,9 @@ docker run --rm regulated-ai-control-plane
 
 `Dockerfile` is a multi-stage, uv-based build: a `builder` stage installs the locked
 dependencies and builds the package, then only the resulting virtualenv and source are copied
-into a slim, non-root runtime image. The shipped `CMD` is a placeholder — this harness is
-framework-agnostic and does not assume an ASGI app, CLI, or worker loop. Replace it with the
-project's real entrypoint. Adjust `.dockerignore` if new top-level files or directories need to
-be excluded from the build context.
+into a slim, non-root runtime image. The shipped `CMD` starts the FastAPI application through
+Uvicorn. Adjust `.dockerignore` if new top-level files or directories need to be excluded from the
+build context.
 
 ## Local configuration
 

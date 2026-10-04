@@ -146,8 +146,9 @@ The service persists `PREPARED`, atomically claims `DISPATCHED` before invoking 
 and then advances the same record to `EXECUTED`. A persistence or transformation failure stops
 before execution. A repeated request that observes `DISPATCHED` does not issue another call.
 
-To resume the high-impact example, configure a dedicated `REGULAAI_APPROVAL_HMAC_KEY` of at least
-32 bytes before startup. Read `output_digest` from the evaluation evidence referenced by the
+For this local/pilot-compatible example, configure a dedicated `REGULAAI_APPROVAL_HMAC_KEY` of at
+least 32 bytes before startup. Production instead uses the public-key-only flow in
+`OPERATOR_AUTHORITY.md`. Read `output_digest` from the evaluation evidence referenced by the
 waiting response, then have the organization-owned approval workflow issue the strict decision
 assertion documented in `API_CONTRACT.md`. Resend the same enforcement request with:
 
@@ -180,8 +181,8 @@ execution and acceptance criteria.
 
 ## Action-specific approval proof
 
-Configure a distinct `REGULAAI_ACTION_APPROVAL_HMAC_KEY` of at least 32 bytes. Submit the exact
-proposal arguments, workload identity and idempotency key to
+For the local example, configure a distinct `REGULAAI_ACTION_APPROVAL_HMAC_KEY` of at least 32
+bytes. Submit the exact proposal arguments, workload identity and idempotency key to
 `POST /v1/enforcements/{enforcement_id}/tool-actions`. The first response is
 `WAITING_APPROVAL` and contains the action digest. An organization-owned workflow issues the
 domain-separated `ra2` assertion documented in `API_CONTRACT.md`; resend the identical request with
@@ -194,6 +195,12 @@ To exercise the read-only sandbox boundary instead, configure every
 the live connector. See `READ_ONLY_ENTERPRISE_CONNECTOR.md` for the downstream contract and egress
 requirements.
 
+To exercise the separately reviewed state-changing sandbox boundary, use only synthetic data,
+configure every `REGULAAI_STATE_CHANGE_TOOL_*` variable and select
+`REGULAAI_TOOL_EXECUTION_MODE=state_change_http` in a non-production environment. The connector is
+fixed to `cards.unblock`, makes one request and verifies the returned idempotency-key digest. Follow
+`STATE_CHANGING_ENTERPRISE_CONNECTOR.md`; do not infer failure or retry after an ambiguous outcome.
+
 The mock result is validated against the trusted output schema. The immediate successful response
 contains only `safe_result`: a closed status enum may be returned, a financial reference is
 replaced with `***MASKED***`, and diagnostic content is dropped. `GET /v1/tool-actions/{action_id}`
@@ -201,7 +208,7 @@ and action replay return metadata/digests only and set `safe_result` to `null`.
 
 The demo never persists arguments, idempotency keys, raw assertions, raw tool output or the safe
 result. Schema-invalid output becomes terminal `RESULT_REJECTED`; it is not retried because the
-downstream effect may already have occurred. State-changing enterprise-system connectors and model
+downstream effect may already have occurred. Production state-changing connectors and model
 continuation remain disabled.
 
 If a tool call ends in `RECONCILIATION_REQUIRED`, do not resubmit the action. Follow

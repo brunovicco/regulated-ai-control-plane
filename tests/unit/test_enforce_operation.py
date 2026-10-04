@@ -264,6 +264,67 @@ def test_approval_consumption_failure_is_terminal_and_prevents_execution() -> No
     assert mock.call_count == 0
 
 
+class _FailingAtomicApprovalFake(_ApprovalFake):
+    def __init__(
+        self,
+        records: MemoryEnforcementRepository,
+        *,
+        concurrent_claim: bool,
+    ) -> None:
+        super().__init__()
+        self.records = records
+        self.concurrent_claim = concurrent_claim
+        self.claim_count = 0
+        self.concurrent_receipt: ApprovalReceipt | None = None
+
+    def claim_execution(
+        self,
+        grant: ApprovalGrant,
+        *,
+        record: EnforcementRecord,
+        now: datetime,
+    ) -> tuple[EnforcementRecord, bool, ApprovalReceipt | None]:
+        self.claim_count += 1
+        if self.concurrent_claim:
+            self.concurrent_receipt = super().consume(
+                grant, enforcement_id=record.enforcement_id, now=now
+            )
+            _stored, claimed = self.records.claim_execution(
+                replace(record, approval_receipt=self.concurrent_receipt)
+            )
+            assert claimed
+        raise ValueError("synthetic atomic claim failed")
+
+
+@pytest.mark.parametrize("concurrent_claim", [False, True])
+def test_atomic_approval_failure_preserves_persisted_state_without_claim_ownership(
+    concurrent_claim: bool,
+) -> None:
+    records = MemoryEnforcementRepository()
+    approval = _FailingAtomicApprovalFake(records, concurrent_claim=concurrent_claim)
+    enforcer, _records, mock = _enforcer(
+        _policy(DecisionOutcome.REQUIRE_APPROVAL),
+        enforcement=records,
+        approval=approval,
+    )
+
+    with pytest.raises(ApprovalFailedError, match="consumption failed closed"):
+        enforcer.execute(context(), approval_assertion="synthetic-approval")
+
+    stored = next(iter(records.items.values()))
+    expected_status = (
+        EnforcementStatus.DISPATCHED if concurrent_claim else EnforcementStatus.PREPARED
+    )
+    assert stored.status is expected_status
+    assert stored.approval_receipt == approval.concurrent_receipt
+    assert records.saved_statuses == (
+        ["PREPARED", "DISPATCHED"] if concurrent_claim else ["PREPARED"]
+    )
+    assert approval.inspect_count == 1
+    assert approval.claim_count == 1
+    assert mock.call_count == 0
+
+
 class _MismatchedApprovalReceipt(_ApprovalFake):
     def consume(
         self,

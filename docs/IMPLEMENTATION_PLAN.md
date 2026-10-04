@@ -1,5 +1,69 @@
 # Implementation plan
 
+## Enterprise API identity — offline access-token JWT RBAC
+
+Status: implemented after the first state-changing sandbox connector.
+
+- A strict resource-server adapter verifies short-lived EdDSA JWTs against a mounted public JWKS
+  without discovery, remote key retrieval or identity-provider secrets.
+- Explicit access-token type, issuer, audience, signature, key ID, time window and bounded roles
+  fail closed before request parsing.
+- Separate runtime, operator and reconciler roles protect mutations, metadata inspection and
+  terminal reconciliation; health and static dashboard styling remain public.
+- Tokens, claims, subjects and roles are ephemeral and excluded from application evidence/logging.
+- Production-labelled API startup requires the identity boundary; local development remains
+  explicitly disabled by default.
+
+Concrete IdP issuance, MFA, group mapping, revocation feeds and automated JWKS refresh remain
+deployment-owned work.
+
+## Phase 7d — bound state-changing enterprise sandbox connector
+
+Status: implemented after transactional persistence and asymmetric operator authority.
+
+- One opt-in adapter is fixed to signed-catalog `cards.unblock`, its high-impact risk class, one
+  configured workload identity and one non-production sandbox endpoint.
+- Exact action approval is consumed before a single bounded POST; redirects, environment proxies,
+  retry and fallback remain disabled.
+- The idempotency key is header-only, while the exact action digest and key's SHA-256 digest bind
+  the canonical request and success response.
+- Invalid or uncertain outcomes use the existing `RECONCILIATION_REQUIRED` path without
+  reexecution; successful output still crosses the signed closed-schema minimization boundary.
+- Production-labelled runtime rejects this connector until a concrete enterprise identity,
+  durable idempotency and recovery contract receives a separate review.
+
+Operational sandbox exercises and any production integration remain deployment-owned work.
+
+## Production operator authority — role-bound Ed25519 assertions
+
+Status: implemented in source after the PostgreSQL persistence foundation.
+
+- One strict public trust store binds each key to an actor, lifecycle and explicit decision,
+  action and/or reconciliation scopes.
+- Canonical `ra1e`, `ra2e` and `rr1e` assertions remain exact-digest bound, short-lived and
+  single-use while removing signing capability from the runtime.
+- Consumption ledgers and receipts retain the non-secret verification-key identifier.
+- Production startup requires the trust store and rejects simultaneous HMAC authority settings.
+- HMAC remains a local and controlled-pilot compatibility mode.
+
+Enterprise OIDC federation and state-changing connectors remain outside this phase.
+
+## Production persistence — PostgreSQL and multi-replica safety
+
+Status: implemented in source after the `v0.1.0rc1` controlled-pilot tag.
+
+- PostgreSQL adapters preserve the evidence, enforcement, action and operator-timeline ports.
+- Alembic owns explicit schema migration; the API requires the exact supported revision.
+- Conditional updates make provider and tool dispatch claims single-winner across replicas.
+- PostgreSQL authority adapters commit decision/action approval consumption with dispatch claims and
+  reconciliation consumption with the terminal action transition.
+- Database triggers append immutable lifecycle events in the state transaction.
+- SQLite remains the network-silent local and controlled-pilot adapter.
+- The deployment reference uses two replicas and a restricted, separately completed migration job.
+
+Operational production acceptance, database TLS/egress, least-privilege roles, backup/restore,
+SLOs and incident exercises remain deployment-owned work.
+
 ## Phase 7c — authenticated terminal tool-action reconciliation
 
 ### Goal
@@ -893,8 +957,10 @@ evidence.
 ### Decisions and assumptions
 
 - Approval assertions are issued outside RegulaAI by an organization-controlled workflow.
-- The Phase 4a assertion format is strict canonical JSON protected by HMAC-SHA256 with a dedicated
-  key of at least 32 bytes. A future asymmetric/OIDC adapter can implement the same port.
+- The Phase 4a local/pilot format is strict canonical JSON protected by HMAC-SHA256 with a
+  dedicated key of at least 32 bytes. The later production adapter implements the same port with
+  role-bound Ed25519 public-key verification; enterprise OIDC federation remains optional future
+  work.
 - `approval_id` is globally single-use. The assertion is checked before execution claim and
   consumed atomically after the claim, so losing a concurrent claim does not consume authority.
 - Approval authorizes the deterministic decision digest, not free-form text, a tool name alone or

@@ -4,7 +4,7 @@ namespace: regulaai-system
 resources:
   - namespace.yaml
   - service-account.yaml
-  - data-pvc.yaml
+  - database-migration-job.yaml
   - deployment.yaml
   - runtime-trust-verifier-cronjob.yaml
   - service.yaml

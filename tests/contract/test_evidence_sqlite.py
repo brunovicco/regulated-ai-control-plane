@@ -191,6 +191,7 @@ def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path
                 issued_at=datetime(2026, 9, 23, 11, 55, tzinfo=UTC),
                 expires_at=datetime(2026, 9, 23, 12, 5, tzinfo=UTC),
                 consumed_at=datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
+                authority_key_id="operator-key-test",
             ),
             provider_call_metadata=ProviderCallMetadata(
                 gateway_request_id="00000000-0000-0000-0000-000000000001",
@@ -224,6 +225,7 @@ def test_enforcement_round_trip_advances_state_without_raw_values(tmp_path: Path
     assert completed.provider_call_metadata.routing_decision_id == "route_1"
     assert completed.approval_receipt is not None
     assert completed.approval_receipt.approval_id == "approval-test"
+    assert completed.approval_receipt.authority_key_id == "operator-key-test"
     assert completed.tool_proposals[0].tool_name == "cards.read"
     replayed, replay_claimed = repository.claim_execution(
         replace(prepared, status=EnforcementStatus.DISPATCHED)
@@ -363,6 +365,7 @@ def test_tool_action_round_trip_claims_once_without_ephemeral_values(tmp_path: P
                 issued_at=datetime(2026, 9, 23, 11, 55, tzinfo=UTC),
                 expires_at=datetime(2026, 9, 23, 12, 5, tzinfo=UTC),
                 consumed_at=datetime(2026, 9, 23, 12, 0, tzinfo=UTC),
+                authority_key_id="action-key-test",
             ),
             tool_execution_id="mocktool_test",
             output_digest="sha256:output",
@@ -380,6 +383,7 @@ def test_tool_action_round_trip_claims_once_without_ephemeral_values(tmp_path: P
     assert replayed.status is ToolActionStatus.DISPATCHED
     assert completed.status is ToolActionStatus.EXECUTED
     assert completed.approval_receipt is not None
+    assert completed.approval_receipt.authority_key_id == "action-key-test"
     assert completed.output_schema_digest == "sha256:output-schema"
     assert completed.safe_output_digest == "sha256:safe-output"
     assert completed.result_classifications == (
@@ -525,6 +529,7 @@ def test_tool_action_reconciliation_is_terminal_and_metadata_only(tmp_path: Path
         issued_at=datetime(2026, 9, 23, 11, 55, tzinfo=UTC),
         expires_at=datetime(2026, 9, 23, 12, 5, tzinfo=UTC),
         consumed_at=datetime(2026, 9, 23, 12, tzinfo=UTC),
+        authority_key_id="reconciliation-key-test",
     )
 
     forged = repository.save(

@@ -21,8 +21,46 @@
 5. external approval system -> enforcement service approval verifier;
 6. control-plane policy/registry release -> runtime enforcement plane.
 7. enforcement service -> organization tool system through the tool execution port.
+8. enterprise identity provider -> caller -> API bearer-token verifier.
 
 ## Threats and required mitigations
+
+### API caller impersonation or role escalation
+
+Threat:
+an unauthenticated caller, ID token substituted for an access token, token issued for another
+service, algorithm-confused JWT or caller with a read-only role reaches a protected runtime or
+reconciliation route.
+
+Mitigations:
+
+- production requires offline EdDSA JWT verification against a deployment-pinned public JWKS;
+- exact HTTPS issuer and bounded audience prevent cross-issuer/service token reuse;
+- access-token `typ=at+jwt` or `typ=application/at+jwt` is required case-insensitively; generic
+  `typ=JWT` is rejected even with a valid signature;
+- strict header, key ID, signature, issued/not-before/expiry and maximum-lifetime checks fail closed;
+- `client_id` and `jti` are required bounded safe identifiers; they remain ephemeral and are not
+  permission claims or a replay cache;
+- bounded JWT/JWKS parsing rejects duplicate fields, non-JSON constants, malformed JSON and nesting
+  that exceeds parser capacity; invalid, oversized or private/unexpected JWKS material prevents
+  startup;
+- runtime, operator and reconciler roles are separate and evaluated before request parsing;
+- `/health` and static dashboard CSS contain no protected data and are the only public surfaces;
+- tokens, claims and subjects are not logged, persisted or echoed in generic 401/403 responses;
+- API roles do not replace exact-digest decision, action or reconciliation assertions.
+
+Token separation follows [RFC 8725 §3.11](https://www.rfc-editor.org/rfc/rfc8725.html#section-3.11) and
+[§3.12](https://www.rfc-editor.org/rfc/rfc8725.html#section-3.12), with access-token typing and required
+claims from [RFC 9068 §2](https://www.rfc-editor.org/rfc/rfc9068.html#section-2) and
+[§4](https://www.rfc-editor.org/rfc/rfc9068.html#section-4). The EdDSA-only offline adapter is a
+restricted integration contract, not a claim of universal OAuth/OIDC support or full standards
+conformance; the chosen issuer must produce that contract.
+
+Residual risk:
+identity-provider signing-key compromise, incorrect upstream role assignment or stale mounted JWKS
+can authorize an unintended session. A stolen valid bearer access token can be replayed until
+expiry; requiring `jti` alone does not prevent this. Issuer operations, role governance, MFA,
+revocation and key distribution remain deployment controls.
 
 ### Policy bypass
 
@@ -58,16 +96,19 @@ Threat:
 a valid decision approval or altered/replayed arguments execute a model-proposed external action.
 
 Mitigations:
-- decision (`ra1`) and action (`ra2`) assertions use separate schemas, prefixes and keys;
+- production decision (`ra1e`) and action (`ra2e`) assertions use separate schemas, prefixes and
+  trust-store scopes; local/pilot HMAC `ra1` and `ra2` remain domain-separated;
 - action digest binds enforcement/call, current catalog definition/schema, exact argument digest,
   downstream workload and idempotency digest;
 - resubmitted arguments must satisfy the closed schema and reproduce the stored proposal digest;
 - each proposal has one immutable action binding and one atomic execution claim;
 - approval is consumed before the tool port and ambiguous failures are never retried automatically;
 - Phase 4c defaults to a network-silent mock; Phase 7b permits only the separately configured
-  `cards.read` sandbox binding.
-- Phase 7c requires distinct `rr1` authority to declare an investigated outcome and has no tool-port
-  dependency.
+  `cards.read` sandbox binding, and Phase 7d permits only a non-production `cards.unblock` binding;
+- the state-changing connector requires the exact idempotency-key digest in the response, makes one
+  attempt and sends any uncertainty to terminal reconciliation instead of retrying;
+- terminal reconciliation requires distinct `rr1e` production scope or local/pilot `rr1`
+  authority and has no tool-port dependency.
 
 ### Operator falsifies or replays reconciliation
 
@@ -76,7 +117,8 @@ an unauthorized caller closes an ambiguous action, reuses execution approval as 
 changes the outcome or causes a second tool execution.
 
 Mitigations:
-- `rr1` uses a dedicated key, prefix and strict canonical schema distinct from `ra1`/`ra2`;
+- production `rr1e` uses a dedicated authority scope, prefix and strict canonical schema distinct
+  from `ra1e`/`ra2e`; local/pilot HMAC prefixes remain separate;
 - the assertion binds exact action digest, pseudonymous actor, closed outcome, execution identifier
   semantics, bounded lifetime and unique reconciliation id;
 - only `RECONCILIATION_REQUIRED` can transition, and reconciled states are terminal;
@@ -85,9 +127,10 @@ Mitigations:
 - raw assertions, free-form notes, output and evidence URLs are neither accepted nor persisted.
 
 Residual risk:
-the HMAC verifier holds symmetric signing material, and the service does not provide organization
-identity or role enforcement. Deployments must isolate the dedicated key and protect the operator
-endpoint with their identity-aware perimeter. Issuers must not infer `NOT_EXECUTED` from a timeout.
+an authorized Ed25519 private-key compromise can mint assertions within that key's scope. API
+identity authenticates the caller session but cannot validate the external investigation or signing
+ceremony. The local/pilot HMAC verifier still holds symmetric signing material. Issuers must not
+infer `NOT_EXECUTED` from a timeout.
 
 ### Tool result injects instructions or exfiltrates data
 
@@ -168,8 +211,10 @@ Mitigations:
 - the HTML dashboard escapes every dynamic value, executes no JavaScript, loads only same-origin
   CSS and applies no-store, CSP, frame-denial, referrer and permissions-policy headers;
 - the endpoint is read-only and cannot approve, retry or reconcile;
-- deployments must restrict the JSON and HTML operator routes at the existing access boundary until product
-  authentication and tenant isolation are implemented.
+- the JSON and HTML operator routes require the `regulaai.operator` API role when authentication
+  is enabled, and production requires this identity boundary;
+- deployments must restrict access to the single-organization boundary; tenant isolation is not
+  implemented by the API role check.
 
 ### Lifecycle history is altered or overstated
 
@@ -372,8 +417,8 @@ Residual risks:
 
 Threat:
 a mutable image, injected service-account token, writable root filesystem, broad network access,
-embedded secret or multiple SQLite writers weakens the control boundary; stale runtime assertions
-may also be mistaken for a live probe.
+embedded secret, schema drift or an over-privileged database identity weakens the control boundary;
+stale runtime assertions may also be mistaken for a live probe.
 
 Mitigations:
 - Phase 6s requires image substitution by SHA-256 digest and references secrets/trust/pack volumes
@@ -382,15 +427,16 @@ Mitigations:
   capabilities, bounded resources and restricted seccomp profiles;
 - NetworkPolicies deny verifier traffic and control-plane egress while limiting ingress to labeled
   clients;
-- the SQLite deployment is exactly one replica with `Recreate`, state PVC and health probes;
+- the production deployment uses PostgreSQL, an explicit migration job, exact schema revision
+  checks, two replicas with rolling updates and health probes;
 - the CronJob reads a mounted checkpoint/policy/attestation set, verifies it offline and treats a
   blocked result as a failed job rather than mutating workloads.
 
 Residual risks:
 - the example image digest is deliberately non-routable and deployment automation must replace and
   independently verify it before apply;
-- PVC population, CSI permissions, Secret/ConfigMap integrity, admission, node security, backup,
-  alerting and cluster control-plane availability remain external;
+- database TLS/egress, migration and runtime roles, Secret/ConfigMap integrity, admission, node
+  security, backup/restore, alerting and cluster control-plane availability remain external;
 - signed assertions depend on target/signer integrity and are not independent continuous probes;
 - gateway mode requires reviewed egress/DNS/credential overlays and is unsafe with the default
   network policy unchanged.
@@ -732,7 +778,8 @@ Mitigations:
 ### Approval spoofing or replay
 
 Mitigations:
-- dedicated HMAC-authenticated external issuer and strict assertion schema;
+- production Ed25519 verification against actor-bound, lifecycle-aware, role-scoped public keys;
+- distinct canonical assertion schemas and prefixes for decision, action and reconciliation;
 - actor identity and policy/provider versions are transitively bound by the decision digest;
 - bounded lifetime, future-issuance rejection and globally single-use approval IDs;
 - atomic consumption after the execution claim and before execution;
@@ -740,9 +787,11 @@ Mitigations:
 - approval applies to an operation-specific decision digest that commits to normalized input and
   policy output, not free-form text, a tool name or model output.
 
-The HMAC verifier necessarily possesses symmetric signing material. Issuer/verifier separation is
-therefore operational in Phase 4a, not cryptographic; deployments must restrict key access. A
-future asymmetric or OIDC adapter should remove signing capability from the enforcement service.
+Production replicas possess only public verification keys, so issuer/verifier separation is
+cryptographic. Trust-store compromise or an authorized private-key compromise can still grant
+authority within configured scope. HMAC compatibility retains symmetric signing material only for
+local/pilot operation and must not be enabled with the production trust store. Enterprise OIDC
+session authentication remains a deployment-owned boundary.
 
 ## Abuse cases to test
 
@@ -761,8 +810,11 @@ future asymmetric or OIDC adapter should remove signing capability from the enfo
 - malformed, failed or content-free terminal gateway response.
 - mock mode, arbitrary correlation id or inconsistent receipt/timeline reaches the Phase 7a pilot;
 - fixed synthetic request values or model output appear in the pilot report or evidence database;
-- live connector receives `cards.unblock`, a mismatched workload, unsafe endpoint/idempotency key,
+- read-only connector receives `cards.unblock`, a mismatched workload, unsafe endpoint/idempotency key,
   redirect, oversized body or malformed/duplicate/wrong-action response;
+- state-changing connector receives `cards.read`, a mismatched workload, wrong idempotency digest,
+  redirect, oversized body or malformed/duplicate/wrong-action response;
+- production-labelled runtime attempts to enable the state-changing sandbox connector;
 - connector credential, exact arguments, idempotency key or raw output appears in logs, evidence or
   replay responses;
 - `ra1`/`ra2`, wrong-action, expired, malformed or conflicting `rr1` authority changes an action;

@@ -4,6 +4,21 @@ The API exposes deterministic evaluation, enforcement, tool authority, reconcili
 metadata-only inspection. Schemas may evolve before the stable release, but privacy and authority
 boundaries are compatibility requirements.
 
+## Authentication and route roles
+
+Local development defaults to authentication disabled. A production-labelled API requires
+`oidc_jwt` mode and verifies short-lived EdDSA bearer access tokens offline against a mounted public
+JWKS. Exact issuer, audience, signature, time and role validation apply before request parsing.
+
+- `regulaai.runtime`: POST evaluation, enforcement and tool-action operations;
+- `regulaai.operator`: GET metadata, OpenAPI/docs and operator dashboard routes;
+- `regulaai.reconciler`: POST reconciliation operations.
+
+`/health` and the dashboard stylesheet are public. Missing or invalid tokens receive generic HTTP
+401; a valid token lacking the exact route role receives generic HTTP 403. API roles do not replace
+the separate exact-digest approval or reconciliation assertions described below. See
+[Enterprise API identity](API_IDENTITY.md).
+
 ## POST /v1/evaluations
 
 Evaluates an AI operation without invoking a provider.
@@ -163,13 +178,18 @@ runtime calls the network-silent mock. Explicit gateway mode sends the sanitized
 `governed-llm-gateway`; tool-bearing plans include only definitions resolved from the trusted
 catalog.
 
-The decision-approval assertion is issued by an external organization-owned workflow and has the form
-`ra1.<base64url-canonical-json>.<base64url-hmac-sha256>`. Its exact fields are `schema_version=1`,
-`approval_id`, pseudonymous `actor_id`, `decision_digest`, `issued_at` and `expires_at`. Unix
-timestamps are seconds. The configured verifier rejects malformed, future, expired, over-lifetime,
-wrong-digest and previously consumed approvals. The decision digest commits to both the normalized
-operation input digest and the resulting policy decision, so an approval cannot be moved to another
-operation with the same policy outcome. RegulaAI exposes no approval-issuance endpoint.
+The production decision-approval assertion is issued by an external organization-owned workflow
+and has the form `ra1e.<base64url-canonical-json>.<base64url-ed25519-signature>`. Its exact fields
+are `schema_version=2`, `authority_kind=decision_approval`, `key_id`, `approval_id`, pseudonymous
+`actor_id`, `decision_digest`, `issued_at` and `expires_at`. The key must be active, actor-bound and
+authorized for decision approval in the configured public trust store.
+
+The local/pilot compatibility verifier retains the HMAC `ra1` schema version 1. The two modes are
+mutually exclusive. Unix timestamps are seconds. Both reject malformed, future, expired,
+over-lifetime, wrong-digest and previously consumed approvals. The decision digest commits to both
+the normalized operation input digest and the resulting policy decision, so an approval cannot be
+moved to another operation with the same policy outcome. RegulaAI exposes no approval-issuance
+endpoint. A consumed asymmetric receipt additionally returns the non-secret `authority_key_id`.
 
 The response never includes source or transformed values:
 
@@ -216,17 +236,20 @@ Resubmit one proposal's exact arguments with a downstream `workload_identity` an
 returns metadata-only `WAITING_APPROVAL` state and an `action_digest`. Every tool effect requires a
 separate action approval before execution.
 
-Resend the identical request with an externally issued `approval_assertion` using
-`ra2.<base64url-canonical-json>.<base64url-hmac-sha256>`. Its payload contains
-`schema_version=2`, `subject_type=tool_action`, `approval_id`, pseudonymous `actor_id`,
-`action_digest`, `issued_at` and `expires_at`. `ra1` decision approvals are rejected.
+Resend the identical request with an externally issued production `approval_assertion` using
+`ra2e.<base64url-canonical-json>.<base64url-ed25519-signature>`. Its payload contains
+`schema_version=3`, `subject_type=tool_action`, `authority_kind=action_approval`, `key_id`,
+`approval_id`, pseudonymous `actor_id`, `action_digest`, `issued_at` and `expires_at`. The
+local/pilot compatibility verifier retains HMAC `ra2` schema version 2. Decision approvals are
+rejected in either mode, and asymmetric receipts expose the verification `authority_key_id`.
 
 After an atomic `DISPATCHED` claim, authority is consumed once and the configured tool port
 executes. The default remains the network-silent mock. Opt-in `read_only_http` mode is fixed to
-`cards.read`, the configured workload identity and a deployment-controlled sandbox endpoint; it
-does not enable `cards.unblock` or caller-selected HTTP. Success is accepted only when the untrusted
-output exactly matches the trusted, action-bound closed output schema. Per-field catalog rules
-return a closed enum, replace a value
+`cards.read`, the configured workload identity and a deployment-controlled sandbox endpoint.
+Opt-in `state_change_http` is restricted to non-production and fixed to `cards.unblock`, its exact
+workload and an idempotency-key digest echoed by the downstream response. Neither mode accepts
+caller-selected HTTP. Success is accepted only when the untrusted output exactly matches the
+trusted, action-bound closed output schema. Per-field catalog rules return a closed enum, replace a value
 with `***MASKED***`, or drop the field. Personal/financial values cannot be returned directly and
 authentication secrets are always dropped.
 
@@ -266,11 +289,13 @@ minimized result values are never persisted or recoverable from this endpoint.
 ## POST /v1/tool-actions/{action_id}/reconciliation
 
 Resolve only an action currently in `RECONCILIATION_REQUIRED`. The request contains one ephemeral
-`reconciliation_assertion` with the form
-`rr1.<base64url-canonical-json>.<base64url-hmac-sha256>`. Its strict payload contains
-`schema_version=1`, `subject_type=tool_action_reconciliation`, `reconciliation_id`, pseudonymous
-`actor_id`, exact `action_digest`, `outcome`, nullable `tool_execution_id`, `issued_at` and
-`expires_at`.
+`reconciliation_assertion` with the production form
+`rr1e.<base64url-canonical-json>.<base64url-ed25519-signature>`. Its strict payload contains
+`schema_version=2`, `subject_type=tool_action_reconciliation`,
+`authority_kind=reconciliation`, `key_id`, `reconciliation_id`, pseudonymous `actor_id`, exact
+`action_digest`, `outcome`, nullable `tool_execution_id`, `issued_at` and `expires_at`. The
+local/pilot compatibility verifier retains HMAC `rr1` schema version 1. Asymmetric receipts include
+the non-secret verification `authority_key_id`.
 
 `outcome=EXECUTED` requires a valid downstream execution identifier and produces
 `RECONCILED_EXECUTED`. `outcome=NOT_EXECUTED` requires a null identifier and produces
@@ -378,7 +403,8 @@ inventing earlier transitions. At most 256 events are returned; a longer sequenc
 `events_truncated=true`, adds `EVENT_LIST_TRUNCATED`, and also makes `history_complete=false`.
 The completeness flag is also false when current actions are truncated or the transition events do
 not cover the current evaluation, enforcement and returned action states.
-Append-only enforcement is local to SQLite and is not a signed or externally anchored audit claim.
+Append-only enforcement is implemented by the selected SQLite or PostgreSQL persistence boundary;
+it is not a signed or externally anchored audit claim.
 
 The control context uses only metadata captured by the linked evidence and enforcement records.
 Approval summaries omit actor identity, and tool-action stages expose only whether an approval was

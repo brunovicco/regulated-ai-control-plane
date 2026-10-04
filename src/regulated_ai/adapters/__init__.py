@@ -5,11 +5,34 @@ from regulated_ai.adapters.action_approval import (
     HmacActionApprovalAdapter,
 )
 from regulated_ai.adapters.approval import ApprovalAssertionError, HmacApprovalAdapter
+from regulated_ai.adapters.authority_postgres import (
+    PostgresHmacActionApprovalAdapter,
+    PostgresHmacApprovalAdapter,
+    PostgresHmacToolActionReconciliationAdapter,
+)
 from regulated_ai.adapters.classifier import DeterministicDataClassifier
+from regulated_ai.adapters.enterprise_identity import (
+    ApiAuthenticationError,
+    ApiAuthorizationError,
+    ApiIdentityConfigurationError,
+    ApiRole,
+    AuthenticatedApiPrincipal,
+    EnterpriseJwtConfig,
+    EnterpriseJwtVerifier,
+)
 from regulated_ai.adapters.evaluation_observability import (
     ControlEventTracer,
     StructuredEvaluationObserver,
     encode_cloudevent,
+)
+from regulated_ai.adapters.evidence_postgres import (
+    POSTGRES_SCHEMA_REVISION,
+    PostgresDatabase,
+    PostgresEnforcementRepository,
+    PostgresEvidenceRepository,
+    PostgresOperatorLifecycleEventRepository,
+    PostgresSchemaError,
+    PostgresToolActionRepository,
 )
 from regulated_ai.adapters.evidence_sqlite import (
     SqliteEnforcementRepository,
@@ -28,6 +51,16 @@ from regulated_ai.adapters.oci_evidence import (
     OciEvidenceIdentity,
     create_oci_evidence_layout,
     verify_oci_evidence_layout,
+)
+from regulated_ai.adapters.operator_authority import (
+    Ed25519ActionApprovalAdapter,
+    Ed25519ApprovalAdapter,
+    Ed25519OperatorAuthorityVerifier,
+    Ed25519ToolActionReconciliationAdapter,
+    OperatorAuthorityTrustStoreError,
+    PostgresEd25519ActionApprovalAdapter,
+    PostgresEd25519ApprovalAdapter,
+    PostgresEd25519ToolActionReconciliationAdapter,
 )
 from regulated_ai.adapters.policy_review_files import (
     PolicyReviewBoundaryError,
@@ -72,6 +105,10 @@ from regulated_ai.adapters.signed_packs import (
     VerifiedControlPack,
     verify_control_pack,
 )
+from regulated_ai.adapters.state_changing_tool_execution import (
+    StateChangingHttpToolExecutionAdapter,
+    StateChangingHttpToolExecutionConfig,
+)
 from regulated_ai.adapters.tokenization import HmacTokenizationAdapter
 from regulated_ai.adapters.tool_review_files import (
     ToolReviewBoundaryError,
@@ -108,12 +145,24 @@ from regulated_ai.adapters.yaml_files import (
 )
 
 __all__ = [
+    "POSTGRES_SCHEMA_REVISION",
     "ActionApprovalAssertionError",
+    "ApiAuthenticationError",
+    "ApiAuthorizationError",
+    "ApiIdentityConfigurationError",
+    "ApiRole",
     "ApprovalAssertionError",
+    "AuthenticatedApiPrincipal",
     "ConfigurationBoundaryError",
     "ControlEventTracer",
     "ControlPackIdentity",
     "DeterministicDataClassifier",
+    "Ed25519ActionApprovalAdapter",
+    "Ed25519ApprovalAdapter",
+    "Ed25519OperatorAuthorityVerifier",
+    "Ed25519ToolActionReconciliationAdapter",
+    "EnterpriseJwtConfig",
+    "EnterpriseJwtVerifier",
     "FilePolicyRepository",
     "FileProviderCapabilityRepository",
     "FileToolCatalogRepository",
@@ -128,7 +177,20 @@ __all__ = [
     "MockToolExecutionAdapter",
     "OciEvidenceError",
     "OciEvidenceIdentity",
+    "OperatorAuthorityTrustStoreError",
     "PolicyReviewBoundaryError",
+    "PostgresDatabase",
+    "PostgresEd25519ActionApprovalAdapter",
+    "PostgresEd25519ApprovalAdapter",
+    "PostgresEd25519ToolActionReconciliationAdapter",
+    "PostgresEnforcementRepository",
+    "PostgresEvidenceRepository",
+    "PostgresHmacActionApprovalAdapter",
+    "PostgresHmacApprovalAdapter",
+    "PostgresHmacToolActionReconciliationAdapter",
+    "PostgresOperatorLifecycleEventRepository",
+    "PostgresSchemaError",
+    "PostgresToolActionRepository",
     "ProviderReviewBoundaryError",
     "ReadOnlyHttpToolExecutionAdapter",
     "ReadOnlyHttpToolExecutionConfig",
@@ -144,6 +206,8 @@ __all__ = [
     "SqliteEvidenceRepository",
     "SqliteOperatorLifecycleEventRepository",
     "SqliteToolActionRepository",
+    "StateChangingHttpToolExecutionAdapter",
+    "StateChangingHttpToolExecutionConfig",
     "StructuredEvaluationObserver",
     "TimestampSubjectKind",
     "ToolActionReconciliationAssertionError",

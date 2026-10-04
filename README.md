@@ -54,8 +54,9 @@ RegulaAI turns those questions into deterministic, reproducible decisions and en
 | Deterministic policy evaluation | `ALLOW`, `ALLOW_WITH_TRANSFORMATION`, `REQUIRE_APPROVAL` or `DENY` |
 | Local data enforcement | Remove, mask, tokenize or pseudonymize fields before external I/O |
 | Provider capability registry | Resolve reviewed provider/service/region facts and fail closed on stale or unknown requirements |
-| Human authority boundaries | Bind approvals to exact decision and action digests, with one-time consumption |
-| Trusted tool execution | Treat model tool calls as proposals; validate exact arguments and closed output schemas |
+| Human authority boundaries | Bind role-scoped Ed25519 approvals to exact decision/action digests with one-time consumption |
+| Enterprise API identity | Verify short-lived EdDSA JWTs offline and separate runtime, operator and reconciler roles |
+| Trusted tool execution | Treat model tool calls as proposals; validate exact arguments and closed output schemas; bind one non-production state-changing sandbox operation |
 | Safe result handling | Minimize untrusted tool output and never persist raw or safe result content |
 | Operational evidence | Store versioned identifiers, reason codes, states and digests—not sensitive content |
 | Release governance | Verify signed control packs, review impact, authorize promotion and preserve evidence custody |
@@ -158,13 +159,17 @@ Not supported:
 The [pilot release profile](docs/PILOT_RELEASE.md) defines verification, acceptance and rollout
 boundaries.
 
+The current source also includes the next production foundation: PostgreSQL persistence, versioned
+migrations and concurrency-safe multi-replica claims. It does not expand the tagged pilot's scope
+until deployment-owned TLS, backup/restore, SLO and acceptance evidence are complete.
+
 ## Repository map
 
 ```text
 src/regulated_ai/
 ├── domain/        # policies, decisions, obligations and evidence types
 ├── application/   # evaluation, enforcement, tool authority and release use cases
-├── adapters/      # YAML, SQLite, signatures, gateway, tools and observability
+├── adapters/      # YAML, SQLite/PostgreSQL, signatures, gateway, tools and observability
 ├── entrypoints/   # FastAPI, operator UI, logging and pilot command
 └── resources/     # packaged signed demo control pack
 

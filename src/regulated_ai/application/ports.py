@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from regulated_ai.domain import (
     ActionApprovalGrant,
@@ -173,6 +173,21 @@ class ApprovalPort(Protocol):
         ...
 
 
+@runtime_checkable
+class AtomicApprovalExecutionPort(Protocol):
+    """Consume decision authority and claim provider execution in one transaction."""
+
+    def claim_execution(
+        self,
+        grant: ApprovalGrant,
+        *,
+        record: EnforcementRecord,
+        now: datetime,
+    ) -> tuple[EnforcementRecord, bool, ApprovalReceipt | None]:
+        """Atomically consume authority and advance PREPARED to DISPATCHED."""
+        ...
+
+
 class ActionApprovalPort(Protocol):
     """Validate and consume authority bound to an exact action digest."""
 
@@ -197,6 +212,21 @@ class ActionApprovalPort(Protocol):
         ...
 
 
+@runtime_checkable
+class AtomicActionApprovalExecutionPort(Protocol):
+    """Consume action authority and claim tool execution in one transaction."""
+
+    def claim_execution(
+        self,
+        grant: ActionApprovalGrant,
+        *,
+        record: ToolActionRecord,
+        now: datetime,
+    ) -> tuple[ToolActionRecord, bool, ActionApprovalReceipt | None]:
+        """Atomically consume authority and advance PREPARED to DISPATCHED."""
+        ...
+
+
 class ToolActionReconciliationPort(Protocol):
     """Validate and consume authority to resolve one ambiguous action outcome."""
 
@@ -218,6 +248,21 @@ class ToolActionReconciliationPort(Protocol):
         now: datetime,
     ) -> ToolActionReconciliationReceipt:
         """Consume or idempotently recover one exact reconciliation grant."""
+        ...
+
+
+@runtime_checkable
+class AtomicToolActionReconciliationPort(Protocol):
+    """Consume reconciliation authority and close action state atomically."""
+
+    def reconcile(
+        self,
+        grant: ToolActionReconciliationGrant,
+        *,
+        record: ToolActionRecord,
+        now: datetime,
+    ) -> ToolActionRecord:
+        """Persist the receipt and irreversible terminal state in one transaction."""
         ...
 
 

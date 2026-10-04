@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS approval_consumption (
     enforcement_id TEXT NOT NULL,
     issued_at TEXT NOT NULL,
     expires_at TEXT NOT NULL,
-    consumed_at TEXT NOT NULL
+    consumed_at TEXT NOT NULL,
+    authority_key_id TEXT
 )
 """
 _INSERT = """
@@ -47,8 +48,9 @@ INSERT INTO approval_consumption (
     enforcement_id,
     issued_at,
     expires_at,
-    consumed_at
-) VALUES (?, ?, ?, ?, ?, ?, ?)
+    consumed_at,
+    authority_key_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -73,14 +75,26 @@ class HmacApprovalAdapter:
         """Initialize a dedicated-key verifier and local replay ledger."""
         if len(key) < 32:
             raise ValueError("Approval HMAC key must be at least 32 bytes")
+        self._key = bytes(key)
+        self._initialize_ledger(path, max_lifetime_seconds)
+
+    def _initialize_ledger(self, path: Path, max_lifetime_seconds: int) -> None:
+        """Initialize the algorithm-independent local consumption ledger."""
         if max_lifetime_seconds <= 0 or max_lifetime_seconds > 86_400:
             raise ValueError("Approval lifetime ceiling must be in the range [1, 86400]")
         self._path = path
-        self._key = bytes(key)
         self._max_lifetime_seconds = max_lifetime_seconds
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute(_SCHEMA)
+            columns = {
+                str(row[1])
+                for row in connection.execute("PRAGMA table_info(approval_consumption)").fetchall()
+            }
+            if "authority_key_id" not in columns:
+                connection.execute(
+                    "ALTER TABLE approval_consumption ADD COLUMN authority_key_id TEXT"
+                )
 
     def inspect(
         self,
@@ -160,6 +174,10 @@ class HmacApprovalAdapter:
         if (
             _SAFE_ID.fullmatch(grant.approval_id) is None
             or _SAFE_ID.fullmatch(grant.actor_id) is None
+            or (
+                grant.authority_key_id is not None
+                and _SAFE_ID.fullmatch(grant.authority_key_id) is None
+            )
             or _DIGEST.fullmatch(grant.decision_digest) is None
             or _SAFE_ID.fullmatch(enforcement_id) is None
             or issued_at > checked_now
@@ -176,6 +194,7 @@ class HmacApprovalAdapter:
             issued_at=issued_at,
             expires_at=expires_at,
             consumed_at=checked_now,
+            authority_key_id=grant.authority_key_id,
         )
         try:
             with self._connect() as connection:
@@ -189,6 +208,7 @@ class HmacApprovalAdapter:
                         receipt.issued_at.isoformat(),
                         receipt.expires_at.isoformat(),
                         receipt.consumed_at.isoformat(),
+                        receipt.authority_key_id,
                     ),
                 )
         except sqlite3.IntegrityError as exc:
@@ -199,7 +219,10 @@ class HmacApprovalAdapter:
         """Return metadata-only consumption evidence for operational inspection."""
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT * FROM approval_consumption WHERE approval_id = ?", (approval_id,)
+                "SELECT approval_id, actor_id, decision_digest, enforcement_id, issued_at, "
+                "expires_at, consumed_at, authority_key_id "
+                "FROM approval_consumption WHERE approval_id = ?",
+                (approval_id,),
             ).fetchone()
         if row is None:
             return None
@@ -211,6 +234,7 @@ class HmacApprovalAdapter:
             issued_at=datetime.fromisoformat(str(row[4])),
             expires_at=datetime.fromisoformat(str(row[5])),
             consumed_at=datetime.fromisoformat(str(row[6])),
+            authority_key_id=None if row[7] is None else str(row[7]),
         )
 
     @contextmanager

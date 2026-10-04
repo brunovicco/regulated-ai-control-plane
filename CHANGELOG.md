@@ -9,6 +9,29 @@ The project is currently a **controlled pilot**. Breaking changes may occur befo
 
 ## [Unreleased]
 
+### Added
+
+- PostgreSQL production persistence with versioned Alembic migrations, multi-replica execution
+  claims, atomic authority/state transitions and append-only lifecycle triggers.
+- Restricted two-replica Kubernetes/OpenShift reference with separate runtime and migration
+  database identities and an explicit migration Job.
+- Role-bound Ed25519 production operator authority with lifecycle-aware public keys, distinct
+  decision/action/reconciliation scopes and verification-key identity in metadata-only receipts.
+- An opt-in, non-production `cards.unblock` connector with exact workload, action and idempotency
+  binding, bounded single-attempt I/O and mandatory ambiguous-outcome reconciliation.
+- Offline EdDSA JWT API identity with pinned issuer/audience/JWKS and separate runtime, operator and
+  reconciler roles.
+
+### Changed
+
+- Production-labelled runtimes now require PostgreSQL and fail startup when the database is
+  unavailable or the schema revision does not match the application.
+- Production-labelled runtimes require a public operator-authority trust store and reject
+  simultaneous HMAC authority configuration.
+- Production-labelled APIs require the restricted EdDSA JWT access-token contract; health and
+  static dashboard styling remain public while runtime, inspection and reconciliation routes
+  require distinct roles.
+
 ## [0.1.0rc1] - 2026-09-28
 
 ### Added

@@ -3,22 +3,32 @@
 import os
 import re
 import secrets
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 from typing import Annotated, Protocol, cast
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from regulated_ai.adapters import (
+    ApiAuthenticationError,
+    ApiAuthorizationError,
+    ApiRole,
     ControlEventTracer,
     ControlPackIdentity,
     DeterministicDataClassifier,
+    Ed25519ActionApprovalAdapter,
+    Ed25519ApprovalAdapter,
+    Ed25519OperatorAuthorityVerifier,
+    Ed25519ToolActionReconciliationAdapter,
+    EnterpriseJwtConfig,
+    EnterpriseJwtVerifier,
     FilePolicyRepository,
     FileProviderCapabilityRepository,
     FileToolCatalogRepository,
@@ -30,12 +40,25 @@ from regulated_ai.adapters import (
     HmacToolActionReconciliationAdapter,
     MockInferenceExecutionAdapter,
     MockToolExecutionAdapter,
+    PostgresDatabase,
+    PostgresEd25519ActionApprovalAdapter,
+    PostgresEd25519ApprovalAdapter,
+    PostgresEd25519ToolActionReconciliationAdapter,
+    PostgresEnforcementRepository,
+    PostgresEvidenceRepository,
+    PostgresHmacActionApprovalAdapter,
+    PostgresHmacApprovalAdapter,
+    PostgresHmacToolActionReconciliationAdapter,
+    PostgresOperatorLifecycleEventRepository,
+    PostgresToolActionRepository,
     ReadOnlyHttpToolExecutionAdapter,
     ReadOnlyHttpToolExecutionConfig,
     SqliteEnforcementRepository,
     SqliteEvidenceRepository,
     SqliteOperatorLifecycleEventRepository,
     SqliteToolActionRepository,
+    StateChangingHttpToolExecutionAdapter,
+    StateChangingHttpToolExecutionConfig,
     StructuredEvaluationObserver,
     verify_control_pack,
 )
@@ -50,11 +73,14 @@ from regulated_ai.application import (
     ReconcileToolAction,
 )
 from regulated_ai.application.ports import (
+    ActionApprovalPort,
+    ApprovalPort,
     EnforcementRepository,
     EvidenceRepository,
     InferenceExecutionPort,
     OperatorLifecycleEventRepository,
     ProviderCapabilityRepository,
+    ToolActionReconciliationPort,
     ToolActionRepository,
     ToolExecutionPort,
 )
@@ -91,6 +117,7 @@ from regulated_ai.entrypoints.operator_dashboard import (
 )
 
 _RUNTIME_LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+_API_IDENTITY_LOGGER = structlog.get_logger("regulated_ai.api_identity")
 
 
 class _TelemetryLifecycle(Protocol):
@@ -238,14 +265,39 @@ def build_runtime(
         raise ValueError("Tool catalog is part of the signed control pack")
     tool_file = control_pack.tool_files[0]
     tools = FileToolCatalogRepository.from_bytes(tool_file.content, tool_file.path)
-    configured_path = os.environ.get("REGULAAI_EVIDENCE_DB")
-    database_path = evidence_path or Path(configured_path or "var/regulaai-evidence.sqlite3")
-    repository = SqliteEvidenceRepository(database_path)
-    enforcement = SqliteEnforcementRepository(database_path)
-    actions = SqliteToolActionRepository(database_path)
-    lifecycle_events = SqliteOperatorLifecycleEventRepository(database_path)
     service_version = _runtime_label("REGULAAI_SERVICE_VERSION", "0.1.0")
     environment = _runtime_label("REGULAAI_ENVIRONMENT", "local")
+    configured_database_url = os.environ.get("REGULAAI_DATABASE_URL")
+    postgres_database: PostgresDatabase | None = None
+    repository: EvidenceRepository
+    enforcement: EnforcementRepository
+    actions: ToolActionRepository
+    lifecycle_events: OperatorLifecycleEventRepository
+    if evidence_path is None and configured_database_url is not None:
+        postgres_database = PostgresDatabase(
+            configured_database_url,
+            connect_timeout_seconds=_integer_environment(
+                "REGULAAI_DATABASE_CONNECT_TIMEOUT_SECONDS", 5
+            ),
+            statement_timeout_milliseconds=_integer_environment(
+                "REGULAAI_DATABASE_STATEMENT_TIMEOUT_MILLISECONDS", 5_000
+            ),
+        )
+        postgres_database.verify_schema()
+        repository = PostgresEvidenceRepository(postgres_database)
+        enforcement = PostgresEnforcementRepository(postgres_database)
+        actions = PostgresToolActionRepository(postgres_database)
+        lifecycle_events = PostgresOperatorLifecycleEventRepository(postgres_database)
+        database_path = None
+    else:
+        if evidence_path is None and environment.casefold() in {"prod", "production"}:
+            raise ValueError("REGULAAI_DATABASE_URL is required in production")
+        configured_path = os.environ.get("REGULAAI_EVIDENCE_DB")
+        database_path = evidence_path or Path(configured_path or "var/regulaai-evidence.sqlite3")
+        repository = SqliteEvidenceRepository(database_path)
+        enforcement = SqliteEnforcementRepository(database_path)
+        actions = SqliteToolActionRepository(database_path)
+        lifecycle_events = SqliteOperatorLifecycleEventRepository(database_path)
     telemetry = _build_telemetry_lifecycle(service_version=service_version, environment=environment)
     observer = StructuredEvaluationObserver(
         tracer=None if telemetry is None else telemetry.initialize()
@@ -263,44 +315,30 @@ def build_runtime(
         configured_key.encode() if configured_key is not None else secrets.token_bytes(32)
     )
     execution, mock_execution = _execution_adapter_from_environment()
+    configured_authority_store = _optional_environment_path(
+        "REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE"
+    )
     configured_approval_key = os.environ.get("REGULAAI_APPROVAL_HMAC_KEY")
-    approval = (
-        None
-        if configured_approval_key is None
-        else HmacApprovalAdapter(
-            database_path,
-            configured_approval_key.encode(),
-            max_lifetime_seconds=_integer_environment(
-                "REGULAAI_APPROVAL_MAX_LIFETIME_SECONDS", 3600
-            ),
-        )
-    )
-    enforcer = EnforceAiOperation(
-        evaluator=evaluator,
-        tokenizer=tokenizer,
-        enforcement=enforcement,
-        execution=execution,
-        approval=approval,
-        observer=observer,
-    )
     configured_action_approval_key = os.environ.get("REGULAAI_ACTION_APPROVAL_HMAC_KEY")
+    configured_reconciliation_key = os.environ.get("REGULAAI_RECONCILIATION_HMAC_KEY")
+    configured_hmac_keys = tuple(
+        key
+        for key in (
+            configured_approval_key,
+            configured_action_approval_key,
+            configured_reconciliation_key,
+        )
+        if key is not None
+    )
+    if configured_authority_store is not None and configured_hmac_keys:
+        raise ValueError("Operator authority trust store and HMAC authority are mutually exclusive")
+    if environment.casefold() in {"prod", "production"} and configured_authority_store is None:
+        raise ValueError("REGULAAI_OPERATOR_AUTHORITY_TRUST_STORE is required in production")
     if (
         configured_action_approval_key is not None
         and configured_action_approval_key == configured_approval_key
     ):
         raise ValueError("Decision and action approval HMAC keys must differ")
-    action_approval = (
-        None
-        if configured_action_approval_key is None
-        else HmacActionApprovalAdapter(
-            database_path,
-            configured_action_approval_key.encode(),
-            max_lifetime_seconds=_integer_environment(
-                "REGULAAI_ACTION_APPROVAL_MAX_LIFETIME_SECONDS", 3600
-            ),
-        )
-    )
-    configured_reconciliation_key = os.environ.get("REGULAAI_RECONCILIATION_HMAC_KEY")
     configured_authority_keys = tuple(
         key for key in (configured_approval_key, configured_action_approval_key) if key is not None
     )
@@ -309,18 +347,120 @@ def build_runtime(
         and configured_reconciliation_key in configured_authority_keys
     ):
         raise ValueError("Reconciliation and approval HMAC keys must differ")
-    reconciliation_authority = (
+    authority_verifier = (
         None
-        if configured_reconciliation_key is None
-        else HmacToolActionReconciliationAdapter(
-            database_path,
-            configured_reconciliation_key.encode(),
-            max_lifetime_seconds=_integer_environment(
-                "REGULAAI_RECONCILIATION_MAX_LIFETIME_SECONDS", 3600
-            ),
-        )
+        if configured_authority_store is None
+        else Ed25519OperatorAuthorityVerifier(configured_authority_store)
     )
-    tool_execution, mock_tool_execution = _tool_execution_adapter_from_environment()
+    approval_lifetime = _integer_environment("REGULAAI_APPROVAL_MAX_LIFETIME_SECONDS", 3600)
+    action_lifetime = _integer_environment("REGULAAI_ACTION_APPROVAL_MAX_LIFETIME_SECONDS", 3600)
+    reconciliation_lifetime = _integer_environment(
+        "REGULAAI_RECONCILIATION_MAX_LIFETIME_SECONDS", 3600
+    )
+    approval: ApprovalPort | None
+    action_approval: ActionApprovalPort | None
+    reconciliation_authority: ToolActionReconciliationPort | None
+    if authority_verifier is not None:
+        approval = (
+            PostgresEd25519ApprovalAdapter(
+                postgres_database,
+                authority_verifier,
+                max_lifetime_seconds=approval_lifetime,
+            )
+            if postgres_database is not None
+            else Ed25519ApprovalAdapter(
+                _required_database_path(database_path),
+                authority_verifier,
+                max_lifetime_seconds=approval_lifetime,
+            )
+        )
+        action_approval = (
+            PostgresEd25519ActionApprovalAdapter(
+                postgres_database,
+                authority_verifier,
+                max_lifetime_seconds=action_lifetime,
+            )
+            if postgres_database is not None
+            else Ed25519ActionApprovalAdapter(
+                _required_database_path(database_path),
+                authority_verifier,
+                max_lifetime_seconds=action_lifetime,
+            )
+        )
+        reconciliation_authority = (
+            PostgresEd25519ToolActionReconciliationAdapter(
+                postgres_database,
+                authority_verifier,
+                max_lifetime_seconds=reconciliation_lifetime,
+            )
+            if postgres_database is not None
+            else Ed25519ToolActionReconciliationAdapter(
+                _required_database_path(database_path),
+                authority_verifier,
+                max_lifetime_seconds=reconciliation_lifetime,
+            )
+        )
+    else:
+        approval = (
+            None
+            if configured_approval_key is None
+            else (
+                PostgresHmacApprovalAdapter(
+                    postgres_database,
+                    configured_approval_key.encode(),
+                    max_lifetime_seconds=approval_lifetime,
+                )
+                if postgres_database is not None
+                else HmacApprovalAdapter(
+                    _required_database_path(database_path),
+                    configured_approval_key.encode(),
+                    max_lifetime_seconds=approval_lifetime,
+                )
+            )
+        )
+        action_approval = (
+            None
+            if configured_action_approval_key is None
+            else (
+                PostgresHmacActionApprovalAdapter(
+                    postgres_database,
+                    configured_action_approval_key.encode(),
+                    max_lifetime_seconds=action_lifetime,
+                )
+                if postgres_database is not None
+                else HmacActionApprovalAdapter(
+                    _required_database_path(database_path),
+                    configured_action_approval_key.encode(),
+                    max_lifetime_seconds=action_lifetime,
+                )
+            )
+        )
+        reconciliation_authority = (
+            None
+            if configured_reconciliation_key is None
+            else (
+                PostgresHmacToolActionReconciliationAdapter(
+                    postgres_database,
+                    configured_reconciliation_key.encode(),
+                    max_lifetime_seconds=reconciliation_lifetime,
+                )
+                if postgres_database is not None
+                else HmacToolActionReconciliationAdapter(
+                    _required_database_path(database_path),
+                    configured_reconciliation_key.encode(),
+                    max_lifetime_seconds=reconciliation_lifetime,
+                )
+            )
+        )
+    enforcer = EnforceAiOperation(
+        evaluator=evaluator,
+        tokenizer=tokenizer,
+        enforcement=enforcement,
+        execution=execution,
+        approval=approval,
+        observer=observer,
+    )
+    tool_execution, mock_tool_execution = _tool_execution_adapter_from_environment(environment)
     action_executor = ExecuteToolAction(
         enforcement=enforcement,
         evidence=repository,
@@ -390,37 +530,129 @@ def _execution_adapter_from_environment() -> tuple[
     return adapter, None
 
 
-def _tool_execution_adapter_from_environment() -> tuple[
-    ToolExecutionPort, MockToolExecutionAdapter | None
-]:
+def _tool_execution_adapter_from_environment(
+    environment: str,
+) -> tuple[ToolExecutionPort, MockToolExecutionAdapter | None]:
     mode = os.environ.get("REGULAAI_TOOL_EXECUTION_MODE", "mock").strip().casefold()
     if mode == "mock":
         mock = MockToolExecutionAdapter()
         return mock, mock
-    if mode != "read_only_http":
-        raise ValueError("REGULAAI_TOOL_EXECUTION_MODE must be 'mock' or 'read_only_http'")
-    adapter = ReadOnlyHttpToolExecutionAdapter(
-        ReadOnlyHttpToolExecutionConfig(
-            endpoint_url=_required_environment(
-                "REGULAAI_READ_ONLY_TOOL_URL", context="read-only tool execution mode"
+    if mode == "read_only_http":
+        adapter: ToolExecutionPort = ReadOnlyHttpToolExecutionAdapter(
+            ReadOnlyHttpToolExecutionConfig(
+                endpoint_url=_required_environment(
+                    "REGULAAI_READ_ONLY_TOOL_URL", context="read-only tool execution mode"
+                ),
+                api_key=_required_environment(
+                    "REGULAAI_READ_ONLY_TOOL_API_KEY", context="read-only tool execution mode"
+                ),
+                workload_identity=_required_environment(
+                    "REGULAAI_READ_ONLY_TOOL_WORKLOAD_IDENTITY",
+                    context="read-only tool execution mode",
+                ),
+                timeout_seconds=_float_environment("REGULAAI_READ_ONLY_TOOL_TIMEOUT_SECONDS", 10.0),
+                max_request_bytes=_integer_environment(
+                    "REGULAAI_READ_ONLY_TOOL_MAX_REQUEST_BYTES", 64 * 1024
+                ),
+                max_response_bytes=_integer_environment(
+                    "REGULAAI_READ_ONLY_TOOL_MAX_RESPONSE_BYTES", 64 * 1024
+                ),
+            )
+        )
+        return adapter, None
+    if mode == "state_change_http":
+        if environment.casefold() in {"prod", "production"}:
+            raise ValueError("State-changing HTTP tool execution is restricted to non-production")
+        state_adapter = StateChangingHttpToolExecutionAdapter(
+            StateChangingHttpToolExecutionConfig(
+                endpoint_url=_required_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_URL",
+                    context="state-changing tool execution mode",
+                ),
+                api_key=_required_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_API_KEY",
+                    context="state-changing tool execution mode",
+                ),
+                workload_identity=_required_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_WORKLOAD_IDENTITY",
+                    context="state-changing tool execution mode",
+                ),
+                timeout_seconds=_float_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_TIMEOUT_SECONDS", 10.0
+                ),
+                max_request_bytes=_integer_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_MAX_REQUEST_BYTES", 64 * 1024
+                ),
+                max_response_bytes=_integer_environment(
+                    "REGULAAI_STATE_CHANGE_TOOL_MAX_RESPONSE_BYTES", 64 * 1024
+                ),
+            )
+        )
+        return state_adapter, None
+    raise ValueError(
+        "REGULAAI_TOOL_EXECUTION_MODE must be 'mock', 'read_only_http' or 'state_change_http'"
+    )
+
+
+def _api_identity_from_environment(environment: str) -> EnterpriseJwtVerifier | None:
+    mode = os.environ.get("REGULAAI_API_AUTH_MODE", "disabled").strip().casefold()
+    if mode == "disabled":
+        if environment.casefold() in {"prod", "production"}:
+            raise ValueError("REGULAAI_API_AUTH_MODE=oidc_jwt is required in production")
+        return None
+    if mode != "oidc_jwt":
+        raise ValueError("REGULAAI_API_AUTH_MODE must be 'disabled' or 'oidc_jwt'")
+    return EnterpriseJwtVerifier(
+        EnterpriseJwtConfig(
+            issuer=_required_environment("REGULAAI_OIDC_ISSUER", context="OIDC JWT API auth mode"),
+            audience=_required_environment(
+                "REGULAAI_OIDC_AUDIENCE", context="OIDC JWT API auth mode"
             ),
-            api_key=_required_environment(
-                "REGULAAI_READ_ONLY_TOOL_API_KEY", context="read-only tool execution mode"
+            jwks_path=Path(
+                _required_environment("REGULAAI_OIDC_JWKS_PATH", context="OIDC JWT API auth mode")
             ),
-            workload_identity=_required_environment(
-                "REGULAAI_READ_ONLY_TOOL_WORKLOAD_IDENTITY",
-                context="read-only tool execution mode",
-            ),
-            timeout_seconds=_float_environment("REGULAAI_READ_ONLY_TOOL_TIMEOUT_SECONDS", 10.0),
-            max_request_bytes=_integer_environment(
-                "REGULAAI_READ_ONLY_TOOL_MAX_REQUEST_BYTES", 64 * 1024
-            ),
-            max_response_bytes=_integer_environment(
-                "REGULAAI_READ_ONLY_TOOL_MAX_RESPONSE_BYTES", 64 * 1024
-            ),
+            max_token_age_seconds=_integer_environment("REGULAAI_OIDC_MAX_TOKEN_AGE_SECONDS", 3600),
+            clock_skew_seconds=_integer_environment("REGULAAI_OIDC_CLOCK_SKEW_SECONDS", 30),
         )
     )
-    return adapter, None
+
+
+def _required_api_role(method: str, path: str) -> ApiRole | None:
+    if path in {"/health", "/operator/assets/dashboard.css"}:
+        return None
+    if method == "POST" and re.fullmatch(r"/v1/tool-actions/[^/]+/reconciliation", path):
+        return "regulaai.reconciler"
+    if method in {"GET", "HEAD"}:
+        return "regulaai.operator"
+    return "regulaai.runtime"
+
+
+def _api_route_path(request: Request) -> str:
+    path = cast(str, request.scope["path"])
+    root_path = cast(str, request.scope.get("root_path", ""))
+    if not root_path or not path.startswith(root_path):
+        return path
+    if path == root_path:
+        return ""
+    if path[len(root_path)] == "/":
+        return path[len(root_path) :]
+    return path
+
+
+def _bearer_token(request: Request) -> str:
+    values = request.headers.getlist("authorization")
+    if len(values) != 1:
+        raise ApiAuthenticationError("Bearer token is invalid")
+    value = values[0]
+    scheme, separator, token = value.partition(" ")
+    if (
+        scheme.casefold() != "bearer"
+        or not separator
+        or not token
+        or any(char.isspace() for char in token)
+    ):
+        raise ApiAuthenticationError("Bearer token is invalid")
+    return token
 
 
 def _required_environment(name: str, *, context: str = "gateway execution mode") -> str:
@@ -437,6 +669,12 @@ def _optional_environment_path(name: str) -> Path | None:
     if not value.strip():
         raise ValueError(f"{name} must not be empty")
     return Path(value)
+
+
+def _required_database_path(path: Path | None) -> Path:
+    if path is None:
+        raise RuntimeError("SQLite database path is unavailable")
+    return path
 
 
 def _float_environment(name: str, default: float) -> float:
@@ -501,11 +739,13 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        environment = _runtime_label("REGULAAI_ENVIRONMENT", "local")
         configure_logging(
             service="regulaai-control-plane",
-            environment=_runtime_label("REGULAAI_ENVIRONMENT", "local"),
+            environment=environment,
             version=_runtime_label("REGULAAI_SERVICE_VERSION", "0.1.0"),
         )
+        application.state.api_identity = _api_identity_from_environment(environment)
         runtime = runtime_factory()
         application.state.runtime = runtime
         try:
@@ -516,6 +756,56 @@ def create_app(runtime_factory: Callable[[], Runtime] = build_runtime) -> FastAP
                 runtime.telemetry.shutdown(timeout_seconds=2.0)
 
     application = FastAPI(title="RegulaAI", version="0.1.0", lifespan=lifespan)
+
+    @application.middleware("http")
+    async def authenticate_api_request(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        required_role = _required_api_role(request.method, _api_route_path(request))
+        if required_role is None:
+            return await call_next(request)
+        if not hasattr(application.state, "api_identity"):
+            _API_IDENTITY_LOGGER.error(
+                "api.identity_unavailable", required_role=required_role, method=request.method
+            )
+            return _identity_error_response(
+                503,
+                "API_IDENTITY_UNAVAILABLE",
+                "API identity boundary is unavailable",
+            )
+        verifier: EnterpriseJwtVerifier | None = application.state.api_identity
+        if verifier is None:
+            return await call_next(request)
+        try:
+            verifier.authenticate(
+                _bearer_token(request),
+                required_role=required_role,
+            )
+        except ApiAuthenticationError:
+            _API_IDENTITY_LOGGER.warning(
+                "api.authentication_failed", required_role=required_role, method=request.method
+            )
+            return _identity_error_response(
+                401,
+                "API_AUTHENTICATION_FAILED",
+                "Bearer authentication failed",
+            )
+        except ApiAuthorizationError:
+            _API_IDENTITY_LOGGER.warning(
+                "api.authorization_denied", required_role=required_role, method=request.method
+            )
+            return _identity_error_response(
+                403,
+                "API_AUTHORIZATION_FAILED",
+                "Authenticated principal is not authorized",
+            )
+        _API_IDENTITY_LOGGER.info(
+            "api.identity_authenticated", required_role=required_role, method=request.method
+        )
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @application.exception_handler(RequestValidationError)
     async def invalid_request(_request: Request, _exc: RequestValidationError) -> JSONResponse:
@@ -879,6 +1169,7 @@ def _approval_receipt_payload(receipt: ApprovalReceipt | None) -> dict[str, obje
     return {
         "approval_id": receipt.approval_id,
         "actor_id": receipt.actor_id,
+        "authority_key_id": receipt.authority_key_id,
         "decision_digest": receipt.decision_digest,
         "enforcement_id": receipt.enforcement_id,
         "issued_at": receipt.issued_at.isoformat(),
@@ -982,6 +1273,7 @@ def _operator_timeline_payload(timeline: OperatorTimeline) -> dict[str, object]:
             if timeline.approval is None
             else {
                 "approval_id": timeline.approval.approval_id,
+                "authority_key_id": timeline.approval.authority_key_id,
                 "issued_at": timeline.approval.issued_at.isoformat(),
                 "expires_at": timeline.approval.expires_at.isoformat(),
                 "consumed_at": timeline.approval.consumed_at.isoformat(),
@@ -1050,6 +1342,7 @@ def _action_approval_receipt_payload(
     return {
         "approval_id": receipt.approval_id,
         "actor_id": receipt.actor_id,
+        "authority_key_id": receipt.authority_key_id,
         "action_digest": receipt.action_digest,
         "action_id": receipt.action_id,
         "issued_at": receipt.issued_at.isoformat(),
@@ -1066,6 +1359,7 @@ def _tool_action_reconciliation_receipt_payload(
     return {
         "reconciliation_id": receipt.reconciliation_id,
         "actor_id": receipt.actor_id,
+        "authority_key_id": receipt.authority_key_id,
         "action_digest": receipt.action_digest,
         "action_id": receipt.action_id,
         "outcome": receipt.outcome.value,
@@ -1078,6 +1372,17 @@ def _tool_action_reconciliation_receipt_payload(
 
 def _error_response(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
+
+
+def _identity_error_response(status: int, code: str, message: str) -> JSONResponse:
+    headers = {"Cache-Control": "no-store"}
+    if status == 401:
+        headers["WWW-Authenticate"] = "Bearer"
+    return JSONResponse(
+        status_code=status,
+        content={"error": {"code": code, "message": message}},
+        headers=headers,
+    )
 
 
 app = create_app()

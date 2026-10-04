@@ -116,7 +116,8 @@ Application code depends on domain contracts, never concrete infrastructure.
 
 - strict YAML loaders for policies, provider capabilities, tools and trust stores;
 - SQLite repositories and atomic lifecycle transitions;
-- HMAC approval/reconciliation verification and Ed25519 release verification;
+- role-bound Ed25519 production authority, local HMAC compatibility and Ed25519 release
+  verification;
 - governed-gateway and bounded read-only HTTP execution;
 - release review, custody, OCI and trusted-time verification;
 - structured logs, CloudEvents and optional OpenTelemetry export.
@@ -149,7 +150,7 @@ request
   -> produce decision and obligations
   -> persist metadata-only evidence
   -> apply local transformations
-  -> verify decision approval when required
+  -> verify decision approval against scoped operator authority when required
   -> atomically claim dispatch
   -> mock execution or governed gateway
   -> persist terminal metadata
@@ -167,7 +168,7 @@ model proposal
   -> caller resubmits exact arguments and workload identity
   -> validate closed input schema and proposal binding
   -> compute action digest
-  -> verify separate action approval
+  -> verify separately scoped action approval
   -> atomically claim dispatch and consume authority
   -> mock or fixed read-only sandbox adapter
   -> validate closed output schema
@@ -181,6 +182,8 @@ arguments, idempotency keys, assertions and tool results are ephemeral.
 Timeouts or ambiguous transport failures enter `RECONCILIATION_REQUIRED`. An organization-owned
 investigation can then issue a separately authenticated assertion for `EXECUTED` or
 `NOT_EXECUTED`. Reconciliation records the terminal fact and never calls the tool adapter.
+Production assertions are verified with public Ed25519 keys bound to actor, lifecycle and authority
+kind; the runtime has no signing key. HMAC authority remains a local/pilot compatibility mode.
 
 ### Release trust
 
@@ -202,24 +205,31 @@ trust-store checks. The same authenticated bytes feed runtime parsing and offlin
 
 | Boundary | Data allowed to cross | Authority rule |
 | --- | --- | --- |
-| Application → RegulaAI | Explicit runtime context and ephemeral field values | Input is untrusted and schema-validated |
+| Application → RegulaAI | Restricted EdDSA access token plus explicit runtime context and ephemeral field values | Token is verified against pinned issuer/audience/JWKS and route role; input remains untrusted and schema-validated |
 | RegulaAI → provider gateway | Sanitized in-memory execution plan | Policy must allow execution; configuration fixes target/provider |
 | Model → tool proposal | Tool name plus ephemeral arguments | Proposal carries no execution authority |
-| RegulaAI → enterprise sandbox | One validated, approved `cards.read` request | Exact action digest, workload identity and one-time authority required |
+| RegulaAI → read-only enterprise sandbox | One validated, approved `cards.read` request | Exact action digest, workload identity and one-time authority required |
+| RegulaAI → state-changing sandbox | One validated, approved `cards.unblock` request | Exact action, workload and idempotency binding; non-production only; ambiguous outcomes require reconciliation |
 | Operator → reconciliation | Signed terminal outcome assertion | Separate domain/key and exact action binding required |
 | Runtime → evidence/telemetry | Allowlisted metadata and digests | Content, credentials and tool results are prohibited |
 | Release workflow → runtime | Signed public control material | Private keys remain outside the repository and runtime |
 
 ## Persistence and consistency
 
-SQLite is the reference persistence implementation. It stores evaluation evidence, enforcement
-state, approval consumption, tool-action lifecycle, reconciliation receipts and append-only history.
-Externally visible execution is preceded by an atomic dispatch claim so retries cannot silently
-duplicate an effect.
+SQLite is the local and controlled-pilot persistence implementation. PostgreSQL is the production
+adapter selected through `REGULAAI_DATABASE_URL` and managed by explicit Alembic migrations. Both
+store only evaluation evidence, enforcement state, authority consumption, tool-action lifecycle,
+reconciliation receipts and append-only history.
 
-The supported pilot profile is one replica with a dedicated database. Multi-replica operation is
-blocked until a transactional production adapter, migrations and distributed consistency semantics
-are defined.
+PostgreSQL conditional updates provide single-winner dispatch claims across replicas. Decision and
+action approval consumption is committed in the same transaction as the corresponding claim;
+reconciliation consumption is committed with its irreversible terminal action transition. Database
+triggers append lifecycle history in each state transaction. Production startup checks the exact
+schema revision and never performs opportunistic DDL.
+
+The tagged controlled pilot remains one replica with a dedicated SQLite database. The production
+reference runs two replicas only after the explicit migration job and deployment-owned database
+controls succeed.
 
 ## Failure model
 

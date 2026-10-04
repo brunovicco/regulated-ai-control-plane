@@ -1211,6 +1211,7 @@ class ApprovalGrant:
     decision_digest: str
     issued_at: datetime
     expires_at: datetime
+    authority_key_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1224,6 +1225,7 @@ class ApprovalReceipt:
     issued_at: datetime
     expires_at: datetime
     consumed_at: datetime
+    authority_key_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1235,6 +1237,7 @@ class ActionApprovalGrant:
     action_digest: str
     issued_at: datetime
     expires_at: datetime
+    authority_key_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1248,6 +1251,7 @@ class ActionApprovalReceipt:
     issued_at: datetime
     expires_at: datetime
     consumed_at: datetime
+    authority_key_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1261,6 +1265,7 @@ class ToolActionReconciliationGrant:
     tool_execution_id: str | None
     issued_at: datetime
     expires_at: datetime
+    authority_key_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1276,6 +1281,7 @@ class ToolActionReconciliationReceipt:
     issued_at: datetime
     expires_at: datetime
     consumed_at: datetime
+    authority_key_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1483,6 +1489,7 @@ class OperatorApprovalSummary:
     issued_at: datetime
     expires_at: datetime
     consumed_at: datetime
+    authority_key_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

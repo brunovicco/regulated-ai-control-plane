@@ -55,7 +55,8 @@ reproduzíveis.
 | Enforcement local de dados | Remove, mascara, tokeniza ou pseudonimiza campos antes de I/O externo |
 | Registro de capacidades | Resolve fatos revisados de provider/serviço/região e falha fechado quando requisitos estão obsoletos ou desconhecidos |
 | Fronteiras de autoridade humana | Vincula aprovações aos digests exatos da decisão e da ação, com consumo único |
-| Execução confiável de ferramentas | Trata tool calls do modelo como propostas e valida argumentos e schemas de saída fechados |
+| Identidade corporativa da API | Verifica JWTs EdDSA de curta duração e separa papéis de runtime, operador e reconciliador |
+| Execução confiável de ferramentas | Trata tool calls como propostas, valida argumentos e schemas fechados e vincula uma operação mutável de sandbox não produtiva |
 | Tratamento seguro de resultados | Minimiza outputs não confiáveis e nunca persiste conteúdo bruto ou seguro do resultado |
 | Evidência operacional | Armazena IDs versionados, reason codes, estados e digests—não conteúdo sensível |
 | Governança de releases | Verifica control packs assinados, analisa impacto, autoriza promoção e preserva custódia |
@@ -158,13 +159,19 @@ Não suportado:
 
 O [perfil do release piloto](docs/PILOT_RELEASE.md) define verificação, aceite e limites de rollout.
 
+O código-fonte atual também inclui a próxima fundação produtiva: persistência PostgreSQL,
+migrations versionadas, claims concorrentes seguros para múltiplas réplicas e autoridade
+operacional Ed25519 com escopo por função. Isso não amplia o escopo do piloto publicado até
+existirem evidências operacionais de TLS, rotação do trust store, backup/restore, SLO e aceite sob
+responsabilidade do deployment.
+
 ## Mapa do repositório
 
 ```text
 src/regulated_ai/
 ├── domain/        # políticas, decisões, obrigações e tipos de evidência
 ├── application/   # avaliação, enforcement, autoridade e releases
-├── adapters/      # YAML, SQLite, assinaturas, gateway, ferramentas e observabilidade
+├── adapters/      # YAML, SQLite/PostgreSQL, assinaturas, gateway, ferramentas e observabilidade
 ├── entrypoints/   # FastAPI, UI do operador, logging e comando do piloto
 └── resources/     # control pack de demonstração assinado
 

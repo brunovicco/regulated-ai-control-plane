@@ -62,12 +62,15 @@ production credentials, personal data or customer systems to satisfy pilot accep
 ## Explicitly unsupported
 
 - production traffic or production personal data;
-- multiple replicas or shared/distributed persistence;
+- production use of the PostgreSQL adapter without deployment-owned migration, TLS, backup,
+  restore and SLO evidence;
 - SaaS multi-tenancy or tenant-wide record discovery;
 - state-changing enterprise connectors or model continuation with tool results;
 - product-grade OIDC/RBAC for the operator surface;
 - a guarantee of provider behavior, regulatory compliance or legal correctness.
 
-Production readiness requires a transactional persistence adapter and migrations, enterprise
-identity-backed operator authority, deployment-owned TLS/egress/secrets/backup controls, operational
-SLOs and incident exercises. These remain follow-up work after the controlled pilot.
+The PostgreSQL transactional adapter, migrations and role-bound Ed25519 operator verifier now
+provide the application boundary for multi-replica execution with public-key-only runtime
+authority. Production readiness still requires organization-owned validation of those adapters,
+trust-store distribution/rotation, deployment-owned TLS/egress/secrets/backup controls,
+operational SLOs and incident exercises.
