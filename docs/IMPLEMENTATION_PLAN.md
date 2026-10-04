@@ -1,5 +1,27 @@
 # Implementation plan
 
+## Self-attested financial PoC — bound evidence and authenticated verification
+
+Status: repository implementation complete; the individual author can configure a local compatible
+IdP, development gateway workloads and a stateful synthetic sandbox to produce the live evidence.
+
+- CI provisions disposable PostgreSQL 17, requires the migration/concurrency/integrated suite and
+  retains a metadata-only result summary that declares external boundaries simulated.
+- Strict profiles bind the OpenAI and Bedrock targets to exact terminal gateway provider, model,
+  deployment and policy version. The PoC uses demonstrable `store=false`, IAM authorization and
+  documented provider-access controls without ZDR or PrivateLink eligibility claims.
+- A non-mutating probe verifies the anonymous/runtime/operator/reconciler enterprise identity role
+  matrix using externally injected access tokens.
+- The integrated PostgreSQL suite composes API identity, Ed25519 decision/action/reconciliation
+  authority, both gateway providers, one state-changing attempt and both terminal recovery results.
+- The PoC policy remains a technical draft and requires explicit self-review over its exact bytes.
+- `POC_VERIFIED` requires nine fresh, exact-scope metadata observations plus role-bound Ed25519
+  signatures from two distinct keys. One individual may control both keys.
+
+The result is self-attested and does not claim independent review, organizational authority,
+production readiness or compliance. A separate future enterprise profile retains stricter ZDR,
+PrivateLink, CloudTrail and independent-review requirements.
+
 ## Enterprise API identity — offline access-token JWT RBAC
 
 Status: implemented after the first state-changing sandbox connector.

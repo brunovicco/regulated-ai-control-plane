@@ -1,0 +1,13 @@
+{
+  "schema_version": "1",
+  "profile_id": "financial-pilot-openai",
+  "provider": "openai",
+  "gateway_provider": "openai",
+  "gateway_model": "replace-with-reviewed-model",
+  "gateway_deployment": "replace-with-reviewed-deployment",
+  "policy_set_version": "org-financial-pilot@1.0.0",
+  "organization_assertions": {
+    "eligible_organization_required": false,
+    "endpoint_or_feature_must_be_zdr_eligible": false
+  }
+}

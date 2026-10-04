@@ -4,6 +4,10 @@
 deterministic control-plane, governed execution and evidence work as a deliberately bounded pilot.
 It is not a production release or a compliance claim.
 
+The current source candidate adds an [integrated financial-pilot](FINANCIAL_PILOT.md) acceptance
+profile after that tag. Its new PostgreSQL, identity, dual-provider and state-changing tool
+capabilities do not retroactively change the `v0.1.0rc1` supported profile.
+
 ## Supported profile
 
 The supported deployment is:
@@ -43,6 +47,9 @@ image with a scanned and signed immutable digest, provision trust material and r
 outside Git, and perform an approved server-side dry run.
 
 ## Pilot acceptance
+
+The checklist below applies to `v0.1.0rc1`. For the current source candidate, use the stricter
+[integrated financial-pilot](FINANCIAL_PILOT.md) scope and authenticated acceptance bundle.
 
 An organization may accept its own pilot only after it has:
 

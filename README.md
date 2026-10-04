@@ -159,9 +159,12 @@ Not supported:
 The [pilot release profile](docs/PILOT_RELEASE.md) defines verification, acceptance and rollout
 boundaries.
 
-The current source also includes the next production foundation: PostgreSQL persistence, versioned
-migrations and concurrency-safe multi-replica claims. It does not expand the tagged pilot's scope
-until deployment-owned TLS, backup/restore, SLO and acceptance evidence are complete.
+The current source also includes a [self-attested financial proof of
+concept](docs/FINANCIAL_PILOT.md): PostgreSQL persistence, configurable API identity, strict
+OpenAI/Bedrock gateway profiles, state-changing tool recovery and metadata evidence signed with two
+distinct keys controlled by the PoC author. `POC_VERIFIED` records this bounded technical
+demonstration; it does not claim independent or organizational acceptance. A stricter [future
+enterprise profile](docs/ENTERPRISE_FINANCIAL_PILOT.md) remains separate.
 
 ## Repository map
 

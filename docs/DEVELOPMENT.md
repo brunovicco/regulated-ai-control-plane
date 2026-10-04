@@ -21,7 +21,10 @@ Tests use in-memory exporters or fakes. Do not point development or CI checks at
 uv run python scripts/quality_gate.py
 ```
 
-PostgreSQL concurrency tests are opt-in because they mutate a dedicated non-production database.
+PostgreSQL integration tests are mandatory in CI and opt-in locally because they mutate a dedicated
+non-production database. CI provisions a disposable PostgreSQL 17 service. For local execution,
+set `REGULAAI_TEST_POSTGRES_URL` to a database whose name ends in `_test`; set
+`REGULAAI_REQUIRE_POSTGRES_TESTS=1` to fail instead of skip when it is unavailable.
 Apply migrations and run them with an explicitly isolated test URL:
 
 ```bash
