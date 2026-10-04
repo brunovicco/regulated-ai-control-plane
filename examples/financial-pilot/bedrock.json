@@ -1,0 +1,13 @@
+{
+  "schema_version": "1",
+  "profile_id": "financial-pilot-bedrock",
+  "provider": "bedrock",
+  "gateway_provider": "aws",
+  "gateway_model": "replace-with-reviewed-model",
+  "gateway_deployment": "replace-with-reviewed-deployment",
+  "policy_set_version": "org-financial-pilot@1.0.0",
+  "organization_assertions": {
+    "supported_endpoint_and_region_required": false,
+    "event_configuration_depends_on_api_operation": false
+  }
+}

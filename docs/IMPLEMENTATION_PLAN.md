@@ -1,5 +1,26 @@
 # Implementation plan
 
+## Integrated financial pilot — bound evidence and authenticated acceptance
+
+Status: repository implementation complete; organization-owned live acceptance pending selection
+of the enterprise IdP, gateway workloads and downstream sandbox.
+
+- CI provisions disposable PostgreSQL 17, requires the migration/concurrency/integrated suite and
+  retains a metadata-only result summary that declares external boundaries simulated.
+- Strict profiles bind the OpenAI and Bedrock targets to exact terminal gateway provider, model,
+  deployment, organization condition assertions and policy version.
+- A non-mutating probe verifies the anonymous/runtime/operator/reconciler enterprise identity role
+  matrix using externally injected access tokens.
+- The integrated PostgreSQL suite composes API identity, Ed25519 decision/action/reconciliation
+  authority, both gateway providers, one state-changing attempt and both terminal recovery results.
+- The organization policy remains a draft until promoted through the existing signed release
+  workflow; false capability assertions fail closed.
+- Acceptance requires nine fresh, exact-scope metadata observations plus distinct role-bound
+  Ed25519 signatures from operations and the policy owner.
+
+The repository cannot supply enterprise credentials, select the organization reviewers, verify a
+real backup or claim live-provider acceptance. The runbook keeps those requirements explicit.
+
 ## Enterprise API identity — offline access-token JWT RBAC
 
 Status: implemented after the first state-changing sandbox connector.

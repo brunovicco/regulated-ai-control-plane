@@ -12,6 +12,24 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+        env:
+          POSTGRES_DB: regulaai_test
+          # Ephemeral CI service only; no production credentials or persistent volume.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d regulaai_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      REGULAAI_TEST_POSTGRES_URL: postgresql://postgres@127.0.0.1:5432/regulaai_test
+      REGULAAI_REQUIRE_POSTGRES_TESTS: "1"
+      PYTEST_ADDOPTS: --junitxml=/tmp/regulaai-pilot-pytest.xml
 
     steps:
       - name: Check out repository
@@ -34,3 +52,20 @@ jobs:
 
       - name: Project quality gate
         run: uv run python scripts/quality_gate.py
+
+      - name: Summarize financial pilot evidence
+        if: ${{ !cancelled() }}
+        run: >-
+          uv run python scripts/report_financial_pilot_ci.py
+          --junit /tmp/regulaai-pilot-pytest.xml
+          --source-revision "$GITHUB_SHA"
+          > /tmp/regulaai-pilot-ci.json
+
+      - name: Retain metadata-only pilot evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: financial-pilot-ci
+          path: /tmp/regulaai-pilot-ci.json
+          if-no-files-found: error
+          retention-days: 14

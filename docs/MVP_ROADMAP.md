@@ -375,7 +375,9 @@ the signed `cards.read` definition, exact workload identity and closed output bo
 adds separately authenticated, terminal resolution of ambiguous tool outcomes without reexecution.
 Phase 7d adds one non-production `cards.unblock` connector with exact idempotency-response binding
 and the existing recovery path. Together these capabilities extend the bounded controlled-pilot
-profile; production readiness is not claimed.
+profile. The integrated financial-pilot milestone now composes these boundaries with real
+PostgreSQL in CI, configurable enterprise identity, OpenAI and Bedrock profiles, reviewed policy and
+authenticated evidence acceptance. Production readiness is not claimed.
 
 Implemented in Phase 7a:
 - explicit gateway-mode requirement and one reviewed OpenAI capability target;
@@ -418,11 +420,19 @@ Implemented after Phase 7c:
   retained only for local/pilot compatibility.
 - Restricted EdDSA JWT access-token identity with pinned issuer/audience/JWKS and distinct runtime,
   operator and reconciler roles; production API startup fails closed when it is absent.
+- disposable PostgreSQL 17 in CI with mandatory concurrency and integrated composition cases;
+- strict OpenAI and Bedrock pilot profiles with terminal provider/model/deployment validation;
+- non-mutating enterprise role-matrix probe and a metadata-only CI evidence reducer;
+- exact-scope acceptance requiring all live checks and distinct operations/policy-owner Ed25519
+  reviews.
 
 Next:
-- exercise downstream idempotency and recovery cases in the controlled sandbox.
-- integrate and exercise token issuance, role mapping and signing-key rotation against the selected
+- select and exercise downstream idempotency and both recovery cases in the controlled sandbox.
+- select, integrate and exercise token issuance, role mapping and signing-key rotation against the
   enterprise identity provider.
+- replace provider-profile placeholders and run both reviewed gateway workloads.
+- promote the organization policy, verify PostgreSQL backup/restore and sign the exact acceptance
+  bundle.
 - production state-changing integration only after selecting and reviewing its concrete workload
   authorization and durable idempotency contract.
 - deployment-owned PostgreSQL, trust-store rotation, backup/restore, SLO and incident exercises.

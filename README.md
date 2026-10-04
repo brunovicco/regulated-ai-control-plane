@@ -159,9 +159,11 @@ Not supported:
 The [pilot release profile](docs/PILOT_RELEASE.md) defines verification, acceptance and rollout
 boundaries.
 
-The current source also includes the next production foundation: PostgreSQL persistence, versioned
-migrations and concurrency-safe multi-replica claims. It does not expand the tagged pilot's scope
-until deployment-owned TLS, backup/restore, SLO and acceptance evidence are complete.
+The current source also includes the next production foundation and an [integrated financial-pilot
+acceptance profile](docs/FINANCIAL_PILOT.md): PostgreSQL persistence, enterprise API identity,
+strict OpenAI/Bedrock gateway profiles, state-changing tool recovery and signed metadata evidence.
+The tagged pilot's scope remains unchanged, and organizational acceptance stays blocked until the
+deployment supplies its IdP, sandbox, policy review, backup/restore and live evidence.
 
 ## Repository map
 

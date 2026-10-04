@@ -1,19 +1,21 @@
-import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from alembic import command
-from alembic.config import Config
-from psycopg.conninfo import conninfo_to_dict
 
 from regulated_ai.adapters import (
+    ActionApprovalAssertionError,
+    Ed25519OperatorAuthorityVerifier,
     PostgresDatabase,
+    PostgresEd25519ActionApprovalAdapter,
+    PostgresEd25519ToolActionReconciliationAdapter,
     PostgresEnforcementRepository,
     PostgresHmacApprovalAdapter,
     PostgresToolActionRepository,
+    ToolActionReconciliationAssertionError,
 )
 from regulated_ai.domain import (
     ApprovalGrant,
@@ -24,35 +26,9 @@ from regulated_ai.domain import (
     ToolActionStatus,
 )
 
-_DATABASE_URL = os.environ.get("REGULAAI_TEST_POSTGRES_URL")
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skipif(
-        _DATABASE_URL is None,
-        reason="REGULAAI_TEST_POSTGRES_URL is not configured",
-    ),
-]
+from .pilot_support import PilotIssuer
 
-
-@pytest.fixture(scope="module")
-def database() -> PostgresDatabase:
-    assert _DATABASE_URL is not None
-    database_name = str(conninfo_to_dict(_DATABASE_URL).get("dbname") or "").casefold()
-    if "test" not in database_name:
-        raise RuntimeError("REGULAAI_TEST_POSTGRES_URL must name a dedicated test database")
-    configuration = Config("alembic.ini")
-    previous = os.environ.get("REGULAAI_DATABASE_URL")
-    os.environ["REGULAAI_DATABASE_URL"] = _DATABASE_URL
-    try:
-        command.upgrade(configuration, "head")
-    finally:
-        if previous is None:
-            os.environ.pop("REGULAAI_DATABASE_URL", None)
-        else:
-            os.environ["REGULAAI_DATABASE_URL"] = previous
-    configured = PostgresDatabase(_DATABASE_URL)
-    configured.verify_schema()
-    return configured
+pytestmark = pytest.mark.integration
 
 
 def test_enforcement_claim_has_one_winner_across_connections(
@@ -115,6 +91,87 @@ def test_decision_approval_consumption_and_claim_are_atomic(
     receipts = tuple(receipt for _record, _claimed, receipt in results if receipt is not None)
     assert len(receipts) == 1
     assert authority.get(grant.approval_id) == receipts[0]
+
+
+def test_signed_action_approval_is_consumed_by_one_concurrent_claim(
+    database: PostgresDatabase, tmp_path: Path
+) -> None:
+    issuer = PilotIssuer(tmp_path)
+    authority = PostgresEd25519ActionApprovalAdapter(
+        database, Ed25519OperatorAuthorityVerifier(issuer.trust_store)
+    )
+    repository = PostgresToolActionRepository(database)
+    suffix = uuid4().hex
+    record = repository.save(_action(f"act_{suffix}", f"enf_{suffix}"))
+    now = datetime.now(UTC)
+    grant = authority.inspect(
+        issuer.assertion("action_approval", record.action_digest),
+        action_digest=record.action_digest,
+        now=now,
+    )
+    dispatched = replace(record, status=ToolActionStatus.DISPATCHED)
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = tuple(
+            executor.map(
+                lambda _: authority.claim_execution(grant, record=dispatched, now=now), range(8)
+            )
+        )
+    assert sum(claimed for _, claimed, _ in results) == 1
+    assert authority.get(grant.approval_id) is not None
+    other = repository.save(_action(f"act_other_{suffix}", f"enf_other_{suffix}"))
+    with pytest.raises(ActionApprovalAssertionError):
+        authority.claim_execution(
+            grant, record=replace(other, status=ToolActionStatus.DISPATCHED), now=now
+        )
+    failed = repository.get(other.action_id)
+    assert failed is not None and failed.status is ToolActionStatus.APPROVAL_FAILED
+    with database.connect() as connection:
+        count = connection.execute(
+            "SELECT count(*) FROM operator_lifecycle_event "
+            "WHERE entity_id=%s AND status='DISPATCHED'",
+            (other.action_id,),
+        ).fetchone()
+    assert count == (0,)
+
+
+@pytest.mark.parametrize("outcome", ["EXECUTED", "NOT_EXECUTED"])
+def test_signed_reconciliation_is_atomic_idempotent_and_rejects_conflicting_outcome(
+    database: PostgresDatabase, tmp_path: Path, outcome: str
+) -> None:
+    issuer = PilotIssuer(tmp_path)
+    authority = PostgresEd25519ToolActionReconciliationAdapter(
+        database, Ed25519OperatorAuthorityVerifier(issuer.trust_store)
+    )
+    repository = PostgresToolActionRepository(database)
+    suffix = uuid4().hex
+    record = repository.save(
+        replace(
+            _action(f"act_{suffix}", f"enf_{suffix}"),
+            status=ToolActionStatus.RECONCILIATION_REQUIRED,
+        )
+    )
+    now = datetime.now(UTC)
+    grant = authority.inspect(
+        issuer.assertion("reconciliation", record.action_digest, outcome=outcome),
+        action_digest=record.action_digest,
+        now=now,
+    )
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = tuple(
+            executor.map(lambda _: authority.reconcile(grant, record=record, now=now), range(8))
+        )
+    assert all(item == results[0] for item in results)
+    assert results[0].status.value == f"RECONCILED_{outcome}"
+    other_outcome = "NOT_EXECUTED" if outcome == "EXECUTED" else "EXECUTED"
+    conflicting = authority.inspect(
+        issuer.assertion("reconciliation", record.action_digest, outcome=other_outcome),
+        action_digest=record.action_digest,
+        now=now,
+    )
+    with pytest.raises(ToolActionReconciliationAssertionError):
+        authority.reconcile(conflicting, record=record, now=now)
+    assert authority.get(conflicting.reconciliation_id) is None
+    assert repository.get(record.action_id) == results[0]
 
 
 def _enforcement(identifier: str) -> EnforcementRecord:

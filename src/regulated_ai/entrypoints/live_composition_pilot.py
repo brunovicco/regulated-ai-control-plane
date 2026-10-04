@@ -7,8 +7,11 @@ import os
 import re
 import sys
 from collections.abc import Sequence
+from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
+from regulated_ai.adapters.pilot_profile import FinancialPilotProfile, load_pilot_profile
 from regulated_ai.domain import (
     AssuranceLevel,
     DataClassification,
@@ -18,7 +21,6 @@ from regulated_ai.domain import (
     EvaluationContext,
     Jurisdiction,
     ObligationType,
-    ProviderTarget,
     Purpose,
     Sector,
 )
@@ -39,6 +41,7 @@ def run_live_composition_pilot(
     runtime: Runtime,
     *,
     correlation_id: str,
+    profile: FinancialPilotProfile | None = None,
 ) -> dict[str, object]:
     """Execute one fixed synthetic inference and return metadata-only proof."""
     if _SAFE_CORRELATION_ID.fullmatch(correlation_id) is None:
@@ -46,7 +49,8 @@ def run_live_composition_pilot(
     if runtime.mock_execution is not None:
         raise LiveCompositionPilotError("Pilot requires gateway execution mode")
 
-    result = runtime.enforcer.execute(_pilot_context(correlation_id))
+    selected = profile or _demo_profile()
+    result = runtime.enforcer.execute(_pilot_context(correlation_id, selected))
     metadata = result.provider_call_metadata
     if (
         result.decision is not DecisionOutcome.ALLOW_WITH_TRANSFORMATION
@@ -55,7 +59,13 @@ def run_live_composition_pilot(
         or result.provider_execution_id is None
         or not result.provider_execution_id.startswith("gw_")
         or metadata is None
-        or metadata.provider != "openai"
+        or metadata.provider != selected.gateway_provider
+        or metadata.cached
+        or (selected.gateway_model is not None and metadata.model != selected.gateway_model)
+        or (
+            selected.gateway_deployment is not None
+            and metadata.deployment != selected.gateway_deployment
+        )
         or result.tool_proposals
         or len(result.transformation_receipts) != 1
         or result.transformation_receipts[0].target != "customer_document"
@@ -68,7 +78,7 @@ def run_live_composition_pilot(
         timeline.enforcement_id != result.enforcement_id
         or timeline.evidence_id != result.evaluation_evidence_id
         or timeline.correlation_id != correlation_id
-        or timeline.provider_target != "openai.responses_api.global"
+        or timeline.provider_target != selected.target.identifier
         or not timeline.provider_context_complete
         or not timeline.history_complete
         or timeline.attention_codes
@@ -80,8 +90,12 @@ def run_live_composition_pilot(
         raise LiveCompositionPilotError("Pilot operator timeline is inconsistent")
 
     core: dict[str, object] = {
-        "schema_version": "1",
+        "schema_version": "2",
         "status": "LIVE_COMPOSITION_VERIFIED",
+        "observed_at": datetime.now(UTC).isoformat(),
+        "profile_digest": selected.digest,
+        "provider_profile": selected.provider,
+        "policy_set_version": selected.policy_set_version,
         "correlation_id": correlation_id,
         "control_pack": {
             "id": runtime.control_pack.pack_id,
@@ -143,6 +157,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Build the configured runtime and print one metadata-only pilot report."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--correlation-prefix", default="pilot")
+    parser.add_argument("--profile", type=Path, help="Reviewed non-secret financial pilot JSON")
     args = parser.parse_args(argv)
 
     if os.environ.get("REGULAAI_EXECUTION_MODE", "mock").strip().casefold() != "gateway":
@@ -155,7 +170,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
-    if not os.environ.get("REGULAAI_EVIDENCE_DB", "").strip():
+    if not any(
+        os.environ.get(name, "").strip()
+        for name in ("REGULAAI_EVIDENCE_DB", "REGULAAI_DATABASE_URL")
+    ):
         print(
             "Live composition pilot failed: a dedicated evidence database is required",
             file=sys.stderr,
@@ -164,6 +182,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     runtime: Runtime | None = None
     try:
+        profile = load_pilot_profile(args.profile) if args.profile is not None else _demo_profile()
+        if args.profile is not None and (
+            os.environ.get("REGULAAI_GATEWAY_ALLOWED_TARGET") != profile.target.identifier
+            or os.environ.get("REGULAAI_GATEWAY_EXPECTED_PROVIDER") != profile.gateway_provider
+            or profile.gateway_model is None
+            or profile.gateway_deployment is None
+        ):
+            raise LiveCompositionPilotError("Pilot and gateway bindings differ")
         configure_logging(
             service="regulaai-live-composition-pilot",
             environment=environment,
@@ -172,7 +198,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         runtime = build_runtime()
         correlation_id = f"{args.correlation_prefix}-{uuid4().hex}"
-        report = run_live_composition_pilot(runtime, correlation_id=correlation_id)
+        report = run_live_composition_pilot(runtime, correlation_id=correlation_id, profile=profile)
     except Exception as exc:
         print(f"Live composition pilot failed closed ({type(exc).__name__})", file=sys.stderr)
         return 1
@@ -185,7 +211,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
-def _pilot_context(correlation_id: str) -> EvaluationContext:
+def _demo_profile() -> FinancialPilotProfile:
+    return FinancialPilotProfile(
+        profile_id="legacy-openai-demo",
+        provider="openai",
+        gateway_provider="openai",
+        policy_set_version="br-financial-demo@1.0.0",
+        organization_assertions={
+            "eligible_organization_required": True,
+            "endpoint_or_feature_must_be_zdr_eligible": True,
+        },
+    )
+
+
+def _pilot_context(correlation_id: str, profile: FinancialPilotProfile) -> EvaluationContext:
     return EvaluationContext(
         correlation_id=correlation_id,
         jurisdiction=Jurisdiction("BR"),
@@ -193,7 +232,7 @@ def _pilot_context(correlation_id: str) -> EvaluationContext:
         purpose=Purpose("customer_support"),
         operation_kind="external_inference",
         assurance_level=AssuranceLevel.HIGH,
-        provider=ProviderTarget(provider="openai", service="responses_api", region="global"),
+        provider=profile.target,
         data_items=(
             DataItem(
                 field="customer_document",
@@ -203,11 +242,8 @@ def _pilot_context(correlation_id: str) -> EvaluationContext:
             DataItem(field="question", value=_SYNTHETIC_QUESTION),
         ),
         tools=(),
-        policy_set_version="br-financial-demo@1.0.0",
-        organization_assertions=(
-            ("eligible_organization_required", True),
-            ("endpoint_or_feature_must_be_zdr_eligible", True),
-        ),
+        policy_set_version=profile.policy_set_version,
+        organization_assertions=tuple(sorted(profile.organization_assertions.items())),
         fallback_providers=(),
     )
 

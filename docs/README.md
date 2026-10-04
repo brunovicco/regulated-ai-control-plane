@@ -9,7 +9,7 @@ what you want to understand or accomplish—not the order in which features were
 | --- | --- |
 | Understand the product | [Project context](PROJECT_CONTEXT.md) → [Product vision](PRODUCT_VISION.md) |
 | See the system in action | [Guided local demo](DEMO.md) |
-| Evaluate the pilot | [Controlled pilot release profile](PILOT_RELEASE.md) → [Live composition pilot](LIVE_COMPOSITION_PILOT.md) |
+| Evaluate the pilot | [Integrated financial pilot](FINANCIAL_PILOT.md) → [Controlled pilot release profile](PILOT_RELEASE.md) |
 | Understand the design | [Architecture](ARCHITECTURE.md) → [Product architecture](PRODUCT_ARCHITECTURE.md) |
 | Integrate with the API | [API contract](API_CONTRACT.md) → [Domain model](DOMAIN_MODEL.md) |
 | Review security and privacy | [Threat model](THREAT_MODEL.md) → [Privacy model](PRIVACY.md) |
@@ -46,6 +46,8 @@ what you want to understand or accomplish—not the order in which features were
 - [Tool-action reconciliation](TOOL_ACTION_RECONCILIATION.md): authenticated terminal resolution
   of ambiguous outcomes without reexecution.
 - [Live composition pilot](LIVE_COMPOSITION_PILOT.md): fixed-synthetic provider integration proof.
+- [Integrated financial pilot](FINANCIAL_PILOT.md): PostgreSQL, identity, both providers, tool
+  recovery, policy review and authenticated acceptance.
 - [MCP configuration](MCP.md): local MCP security policy and validation.
 
 ## Security, privacy and observability
