@@ -84,7 +84,7 @@ docker run -d \
   -p 127.0.0.1:55432:5432 \
   --env-file "$REGULAAI_POC_HOME/config/postgres.env" \
   --mount source=regulaai-poc-postgres,target=/var/lib/postgresql/data \
-  postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+  public.ecr.aws/docker/library/postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
 ```
 
 Wait for `pg_isready`, construct the application URL from the protected password and apply the
