@@ -6,6 +6,9 @@ terminal recovery, a technically reviewed PoC policy and metadata-only evidence.
 result is `POC_VERIFIED`: it is not independent review, organizational acceptance, production
 authorization or a compliance claim.
 
+Use the [detailed PoC execution guide](POC_EXECUTION_GUIDE.md) to configure Keycloak, both provider
+workloads, the stateful tool sandbox, PostgreSQL recovery and the two final signatures.
+
 The future organization-owned profile remains separate in [Enterprise financial pilot
 profile](ENTERPRISE_FINANCIAL_PILOT.md) and `examples/financial-pilot-enterprise/`.
 
