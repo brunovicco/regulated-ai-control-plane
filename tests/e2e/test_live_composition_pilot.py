@@ -161,6 +161,7 @@ def test_live_composition_cli_requires_dedicated_evidence_database(
     monkeypatch.setenv("REGULAAI_EXECUTION_MODE", "gateway")
     monkeypatch.setenv("REGULAAI_ENVIRONMENT", "pilot")
     monkeypatch.delenv("REGULAAI_EVIDENCE_DB", raising=False)
+    monkeypatch.delenv("REGULAAI_DATABASE_URL", raising=False)
 
     assert main([]) == 1
 

@@ -6,6 +6,12 @@ FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa /uv /uvx /bin/
 
+# The locked gateway client is sourced from a fixed Git commit. Keep Git in the disposable
+# builder stage only; it is not copied into the runtime image.
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
@@ -30,6 +36,10 @@ RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home a
 WORKDIR /app
 
 COPY --from=builder --chown=app:app /app /app
+
+# Local/default mode writes only the metadata database beneath /app/var. Keep the application
+# tree read-only for the non-root runtime user and grant write access only to that directory.
+RUN mkdir -p /app/var && chown app:app /app/var
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
